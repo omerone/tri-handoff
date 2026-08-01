@@ -16,7 +16,9 @@ export default defineConfig({
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile', use: { ...devices['iPhone 13'] } },
+    // Pixel 7 rather than an iPhone so the suite needs only the Chromium download; the
+    // point here is the 412px viewport, not the engine.
+    { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
     command: `npm run build && npm run start -- --port ${PORT}`,

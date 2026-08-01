@@ -12,3 +12,6 @@ export { makeTenantContext } from './context';
 export * from './tenants';
 export * from './users';
 export * from './provisioning';
+export * from './sessions';
+export * from './reset-tokens';
+export * from './rate-limit';

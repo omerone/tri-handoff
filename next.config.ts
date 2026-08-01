@@ -6,7 +6,9 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  output: 'standalone',
+  // Standalone output is what the Docker image ships; `next start` warns about it, so it is
+  // opt-in via NEXT_OUTPUT (set in the Dockerfile) and off for local runs and e2e.
+  output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined,
   serverExternalPackages: ['@node-rs/argon2', 'nodemailer'],
   eslint: {
     // Linting is a separate step in `npm run check`; don't run it twice during build.

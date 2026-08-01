@@ -12,6 +12,7 @@ RUN npm ci
 
 # ---------- build ----------
 FROM base AS builder
+ENV NEXT_OUTPUT=standalone
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate && npm run build
