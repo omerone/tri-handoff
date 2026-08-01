@@ -1,0 +1,432 @@
+// TRi — data model
+//
+// Multi-tenancy: one row in `tenants` per paying client, one `users` row per tenant
+// (SPEC §2: "משתמש יחיד בכל דומיין"). Every row that carries user data hangs off `users`,
+// which is why `user_id` is the scoping key on the leaf tables and `tenant_id` is unique
+// on `users`. The repositories in src/lib/db resolve tenant → user once and then scope
+// every query by `user_id`; nothing outside that directory is allowed to touch Prisma.
+//
+// Money and prices are `Decimal` in the database so nothing is lost on the way in. The
+// repositories convert to `number` at the boundary, because the analytics engine is pure
+// arithmetic over JS numbers and the magnitudes involved (retail trading account P&L) are
+// far inside the safe-integer range.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy & identity
+// ---------------------------------------------------------------------------
+
+enum TenantStatus {
+  active
+  suspended
+}
+
+model Tenant {
+  id        String       @id @default(cuid())
+  name      String
+  /// Fully-qualified host, lowercased, no scheme and no trailing dot.
+  /// The middleware matches the incoming Host header against this exactly.
+  domain    String       @unique
+  status    TenantStatus @default(active)
+  notes     String?
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  user User?
+
+  @@index([status])
+  @@map("tenants")
+}
+
+enum Locale {
+  he
+  en
+}
+
+model User {
+  id       String @id @default(cuid())
+  /// Unique: one trader per tenant domain.
+  tenantId String @unique @map("tenant_id")
+
+  email           String
+  passwordHash    String @map("password_hash")
+  locale          Locale @default(he)
+  /// ISO-4217 code the UI renders figures in. Trading data arrives in the MT5 account
+  /// currency and finance data in ILS; both are converted for display.
+  displayCurrency String @default("ILS") @map("display_currency")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sessions       Session[]
+  resetTokens    PasswordResetToken[]
+  mt5Account     Mt5Account?
+  trades         Trade[]
+  financeEntries FinanceEntry[]
+  longPositions  LongPosition[]
+  syncLogs       SyncLog[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+model Session {
+  id String @id @default(cuid())
+
+  userId     String   @map("user_id")
+  /// SHA-256 of the cookie value. The raw token never touches the database, so a dump
+  /// of this table cannot be replayed as a login.
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  ip         String?
+  userAgent  String?  @map("user_agent")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id String @id @default(cuid())
+
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model SuperAdmin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  sessions SuperAdminSession[]
+
+  @@map("super_admins")
+}
+
+model SuperAdminSession {
+  id String @id @default(cuid())
+
+  superAdminId String   @map("super_admin_id")
+  tokenHash    String   @unique @map("token_hash")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  superAdmin SuperAdmin @relation(fields: [superAdminId], references: [id], onDelete: Cascade)
+
+  @@index([superAdminId])
+  @@map("super_admin_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// MT5
+// ---------------------------------------------------------------------------
+
+enum Mt5Status {
+  /// Credentials stored, never successfully verified yet.
+  pending
+  connected
+  /// Last sync failed; see the newest SyncLog row for the reason.
+  error
+  disconnected
+}
+
+model Mt5Account {
+  id String @id @default(cuid())
+
+  /// Unique: SPEC §3.3 — exactly one MT5 account per user.
+  userId String @unique @map("user_id")
+
+  login  String
+  server String
+
+  /// AES-256-GCM ciphertext of the **investor (read-only)** password, encoded as
+  /// iv:authTag:ciphertext in base64. Never logged, never sent to the client, and never
+  /// returned by a repository — only src/lib/mt5 decrypts it.
+  investorPwEncrypted String @map("investor_pw_encrypted")
+
+  status     Mt5Status @default(pending)
+  lastSyncAt DateTime? @map("last_sync_at")
+
+  /// Account state from the last successful sync, in the account's own currency.
+  accountCurrency String?  @map("account_currency")
+  balance         Decimal? @db.Decimal(20, 8)
+  equity          Decimal? @db.Decimal(20, 8)
+
+  /// Provider-side identifier (e.g. the MetaApi account id) when the provider keeps its
+  /// own record of the connection.
+  providerAccountId String? @map("provider_account_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("mt5_accounts")
+}
+
+// ---------------------------------------------------------------------------
+// Trades
+// ---------------------------------------------------------------------------
+
+enum AssetClass {
+  forex
+  crypto
+  indices
+  stocks
+  /// SPEC §3.5 lists סחורות (commodities) as a dimension; the prototype folded gold into
+  /// forex. Classified from the symbol by src/lib/mt5/symbols.ts.
+  commodities
+  other
+}
+
+enum Direction {
+  long
+  short
+}
+
+enum TradeStyle {
+  day
+  swing
+}
+
+enum DealKind {
+  /// A real market position. Only these feed the analytics engine.
+  trade
+  /// Deposit or withdrawal (SPEC §3.2). Stored so the balance view can show cash flow,
+  /// excluded from every performance metric.
+  balance
+  credit
+  correction
+}
+
+model Trade {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+
+  /// MT5 position/deal ticket. Kept as text: tickets are 64-bit and we never do arithmetic
+  /// on them. Together with user_id this is the idempotency key for sync.
+  ticket String
+
+  kind DealKind @default(trade)
+
+  symbol     String
+  assetClass AssetClass @map("asset_class")
+  direction  Direction
+  style      TradeStyle
+
+  openAt  DateTime  @map("open_at")
+  closeAt DateTime? @map("close_at")
+
+  volume     Decimal  @db.Decimal(20, 8)
+  entryPrice Decimal  @map("entry_price") @db.Decimal(20, 8)
+  exitPrice  Decimal? @map("exit_price") @db.Decimal(20, 8)
+  sl         Decimal? @db.Decimal(20, 8)
+  tp         Decimal? @db.Decimal(20, 8)
+
+  commission Decimal @default(0) @db.Decimal(20, 8)
+  swap       Decimal @default(0) @db.Decimal(20, 8)
+  /// Net result in the account currency, commission and swap already included.
+  profit     Decimal @db.Decimal(20, 8)
+
+  /// risk = |entry_price − sl| × contractValue(symbol) × volume, in account currency.
+  /// NULL when the trade carried no stop loss or the symbol's contract spec is unknown.
+  risk Decimal? @db.Decimal(20, 8)
+  /// rr = profit / risk. NULL exactly when `risk` is NULL — such trades are excluded
+  /// from every RR aggregate and counted against RR coverage instead.
+  rr   Decimal? @db.Decimal(20, 8)
+
+  /// Per-trade journal (SPEC §1.1, adopted from tradeReport). Columns land in P1 so no
+  /// migration is needed later; the editing UI is milestone 1.9.
+  note     String?
+  tags     String[] @default([])
+  rating   Int?
+  mood     String?
+  strategy String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ticket])
+  @@index([userId, closeAt])
+  @@index([userId, kind, closeAt])
+  @@index([userId, assetClass])
+  @@index([userId, direction])
+  @@index([userId, style])
+  @@map("trades")
+}
+
+// ---------------------------------------------------------------------------
+// Personal finance
+// ---------------------------------------------------------------------------
+
+enum FinanceType {
+  income
+  expense
+}
+
+model FinanceEntry {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+
+  type     FinanceType
+  category String      @default("other")
+  label    String
+
+  /// Personal finance is ILS-native (SPEC §3.1); display conversion happens at render time.
+  amountIls Decimal @map("amount_ils") @db.Decimal(14, 2)
+
+  entryDate DateTime @map("entry_date") @db.Date
+
+  isRecurring    Boolean   @default(false) @map("is_recurring")
+  /// Optional end of a recurring series; NULL means "until removed".
+  recurringUntil DateTime? @map("recurring_until") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, entryDate])
+  @@index([userId, type])
+  @@map("finance_entries")
+}
+
+// ---------------------------------------------------------------------------
+// Manual long-term positions
+// ---------------------------------------------------------------------------
+
+model LongPosition {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+
+  symbol String
+  qty    Decimal @db.Decimal(20, 8)
+
+  buyPrice Decimal  @map("buy_price") @db.Decimal(20, 8)
+  buyDate  DateTime @map("buy_date") @db.Date
+
+  /// Latest **per-unit** price, entered by hand (SPEC §3.4 — no market-data feed).
+  /// The brief calls this `current_value`; it is stored per unit rather than as a position
+  /// total because that is what the prototype's update field takes and what the user reads
+  /// off their broker. Position value is `currentPrice × qty`.
+  currentPrice   Decimal  @map("current_price") @db.Decimal(20, 8)
+  valueUpdatedAt DateTime @map("value_updated_at")
+
+  fees Decimal @default(0) @db.Decimal(20, 8)
+
+  /// Currency the position is priced in.
+  currency String @default("USD")
+
+  realizedPnl Decimal?  @map("realized_pnl") @db.Decimal(20, 8)
+  closedAt    DateTime? @map("closed_at")
+
+  note String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, closedAt])
+  @@map("long_positions")
+}
+
+// ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+enum SyncStatus {
+  running
+  success
+  error
+}
+
+enum SyncTrigger {
+  login
+  manual
+  admin
+  backfill
+}
+
+model SyncLog {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  status  SyncStatus  @default(running)
+  trigger SyncTrigger @default(login)
+
+  tradesImported Int @default(0) @map("trades_imported")
+  tradesUpdated  Int @default(0) @map("trades_updated")
+
+  /// Operator-facing failure reason. Must never contain credentials.
+  error String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+  @@map("sync_logs")
+}
+
+model FxRate {
+  id String @id @default(cuid())
+
+  base  String
+  quote String
+  rate  Decimal @db.Decimal(20, 10)
+
+  /// The rate's own date, as published. Daily granularity is enough (SPEC §3.1).
+  asOf      DateTime @map("as_of") @db.Date
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@unique([base, quote, asOf])
+  @@index([base, quote, asOf])
+  @@map("fx_rates")
+}
+
+/// Fixed-window counters for login, password reset and sync. Kept in the database rather
+/// than in memory so the limit still holds when the app runs more than one instance.
+model RateLimit {
+  id String @id @default(cuid())
+
+  /// "<bucket>:<subject>", e.g. "login:demo.tri.app|user@example.com".
+  key         String   @unique
+  count       Int      @default(0)
+  windowStart DateTime @map("window_start")
+  expiresAt   DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("rate_limits")
+}
