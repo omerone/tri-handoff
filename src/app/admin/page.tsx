@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { requireAdmin } from '@/lib/auth/admin-session';
-import { listTenants } from '@/lib/db';
+import { listTenants } from '@/lib/db/unscoped';
 import { adminSignOutAction, setTenantStatusAction } from './actions';
 import { CreateTenantForm } from './create-tenant-form';
 

@@ -24,8 +24,25 @@ https:// {
 		-Server
 	}
 
-	reverse_proxy app:3000 {
-		header_up X-Forwarded-Host {host}
-		header_up X-Real-IP {remote_host}
+	# The on-demand TLS "ask" endpoint answers 200 for an active tenant domain and 404
+	# otherwise, which makes it a client-enumeration oracle. Caddy reaches it directly over
+	# the compose network, so it has no business being reachable from the internet.
+	handle /api/tls/allow* {
+		respond 404
+	}
+
+	handle {
+		reverse_proxy app:3000 {
+			# X-Forwarded-Host is *set*, so the app's tenant resolution and Next's server-action
+			# origin check both see the real host.
+			header_up X-Forwarded-Host {host}
+
+			# Both of these are overwritten rather than appended. Caddy's default behaviour is
+			# to append the client address to whatever X-Forwarded-For the client sent, which
+			# would let a caller put any value in front of their own and defeat every per-IP
+			# rate limit by rotating it. {remote_host} is the socket peer and cannot be forged.
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Real-IP {remote_host}
+		}
 	}
 }

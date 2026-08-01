@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
-import { makeTenantContext } from '@/lib/db';
+import { makeTenantContext } from '@/lib/db/unscoped';
 import type { TenantContext } from '@/lib/tenant/context';
 
 /**

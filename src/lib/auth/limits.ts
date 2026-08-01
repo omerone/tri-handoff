@@ -13,14 +13,31 @@ export const LIMITS = {
   resetPerAccount: { limit: 5, windowMs: 60 * 60 * 1000 },
   resetPerIp: { limit: 15, windowMs: 60 * 60 * 1000 },
   syncManual: { limit: 6, windowMs: 5 * 60 * 1000 },
+  /**
+   * Operator login is tighter than a client's: there is no self-service reset behind it,
+   * compromising it exposes every client, and legitimate use is a handful of sign-ins a
+   * week. Per-account as well as per-IP, so rotating source addresses does not buy an
+   * attacker an unlimited guess budget.
+   */
+  adminLoginPerAccount: { limit: 5, windowMs: 15 * 60 * 1000 },
+  adminLoginPerIp: { limit: 10, windowMs: 15 * 60 * 1000 },
 } as const;
 
-/** Best-effort client address. Behind Caddy this is the first hop of X-Forwarded-For. */
+/**
+ * Client address, for per-IP buckets.
+ *
+ * `X-Real-Ip` first, and it is not a stylistic preference. Caddy sets it from `{remote_host}`
+ * — the socket peer, which the caller cannot choose. `X-Forwarded-For` is a list a client is
+ * free to prepend to, and a proxy that appends rather than overwrites will happily pass the
+ * forged entry through; taking `split(',')[0]` off it hands an attacker a fresh rate-limit
+ * bucket per request, which is the same as having no rate limit. The Caddyfile now
+ * overwrites both headers, so the fallback is only reached in a direct-to-app dev run.
+ */
 export async function clientIp(): Promise<string> {
   const store = await headers();
-  const forwarded = store.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0]?.trim() || 'unknown';
-  return store.get('x-real-ip')?.trim() || 'unknown';
+  const real = store.get('x-real-ip')?.trim();
+  if (real) return real;
+  return store.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }
 
 export function limitKey(bucket: string, ...parts: string[]): string {

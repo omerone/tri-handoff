@@ -1,5 +1,9 @@
 import { assertAdminHost } from '@/lib/auth/admin-session';
 
+/** Tenant-scoped: never prerender. See the note in src/app/(app)/layout.tsx. */
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Operator panel. English-only on purpose: the he/en requirement in SPEC §4 is about the
  * client-facing product, and this screen has exactly one audience. P4 can revisit if the

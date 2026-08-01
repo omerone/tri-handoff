@@ -14,8 +14,19 @@ import { safeEqual } from '@/lib/crypto/secretbox';
 export const SESSION_COOKIE = 'tri_session';
 export const ADMIN_SESSION_COOKIE = 'tri_admin_session';
 
-/** 30 days, refreshed on use. */
+/**
+ * Session lifetime lives in the database, not in the cookie.
+ *
+ * `SESSION_TTL_MS` is the authority: 30 days of inactivity ends the session, and every use
+ * pushes it out again. The cookie cannot carry that, because a rolling expiry would mean
+ * re-issuing it on every page render — and cookies can only be written from a server action
+ * or route handler, never from the layout that reads the session. So the cookie is given the
+ * longest max-age browsers honour and acts purely as transport; `findSession` filters on
+ * `expiresAt`, so a cookie that outlives its row authenticates nothing.
+ */
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** Chrome caps cookie lifetime at 400 days and silently clamps anything longer. */
+export const SESSION_COOKIE_MAX_AGE_MS = 400 * 24 * 60 * 60 * 1000;
 /** Rewrite the expiry at most once a day, to avoid a write on every request. */
 export const SESSION_REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
 

@@ -14,7 +14,22 @@ export type ProvisionInput = {
 
 export type ProvisionResult =
   | { ok: true; tenantId: string; userId: string; domain: string }
-  | { ok: false; reason: 'invalid-domain' | 'domain-taken' };
+  | { ok: false; reason: 'invalid-domain' | 'domain-taken' | 'reserved-domain' };
+
+/**
+ * Hosts a client may not be given.
+ *
+ * The platform's own base domain serves the operator panel. Handing it to a client would put
+ * their app and `/admin` on one origin, where they share a cookie jar and the host check
+ * that hides the panel from clients stops meaning anything.
+ *
+ * Read straight from `process.env` rather than through `env()` so this module stays usable
+ * from the provisioning CLI, which runs without the app's full configuration.
+ */
+function reservedDomains(): string[] {
+  const base = process.env.APP_BASE_DOMAIN;
+  return base ? [normalizeDomain(base)].filter(Boolean) : [];
+}
 
 /**
  * Creates a client: one tenant plus its single user, in one transaction so a half-created
@@ -24,6 +39,7 @@ export type ProvisionResult =
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
   const domain = normalizeDomain(input.domain);
   if (!isValidDomain(domain)) return { ok: false, reason: 'invalid-domain' };
+  if (reservedDomains().includes(domain)) return { ok: false, reason: 'reserved-domain' };
 
   const existing = await prisma.tenant.findUnique({ where: { domain }, select: { id: true } });
   if (existing) return { ok: false, reason: 'domain-taken' };

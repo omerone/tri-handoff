@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { findUserForLogin, lookupTenantByDomain, provisionTenant } from '@/lib/db';
+import { findUserForLogin, lookupTenantByDomain, provisionTenant } from '@/lib/db/unscoped';
 import { cleanup, reserveDomain, testDb } from '../helpers/fixtures';
 
 /**

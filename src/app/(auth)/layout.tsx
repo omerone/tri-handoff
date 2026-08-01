@@ -5,6 +5,10 @@ import { LanguageToggle } from '@/components/shell/language-toggle';
 import type { Locale } from '@/i18n/config';
 import { getSession } from '@/lib/auth/session';
 
+/** Tenant-scoped: never prerender. See the note in src/app/(app)/layout.tsx. */
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Sign-in, forgot-password and reset all share this frame. Anyone who already has a valid
  * session is sent straight to the dashboard.

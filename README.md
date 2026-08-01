@@ -81,8 +81,9 @@ the server request certificates for domains it doesn't serve.
 
 | Area | Where | Note |
 |---|---|---|
-| Tenant resolution | `src/middleware.ts` → `src/lib/tenant/resolve.ts` | Edge middleware normalises the host and sets `x-tri-host` (stripping any client-supplied value); the Node side looks it up, request-cached |
-| Data access | `src/lib/db/**` | The only place Prisma is imported. Every repository takes a branded `TenantContext`; ESLint fails the build if anything else imports the client |
+| Tenant resolution | `src/lib/tenant/resolve.ts` | Derives the host from the proxy headers itself. The middleware also strips and rewrites `x-tri-host`, but the boundary does not depend on the `matcher` regex being exhaustive |
+| Data access | `src/lib/db/**` | The only place Prisma is imported. `@/lib/db` exports only functions that take a branded `TenantContext`; the primitives that cannot (login, reset redemption, operator tooling) live in `@/lib/db/unscoped`, which ESLint restricts to the modules that establish identity |
+| CSP | `src/middleware.ts` | Per-request nonce with `strict-dynamic`, so `script-src` is real rather than `unsafe-inline` |
 | Auth | `src/lib/auth/**` | argon2id, HMAC-signed session cookie over a random token, sessions scoped to the tenant that issued them |
 | Secrets | `src/lib/crypto/secretbox.ts` | AES-256-GCM envelope for the MT5 investor password |
 | Design tokens | `src/app/globals.css` | CSS variables, so the light theme in SPEC §1.1 is a drop-in |
@@ -91,10 +92,20 @@ the server request certificates for domains it doesn't serve.
 ## Deployment
 
 `docker compose up -d --build` brings up Postgres, the app and Caddy. The app container runs
-`prisma migrate deploy` on boot. Set `APP_PROTOCOL=https`, a real `APP_BASE_DOMAIN`, and
-`ACME_EMAIL` for Let's Encrypt.
+`prisma migrate deploy` on boot. Set `POSTGRES_PASSWORD` (no default — compose refuses to
+start without it), `APP_PROTOCOL=https`, a real `APP_BASE_DOMAIN`, and `ACME_EMAIL` for
+Let's Encrypt.
+
+Caddy overwrites `X-Forwarded-For` and `X-Real-Ip` with the socket peer rather than
+appending, so a client cannot prepend a value and hand itself a fresh rate-limit bucket per
+request. Per-IP limits are only meaningful behind that. It also 404s `/api/tls/allow`
+publicly — Caddy reaches it over the compose network, and exposed it would answer "is this
+domain a client?" to anyone.
 
 Rotating `ENCRYPTION_KEY` makes stored MT5 passwords unreadable — users have to reconnect.
+
+Expired `sessions` and `rate_limits` rows are swept hourly from inside the app
+(`src/instrumentation.ts`); there is no cron container to configure.
 
 ## Status
 

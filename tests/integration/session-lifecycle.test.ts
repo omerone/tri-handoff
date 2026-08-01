@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { hashToken } from '@/lib/crypto/tokens';
+import { pruneExpiredSessions } from '@/lib/db';
 import {
   createSession,
   deleteSession,
   deleteUserSessions,
   findSession,
-  pruneExpiredSessions,
   touchSession,
-} from '@/lib/db';
+} from '@/lib/db/unscoped';
 import { cleanup, createTenantFixture, testDb, type Fixture } from '../helpers/fixtures';
 
 /**

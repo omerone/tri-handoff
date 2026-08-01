@@ -55,7 +55,8 @@ const createSession = vi.fn();
 const touchSession = vi.fn();
 const deleteSession = vi.fn();
 
-vi.mock('@/lib/db', async () => ({
+// Session storage lives in the unscoped module — it runs before a TenantContext exists.
+vi.mock('@/lib/db/unscoped', async () => ({
   // The real branded-context constructor: its validation is part of what getSession relies on.
   ...(await vi.importActual<typeof DbContext>('@/lib/db/context')),
   findSession: (...args: [string, string]) => findSession(...args),
@@ -67,6 +68,7 @@ vi.mock('@/lib/db', async () => ({
 const { hashToken } = await import('@/lib/crypto/tokens');
 const {
   SESSION_COOKIE,
+  SESSION_COOKIE_MAX_AGE_MS,
   SESSION_REFRESH_AFTER_MS,
   SESSION_TTL_MS,
   packCookie,
@@ -240,8 +242,13 @@ describe('startSession', () => {
       httpOnly: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: SESSION_TTL_MS / 1000,
+      // The cookie deliberately outlives the session row. Expiry is enforced in the database
+      // so it can roll on activity; a cookie cannot, because it can only be written from a
+      // server action, never from the layout that reads the session. A cookie that outlives
+      // its row authenticates nothing — findSession filters on expiresAt.
+      maxAge: SESSION_COOKIE_MAX_AGE_MS / 1000,
     });
+    expect(SESSION_COOKIE_MAX_AGE_MS).toBeGreaterThan(SESSION_TTL_MS);
   });
 
   it('records the first forwarded hop as the client address', async () => {

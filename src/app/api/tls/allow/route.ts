@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { isProvisionedDomain } from '@/lib/db';
+import { isProvisionedDomain } from '@/lib/db/unscoped';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

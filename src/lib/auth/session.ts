@@ -9,13 +9,14 @@ import {
   findSession,
   makeTenantContext,
   touchSession,
-} from '@/lib/db';
+} from '@/lib/db/unscoped';
 import type { TenantSession } from '@/lib/tenant/context';
 import { resolveTenant } from '@/lib/tenant/resolve';
 import {
   cookieOptions,
   packCookie,
   SESSION_COOKIE,
+  SESSION_COOKIE_MAX_AGE_MS,
   SESSION_REFRESH_AFTER_MS,
   SESSION_TTL_MS,
   unpackCookie,
@@ -76,7 +77,7 @@ export async function startSession(userId: string): Promise<void> {
   });
 
   const store = await cookies();
-  store.set(SESSION_COOKIE, packCookie(token), cookieOptions(SESSION_TTL_MS / 1000));
+  store.set(SESSION_COOKIE, packCookie(token), cookieOptions(SESSION_COOKIE_MAX_AGE_MS / 1000));
 }
 
 export async function endSession(): Promise<void> {

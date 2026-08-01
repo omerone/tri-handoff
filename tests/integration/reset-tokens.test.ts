@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { generateToken, hashToken } from '@/lib/crypto/tokens';
-import { consumeResetToken, createResetToken, findValidResetToken } from '@/lib/db';
+import { consumeResetToken, createResetToken, findValidResetToken } from '@/lib/db/unscoped';
 import { cleanup, createTenantFixture, testDb, type Fixture } from '../helpers/fixtures';
 
 /**

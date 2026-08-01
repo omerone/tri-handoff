@@ -1,11 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  findUserForLogin,
-  getUser,
-  lookupTenantByDomain,
-  provisionTenant,
-  updateUserPreferences,
-} from '@/lib/db';
+import { getUser, updateUserPreferences } from '@/lib/db';
+import { findUserForLogin, lookupTenantByDomain, provisionTenant } from '@/lib/db/unscoped';
 import { assertContext, makeTenantContext } from '@/lib/db/context';
 import { cleanup, createTenantFixture, crossTenantContext, testDb, type Fixture } from '../helpers/fixtures';
 

@@ -3,7 +3,7 @@ import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { generateToken, hashToken } from '@/lib/crypto/tokens';
-import { createAdminSession, deleteAdminSession, findAdminSession } from '@/lib/db';
+import { createAdminSession, deleteAdminSession, findAdminSession } from '@/lib/db/unscoped';
 import { env } from '@/lib/env';
 import { normalizeDomain } from '@/lib/tenant/domain';
 import { getRequestHost } from '@/lib/tenant/resolve';

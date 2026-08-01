@@ -1,7 +1,10 @@
 import 'server-only';
-import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
+
+// Web Crypto rather than node:crypto — this module ends up in the module graph of code that
+// Next also compiles for the Edge runtime, where a `node:` import is a build error.
+const newId = () => globalThis.crypto.randomUUID();
 
 export type RateLimitVerdict = { allowed: boolean; retryAfterMs: number; remaining: number };
 
@@ -26,7 +29,7 @@ export async function consumeRateLimit(
 
   const rows = await prisma.$queryRaw<{ count: number; expires_at: Date }[]>(Prisma.sql`
     INSERT INTO rate_limits (id, key, count, window_start, expires_at)
-    VALUES (${randomUUID()}, ${key}, 1, ${now}, ${windowEnd})
+    VALUES (${newId()}, ${key}, 1, ${now}, ${windowEnd})
     ON CONFLICT (key) DO UPDATE SET
       count        = CASE WHEN rate_limits.expires_at <= ${now} THEN 1 ELSE rate_limits.count + 1 END,
       window_start = CASE WHEN rate_limits.expires_at <= ${now} THEN ${now} ELSE rate_limits.window_start END,

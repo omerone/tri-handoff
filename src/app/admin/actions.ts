@@ -12,12 +12,8 @@ import {
 } from '@/lib/auth/admin-session';
 import { clientIp, limitKey, LIMITS } from '@/lib/auth/limits';
 import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from '@/lib/crypto/password';
-import {
-  consumeRateLimit,
-  findSuperAdminByEmail,
-  provisionTenant,
-  setTenantStatus,
-} from '@/lib/db';
+import { consumeRateLimit } from '@/lib/db';
+import { findSuperAdminByEmail, provisionTenant, setTenantStatus } from '@/lib/db/unscoped';
 
 export type AdminFormState = { error?: string; notice?: string };
 
@@ -37,12 +33,19 @@ export async function adminSignInAction(
   const password = String(formData.get('password') ?? '');
 
   const ip = await clientIp();
-  const verdict = await consumeRateLimit(
-    limitKey('admin-login', ip),
-    LIMITS.loginPerIp.limit,
-    LIMITS.loginPerIp.windowMs,
+  const perIp = await consumeRateLimit(
+    limitKey('admin-login-ip', ip),
+    LIMITS.adminLoginPerIp.limit,
+    LIMITS.adminLoginPerIp.windowMs,
   );
-  if (!verdict.allowed) return { error: 'Too many attempts. Try again later.' };
+  const perAccount = await consumeRateLimit(
+    limitKey('admin-login', email),
+    LIMITS.adminLoginPerAccount.limit,
+    LIMITS.adminLoginPerAccount.windowMs,
+  );
+  if (!perIp.allowed || !perAccount.allowed) {
+    return { error: 'Too many attempts. Try again later.' };
+  }
 
   const admin = await findSuperAdminByEmail(email);
   if (!admin) {
@@ -86,7 +89,16 @@ export async function createTenantAction(
     password: formData.get('password'),
   });
   if (!parsed.success) {
-    return { error: `Check the form — the password must be at least ${MIN_PASSWORD_LENGTH} characters.` };
+    const field = parsed.error.issues[0]?.path[0];
+    const message =
+      field === 'password'
+        ? `The initial password must be at least ${MIN_PASSWORD_LENGTH} characters.`
+        : field === 'email'
+          ? 'That is not a valid email address.'
+          : field === 'domain'
+            ? 'A domain is required.'
+            : 'A client name is required.';
+    return { error: message };
   }
 
   const result = await provisionTenant({
@@ -97,12 +109,12 @@ export async function createTenantAction(
   });
 
   if (!result.ok) {
-    return {
-      error:
-        result.reason === 'domain-taken'
-          ? 'That domain is already assigned to a client.'
-          : 'That domain is not a valid hostname.',
-    };
+    const reasons = {
+      'domain-taken': 'That domain is already assigned to a client.',
+      'reserved-domain': 'That is the platform domain and cannot be given to a client.',
+      'invalid-domain': 'That domain is not a valid hostname.',
+    } as const;
+    return { error: reasons[result.reason] };
   }
 
   revalidatePath('/admin');
