@@ -1,0 +1,108 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   TRi design tokens — extracted from docs/tri-prototype.jsx.
+   Every colour is routed through a CSS variable so that adding the light theme
+   promised in SPEC §1.1 is a matter of overriding this block, not touching
+   components. Dark is the default and the only theme that ships today.
+   --------------------------------------------------------------------------- */
+:root,
+[data-theme='dark'] {
+  --tri-bg: #0a0b0f;
+  --tri-surface: #12141b;
+  --tri-raised: #1a1d26;
+  --tri-line: rgba(255, 255, 255, 0.07);
+  --tri-text: #e8eaf0;
+  --tri-dim: #8a90a3;
+  --tri-brand: #5b8cff;
+  --tri-brand-2: #8b5bff;
+  --tri-pos: #2dd4a7;
+  --tri-neg: #ff5c7a;
+  --tri-warn: #ffb454;
+
+  /* Heat/fill tints derived from the semantic colours. */
+  --tri-pos-soft: rgba(45, 212, 167, 0.14);
+  --tri-pos-edge: rgba(45, 212, 167, 0.4);
+  --tri-neg-soft: rgba(255, 92, 122, 0.14);
+  --tri-neg-edge: rgba(255, 92, 122, 0.4);
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--tri-bg);
+  --color-surface: var(--tri-surface);
+  --color-raised: var(--tri-raised);
+  --color-line: var(--tri-line);
+  --color-text: var(--tri-text);
+  --color-dim: var(--tri-dim);
+  --color-brand: var(--tri-brand);
+  --color-brand-2: var(--tri-brand-2);
+  --color-pos: var(--tri-pos);
+  --color-neg: var(--tri-neg);
+  --color-warn: var(--tri-warn);
+
+  --font-sans: var(--font-heebo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --radius-card: 18px;
+  --radius-tile: 14px;
+  --radius-control: 10px;
+}
+
+html,
+body {
+  background: var(--tri-bg);
+  color: var(--tri-text);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numbers everywhere use the mono face, per the prototype. */
+.tri-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2e3a;
+  border-radius: 3px;
+}
+
+select,
+input,
+button {
+  outline: none;
+}
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--tri-brand);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@keyframes tri-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.tri-spin {
+  animation: tri-spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

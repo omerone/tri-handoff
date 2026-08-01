@@ -1,0 +1,182 @@
+{
+  "app": {
+    "name": "TRi",
+    "tagline": "Trade · Risk · Insight",
+    "loading": "Loading…"
+  },
+  "nav": {
+    "dash": "Dashboard",
+    "analytics": "Analytics",
+    "trades": "Trades",
+    "calendar": "Calendar",
+    "finance": "Finance",
+    "long": "Long Trades",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "sync": {
+    "syncing": "Syncing from MT5…",
+    "synced": "Synced from MT5",
+    "refresh": "Refresh data",
+    "never": "Not synced yet",
+    "failed": "Sync failed",
+    "notConnected": "No MT5 account connected",
+    "imported": "{count} trades imported",
+    "tooSoon": "Give it a moment before refreshing again"
+  },
+  "auth": {
+    "signInTitle": "Sign in to TRi",
+    "signInSubtitle": "Your trading journal and financial balance",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "forgot": "Forgot password",
+    "invalidCredentials": "Wrong email or password",
+    "tooManyAttempts": "Too many attempts. Try again in {minutes} minutes.",
+    "resetTitle": "Reset password",
+    "resetSubtitle": "We'll email you a link to set a new password",
+    "resetSend": "Send link",
+    "resetSent": "If an account exists for that email, a reset link is on its way.",
+    "backToSignIn": "Back to sign in",
+    "newPasswordTitle": "Choose a new password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "setPassword": "Update password",
+    "passwordsDontMatch": "Passwords don't match",
+    "passwordTooShort": "Password must be at least {min} characters",
+    "resetLinkInvalid": "That link is invalid or has expired",
+    "resetDone": "Password updated. You can sign in now.",
+    "emailSubject": "Reset your TRi password",
+    "emailBody": "Someone asked to reset your TRi password. This link is valid for {minutes} minutes:",
+    "emailIgnore": "If you didn't request this, you can ignore this email."
+  },
+  "kpi": {
+    "balance": "Account balance",
+    "netPnl": "Net P&L",
+    "winRate": "Win rate",
+    "profitFactor": "Profit factor",
+    "avgRR": "Avg RR",
+    "maxDD": "Max drawdown",
+    "expectancy": "Expectancy / trade",
+    "avgWin": "Avg win",
+    "avgLoss": "Avg loss",
+    "trades": "trades",
+    "rrCoverage": "{percent}% of trades have an SL"
+  },
+  "dash": {
+    "rStrip": "Last 60 trades (R)",
+    "equity": "Equity curve",
+    "recent": "Recent trades",
+    "empty": "No trades yet. Connect your MT5 account to get started."
+  },
+  "analytics": {
+    "insights": "Where you are most profitable",
+    "byWeekday": "P&L by weekday",
+    "bySession": "By trading session",
+    "byClass": "By asset class",
+    "byDirection": "By direction",
+    "heatmap": "Heatmap — day × session",
+    "bestNote": "Closed trades only · minimum 5 trades per category",
+    "noData": "Not enough data yet"
+  },
+  "enum": {
+    "session": { "asia": "Asia", "london": "London", "ny": "New York" },
+    "direction": { "long": "Long", "short": "Short" },
+    "style": { "day": "Day", "swing": "Swing", "long": "Long" },
+    "assetClass": {
+      "forex": "Forex",
+      "crypto": "Crypto",
+      "indices": "Indices",
+      "stocks": "Stocks",
+      "commodities": "Commodities",
+      "other": "Other"
+    }
+  },
+  "table": {
+    "filter": "Filter",
+    "all": "All",
+    "symbol": "Symbol",
+    "direction": "Side",
+    "style": "Style",
+    "risk": "Risk",
+    "rr": "RR",
+    "pnl": "P&L",
+    "closed": "Closed",
+    "opened": "Opened",
+    "volume": "Volume",
+    "empty": "No trades match these filters",
+    "from": "From",
+    "to": "To",
+    "prev": "Previous",
+    "next": "Next",
+    "page": "Page {page} of {total}"
+  },
+  "finance": {
+    "income": "Income",
+    "expenses": "Expenses",
+    "monthNet": "Monthly net",
+    "totalWealth": "Total wealth (trading + long + balance)",
+    "title": "Personal finance",
+    "add": "Add",
+    "label": "Label",
+    "amount": "Amount",
+    "category": "Category",
+    "date": "Date",
+    "typeIncome": "Income",
+    "typeExpense": "Expense",
+    "recurring": "Repeats monthly",
+    "delete": "Delete",
+    "empty": "No entries for this month yet"
+  },
+  "long": {
+    "title": "Long-term positions (manual entry)",
+    "qty": "Qty",
+    "buyPrice": "Buy price",
+    "currentValue": "Current value",
+    "unrealized": "Unrealized P&L",
+    "realized": "Realized P&L",
+    "updated": "Updated",
+    "update": "Update",
+    "add": "Add position",
+    "close": "Close position",
+    "cost": "Cost",
+    "empty": "No positions yet"
+  },
+  "settings": {
+    "language": "Language",
+    "currency": "Display currency",
+    "mt5": "Connected MT5 account",
+    "investor": "Read-only (Investor) connection",
+    "server": "Server",
+    "login": "Account number",
+    "connect": "Connect account",
+    "disconnect": "Disconnect",
+    "investorWarning": "Use your Investor (read-only) password only — never your master password. TRi cannot and will never be able to place trades on your account.",
+    "lastSync": "Last sync",
+    "fxNote": "The exchange rate is fetched automatically and refreshed once a day."
+  },
+  "calendar": {
+    "weekdays": ["S", "M", "T", "W", "T", "F", "S"],
+    "noTrades": "—",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month"
+  },
+  "error": {
+    "unknownTenant": "This domain isn't connected to an active TRi account.",
+    "suspendedTenant": "This account is currently suspended. Contact your administrator.",
+    "generic": "Something went wrong. Please try again.",
+    "notFound": "Page not found"
+  },
+  "admin": {
+    "title": "Super admin",
+    "tenants": "Clients",
+    "createTenant": "Create client",
+    "name": "Name",
+    "domain": "Domain",
+    "status": "Status",
+    "userEmail": "User email",
+    "created": "Created",
+    "active": "Active",
+    "suspended": "Suspended"
+  }
+}

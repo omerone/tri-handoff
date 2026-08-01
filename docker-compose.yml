@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tri}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tri}
+      POSTGRES_DB: ${POSTGRES_DB:-tri}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-tri} -d ${POSTGRES_DB:-tri}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tri}:${POSTGRES_PASSWORD:-tri}@postgres:5432/${POSTGRES_DB:-tri}?schema=public
+      SESSION_SECRET: ${SESSION_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      MT5_PROVIDER: ${MT5_PROVIDER:-mock}
+      METAAPI_TOKEN: ${METAAPI_TOKEN:-}
+      METAAPI_REGION: ${METAAPI_REGION:-new-york}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-TRi <no-reply@example.com>}
+      FX_API_URL: ${FX_API_URL:-https://api.frankfurter.app}
+      APP_BASE_DOMAIN: ${APP_BASE_DOMAIN}
+      APP_PROTOCOL: ${APP_PROTOCOL:-https}
+      NODE_ENV: production
+      PORT: '3000'
+      HOSTNAME: '0.0.0.0'
+    expose:
+      - '3000'
+
+  # Caddy terminates TLS and obtains a certificate per tenant domain automatically.
+  # Adding a client = adding their domain to caddy/Caddyfile (or the on-demand TLS ask
+  # endpoint, which validates the host against the tenants table).
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Local-only mail catcher for testing the password-reset flow.
+  mailhog:
+    image: axllent/mailpit:latest
+    profiles: ['dev']
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
