@@ -22,6 +22,21 @@ export type Fixture = {
 };
 
 const created: string[] = [];
+const claimedDomains: string[] = [];
+
+/**
+ * A free `.itest` hostname, registered for deletion in `cleanup()`.
+ *
+ * Tests that provision through the repository rather than through `createTenantFixture`
+ * have no tenant id to hand back until the call succeeds — and a provisioning bug could
+ * leave a row behind after a call that *failed*. Claiming the domain up front means cleanup
+ * catches that row too.
+ */
+export function reserveDomain(): string {
+  const domain = `t-${randomBytes(6).toString('hex')}.itest`;
+  claimedDomains.push(domain);
+  return domain;
+}
 
 export async function createTenantFixture(
   overrides: { status?: 'active' | 'suspended' } = {},
@@ -61,10 +76,13 @@ export function crossTenantContext(attacker: Fixture, victim: Fixture): TenantCo
 }
 
 export async function cleanup(): Promise<void> {
-  if (created.length > 0) {
+  if (created.length > 0 || claimedDomains.length > 0) {
     // Cascades remove the user and everything hanging off it.
-    await testDb.tenant.deleteMany({ where: { id: { in: created } } });
+    await testDb.tenant.deleteMany({
+      where: { OR: [{ id: { in: created } }, { domain: { in: claimedDomains } }] },
+    });
     created.length = 0;
+    claimedDomains.length = 0;
   }
   await testDb.$disconnect();
 }
