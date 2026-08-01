@@ -13,7 +13,11 @@ import 'server-only';
  * that reaches for `setPasswordHash` has to name the unscoped module to get it.
  */
 
+export type { Mt5Status, SyncStatus, SyncTrigger, TenantStatus } from './enums';
 export { getUser, updateUserPreferences, touchLastLogin } from './users';
+export * from './mt5-accounts';
+export * from './trades';
+export * from './sync-logs';
 
 // Not tenant data — counters keyed by an opaque string. Safe for any caller.
 export * from './rate-limit';

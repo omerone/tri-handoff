@@ -14,6 +14,7 @@ export type SessionRecord = {
   email: string;
   locale: Locale;
   displayCurrency: string;
+  lastLoginAt: Date | null;
   tenantName: string;
   tenantDomain: string;
   tenantStatus: 'active' | 'suspended';
@@ -62,6 +63,7 @@ export async function findSession(tokenHash: string, tenantId: string): Promise<
           email: true,
           locale: true,
           displayCurrency: true,
+          lastLoginAt: true,
           tenant: { select: { name: true, domain: true, status: true } },
         },
       },
@@ -76,6 +78,7 @@ export async function findSession(tokenHash: string, tenantId: string): Promise<
     email: row.user.email,
     locale: row.user.locale,
     displayCurrency: row.user.displayCurrency,
+    lastLoginAt: row.user.lastLoginAt,
     tenantName: row.user.tenant.name,
     tenantDomain: row.user.tenant.domain,
     tenantStatus: row.user.tenant.status,

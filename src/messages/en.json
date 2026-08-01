@@ -22,7 +22,9 @@
     "failed": "Sync failed",
     "notConnected": "No MT5 account connected",
     "imported": "{count} trades imported",
-    "tooSoon": "Give it a moment before refreshing again"
+    "tooSoon": "Give it a moment before refreshing again",
+    "upToDate": "Up to date",
+    "importedNone": "No new trades"
   },
   "auth": {
     "signInTitle": "Sign in to TRi",
@@ -80,9 +82,20 @@
     "noData": "Not enough data yet"
   },
   "enum": {
-    "session": { "asia": "Asia", "london": "London", "ny": "New York" },
-    "direction": { "long": "Long", "short": "Short" },
-    "style": { "day": "Day", "swing": "Swing", "long": "Long" },
+    "session": {
+      "asia": "Asia",
+      "london": "London",
+      "ny": "New York"
+    },
+    "direction": {
+      "long": "Long",
+      "short": "Short"
+    },
+    "style": {
+      "day": "Day",
+      "swing": "Swing",
+      "long": "Long"
+    },
     "assetClass": {
       "forex": "Forex",
       "crypto": "Crypto",
@@ -153,10 +166,31 @@
     "disconnect": "Disconnect",
     "investorWarning": "Use your Investor (read-only) password only — never your master password. TRi cannot and will never be able to place trades on your account.",
     "lastSync": "Last sync",
-    "fxNote": "The exchange rate is fetched automatically and refreshed once a day."
+    "fxNote": "The exchange rate is fetched automatically and refreshed once a day.",
+    "connectInvalid": "Fill in the account number, server and Investor password.",
+    "connectRejected": "The broker rejected these details. Check that this is the Investor password, not your master password.",
+    "connectUnreachable": "We couldn't reach the MT5 server just now. Try again in a moment.",
+    "connectSyncFailed": "The account was saved, but the first sync failed. Try \"Refresh data\".",
+    "connected": "Account connected. {count} trades imported.",
+    "tooSoon": "Give it a moment before trying again.",
+    "investorPassword": "Investor password (read-only)",
+    "notConnected": "No MT5 account connected",
+    "notConnectedHint": "Connect your MT5 account to import your trade history.",
+    "disconnectConfirm": "Disconnect the account? Trades already imported will stay.",
+    "backfillNote": "The first connection pulls your entire account history from MT5.",
+    "balance": "Balance",
+    "equity": "Equity"
   },
   "calendar": {
-    "weekdays": ["S", "M", "T", "W", "T", "F", "S"],
+    "weekdays": [
+      "S",
+      "M",
+      "T",
+      "W",
+      "T",
+      "F",
+      "S"
+    ],
     "noTrades": "—",
     "prevMonth": "Previous month",
     "nextMonth": "Next month"

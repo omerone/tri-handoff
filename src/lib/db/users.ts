@@ -26,9 +26,17 @@ export async function getUser(ctx: TenantContext): Promise<TenantUser | null> {
   assertContext(ctx);
   const row = await prisma.user.findFirst({
     where: { id: ctx.userId, tenantId: ctx.tenantId },
-    select: { id: true, email: true, locale: true, displayCurrency: true },
+    select: { id: true, email: true, locale: true, displayCurrency: true, lastLoginAt: true },
   });
-  return row ? { id: row.id, email: row.email, locale: row.locale, displayCurrency: row.displayCurrency } : null;
+  return row
+    ? {
+        id: row.id,
+        email: row.email,
+        locale: row.locale,
+        displayCurrency: row.displayCurrency,
+        lastLoginAt: row.lastLoginAt,
+      }
+    : null;
 }
 
 export async function updateUserPreferences(

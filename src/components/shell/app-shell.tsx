@@ -5,6 +5,7 @@ import type { TenantSession } from '@/lib/tenant/context';
 import { LanguageToggle } from './language-toggle';
 import { MainNav, type NavItem } from './main-nav';
 import { SignOutButton } from './sign-out-button';
+import { SyncStatus } from './sync-status';
 
 /**
  * The frame from the prototype: sticky blurred header with the TRi mark, the sync pill and
@@ -13,12 +14,9 @@ import { SignOutButton } from './sign-out-button';
 export async function AppShell({
   session,
   children,
-  headerSlot,
 }: {
   session: TenantSession;
   children: React.ReactNode;
-  /** The sync pill lands here in M1.2; the shell itself stays free of MT5 concerns. */
-  headerSlot?: React.ReactNode;
 }) {
   const t = await getTranslations();
   const locale = (await getLocale()) as Locale;
@@ -49,7 +47,7 @@ export async function AppShell({
           </div>
 
           <div className="flex items-center gap-2">
-            {headerSlot}
+            <SyncStatus session={session} lastLoginAt={session.user.lastLoginAt} />
             <LanguageToggle current={locale} />
             <SignOutButton label={t('nav.signOut')} />
           </div>

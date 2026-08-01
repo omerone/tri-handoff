@@ -22,7 +22,9 @@
     "failed": "הסנכרון נכשל",
     "notConnected": "לא מחובר חשבון MT5",
     "imported": "{count} עסקאות יובאו",
-    "tooSoon": "נא להמתין רגע לפני רענון נוסף"
+    "tooSoon": "נא להמתין רגע לפני רענון נוסף",
+    "upToDate": "הנתונים מעודכנים",
+    "importedNone": "לא נמצאו עסקאות חדשות"
   },
   "auth": {
     "signInTitle": "כניסה ל-TRi",
@@ -80,9 +82,20 @@
     "noData": "אין מספיק נתונים להצגה"
   },
   "enum": {
-    "session": { "asia": "אסיה", "london": "לונדון", "ny": "ניו יורק" },
-    "direction": { "long": "לונג", "short": "שורט" },
-    "style": { "day": "Day", "swing": "Swing", "long": "Long" },
+    "session": {
+      "asia": "אסיה",
+      "london": "לונדון",
+      "ny": "ניו יורק"
+    },
+    "direction": {
+      "long": "לונג",
+      "short": "שורט"
+    },
+    "style": {
+      "day": "Day",
+      "swing": "Swing",
+      "long": "Long"
+    },
     "assetClass": {
       "forex": "פורקס",
       "crypto": "קריפטו",
@@ -153,10 +166,31 @@
     "disconnect": "ניתוק",
     "investorWarning": "השתמש בסיסמת ה-Investor (קריאה בלבד) בלבד — לעולם לא בסיסמה הראשית. ל-TRi אין ואף פעם לא תהיה יכולת לבצע פעולות בחשבון המסחר שלך.",
     "lastSync": "סנכרון אחרון",
-    "fxNote": "שער החליפין נמשך אוטומטית ומתעדכן פעם ביום."
+    "fxNote": "שער החליפין נמשך אוטומטית ומתעדכן פעם ביום.",
+    "connectInvalid": "נא למלא מספר חשבון, שרת וסיסמת Investor.",
+    "connectRejected": "הפרטים נדחו על ידי הברוקר. ודא שזו סיסמת ה-Investor ולא הסיסמה הראשית.",
+    "connectUnreachable": "לא הצלחנו להגיע לשרת ה-MT5 כרגע. נסה שוב בעוד רגע.",
+    "connectSyncFailed": "החשבון נשמר, אבל הסנכרון הראשון נכשל. נסה 'רענן נתונים'.",
+    "connected": "החשבון חובר. {count} עסקאות יובאו.",
+    "tooSoon": "נא להמתין רגע לפני ניסיון נוסף.",
+    "investorPassword": "סיסמת Investor (קריאה בלבד)",
+    "notConnected": "לא מחובר חשבון MT5",
+    "notConnectedHint": "חבר את חשבון ה-MT5 שלך כדי לייבא את היסטוריית העסקאות.",
+    "disconnectConfirm": "לנתק את החשבון? העסקאות שכבר יובאו יישארו.",
+    "backfillNote": "בחיבור הראשון נמשכת כל היסטוריית החשבון מ-MT5.",
+    "balance": "יתרה",
+    "equity": "הון"
   },
   "calendar": {
-    "weekdays": ["א", "ב", "ג", "ד", "ה", "ו", "ש"],
+    "weekdays": [
+      "א",
+      "ב",
+      "ג",
+      "ד",
+      "ה",
+      "ו",
+      "ש"
+    ],
     "noTrades": "—",
     "prevMonth": "חודש קודם",
     "nextMonth": "חודש הבא"
