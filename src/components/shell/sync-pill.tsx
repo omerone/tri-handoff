@@ -81,8 +81,10 @@ export function SyncPill({
         : status === 'rate-limited'
           ? labels.tooSoon
           : lastSyncedAt
-            ? `${labels.synced} · ${lastSyncedAt}`
+            ? labels.synced
             : labels.never;
+
+  const showTime = connected && !syncing && status === 'idle' && lastSyncedAt !== null;
 
   const tone = syncing
     ? 'text-warn'
@@ -103,7 +105,19 @@ export function SyncPill({
       className={`border-line bg-raised flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${tone} disabled:cursor-default`}
     >
       <RefreshCw size={13} className={syncing ? 'tri-spin' : ''} aria-hidden />
-      <span className="hidden sm:inline">{label}</span>
+      <span className="hidden sm:inline">
+        {label}
+        {/* The time is its own LTR run: in Hebrew a bare "01:40" appended to RTL text has
+            its colon and digits reordered, and the pill ends up reading backwards. */}
+        {showTime ? (
+          <>
+            {' · '}
+            <span dir="ltr" className="tri-num">
+              {lastSyncedAt}
+            </span>
+          </>
+        ) : null}
+      </span>
     </button>
   );
 }

@@ -63,7 +63,10 @@
     "avgWin": "רווח ממוצע",
     "avgLoss": "הפסד ממוצע",
     "trades": "עסקאות",
-    "rrCoverage": "{percent}% מהעסקאות עם SL"
+    "rrCoverage": "{percent}% מהעסקאות עם SL",
+    "fxUnavailable": "שער חליפין אינו זמין כרגע — הסכומים מוצגים ב-{currency}.",
+    "fxStale": "שער חליפין מ-{date}",
+    "tradesCount": "{count, plural, one {עסקה אחת} two {שתי עסקאות} other {# עסקאות}}"
   },
   "dash": {
     "rStrip": "60 העסקאות האחרונות (R)",

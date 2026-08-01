@@ -3,6 +3,7 @@
 import { useActionState, useTransition } from 'react';
 import { Landmark, Shield, TriangleAlert } from 'lucide-react';
 import { Field, FormMessage, SubmitButton } from '@/components/ui/form';
+import { Num } from '@/components/ui/kpi';
 import { connectMt5Action, disconnectMt5Action, type Mt5FormState } from './mt5-actions';
 
 export type Mt5CardLabels = {
@@ -110,7 +111,9 @@ function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5
             <Landmark size={18} className="text-brand" aria-hidden />
           </div>
           <div>
-            <div className="tri-num text-sm font-bold">#{account.login}</div>
+            <div className="text-sm font-bold">
+              <Num>#{account.login}</Num>
+            </div>
             <div className="text-dim text-[11px]">
               {labels.server}: {account.server}
             </div>
@@ -125,15 +128,21 @@ function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5
       <dl className="border-line grid grid-cols-3 gap-3 border-t pt-3 text-xs">
         <div>
           <dt className="text-dim">{labels.lastSync}</dt>
-          <dd className="tri-num mt-0.5">{account.lastSync ?? labels.never}</dd>
+          <dd className="mt-0.5">
+            <Num>{account.lastSync ?? labels.never}</Num>
+          </dd>
         </div>
         <div>
           <dt className="text-dim">{labels.balance}</dt>
-          <dd className="tri-num mt-0.5">{account.balance ?? '—'}</dd>
+          <dd className="mt-0.5">
+            <Num>{account.balance ?? '—'}</Num>
+          </dd>
         </div>
         <div>
           <dt className="text-dim">{labels.equity}</dt>
-          <dd className="tri-num mt-0.5">{account.equity ?? '—'}</dd>
+          <dd className="mt-0.5">
+            <Num>{account.equity ?? '—'}</Num>
+          </dd>
         </div>
       </dl>
 

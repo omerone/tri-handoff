@@ -63,7 +63,10 @@
     "avgWin": "Avg win",
     "avgLoss": "Avg loss",
     "trades": "trades",
-    "rrCoverage": "{percent}% of trades have an SL"
+    "rrCoverage": "{percent}% of trades have an SL",
+    "fxUnavailable": "No exchange rate available right now — amounts are shown in {currency}.",
+    "fxStale": "Exchange rate from {date}",
+    "tradesCount": "{count, plural, one {# trade} other {# trades}}"
   },
   "dash": {
     "rStrip": "Last 60 trades (R)",

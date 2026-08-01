@@ -56,8 +56,13 @@ Postgres, so it needs to be up. This must be green before any milestone is consi
 npm run test:e2e
 ```
 
-Playwright smoke tests across a desktop and a mobile viewport. Builds and boots the app
-itself; needs the seeded demo tenant.
+Playwright, across a desktop and a mobile viewport. Builds and boots the app itself; needs
+the seeded demo tenant.
+
+**Stop `npm run dev` first.** `next dev` and `next build` write to the same `.next`
+directory, and a dev server running during the build corrupts it — the symptom is
+`TypeError: a[d] is not a function` from the webpack runtime on every route, which looks
+like an application bug and is not one. `rm -rf .next` clears it.
 
 ## Onboarding a client
 
@@ -109,5 +114,8 @@ Expired `sessions` and `rate_limits` rows are swept hourly from inside the app
 
 ## Status
 
-Phase 0 (infrastructure) is complete. See [`PLAN.md`](PLAN.md) for what each later phase
-covers and what still needs a decision from the client.
+Phase 0 (infrastructure) and Phase 1 (MT5 sync + analytics) are complete: connect an
+account, backfill its whole history, and read the dashboard, analytics, trades table and
+calendar in Hebrew or English. Phases 2–4 (personal finance, manual long positions, the full
+operator panel) are still ahead — see [`PLAN.md`](PLAN.md), which also lists what needs a
+decision from the client.

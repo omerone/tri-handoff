@@ -22,3 +22,6 @@ npm-debug.log*
 caddy_data/
 caddy_config/
 pgdata/
+
+# Playwright's saved sign-in state
+e2e/.auth/

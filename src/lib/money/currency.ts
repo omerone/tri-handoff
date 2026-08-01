@@ -51,6 +51,29 @@ export function formatMoney(
   return `${sign}${CURRENCY_SYMBOL[currency]}${digits}`;
 }
 
+/**
+ * Everything a client component needs to format money, and nothing it cannot receive.
+ *
+ * Charts run in the browser, and a server component cannot hand one a formatting *function* —
+ * props have to survive serialisation. So the rate, the currency and the locale cross the
+ * boundary as data and `formatDisplayMoney` does the same arithmetic on both sides. One
+ * formatting rule, two runtimes, no chance of the axis disagreeing with the KPI tile above it.
+ */
+export type MoneyDisplay = {
+  currency: Currency;
+  locale: Locale;
+  /** Source currency → display currency. 1 when they are the same or no rate was available. */
+  rate: number;
+};
+
+export function formatDisplayMoney(
+  amount: number,
+  display: MoneyDisplay,
+  options: { decimals?: number; signed?: boolean } = {},
+): string {
+  return formatMoney(amount * display.rate, display.currency, display.locale, options);
+}
+
 export function formatNumber(value: number, locale: Locale, decimals = 0): string {
   return new Intl.NumberFormat(LOCALE_TAG[locale], {
     minimumFractionDigits: decimals,
