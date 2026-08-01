@@ -47,7 +47,10 @@ async function main() {
   console.log('Seeded.');
   console.log(`  tenant : http://${DEMO_DOMAIN}:3000`);
   console.log(`  user   : ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
-  console.log(`  admin  : ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}  (at /admin on any host)`);
+  console.log(`  admin  : ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+  console.log(
+    `           sign in at ${process.env.APP_PROTOCOL ?? 'http'}://${process.env.APP_BASE_DOMAIN ?? 'localhost:3000'}/admin/login`,
+  );
 }
 
 main()

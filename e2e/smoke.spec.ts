@@ -26,6 +26,20 @@ test.describe('tenant boundary', () => {
   });
 });
 
+test.describe('admin panel', () => {
+  test('is not reachable from a client domain', async ({ page }) => {
+    const response = await page.goto('/admin/login');
+    expect(response?.status()).toBe(404);
+    await expect(page.locator('input[name="password"]')).toHaveCount(0);
+  });
+
+  test('is served on the platform base domain', async ({ page }) => {
+    const response = await page.goto(`${unknownHost}/admin/login`);
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole('heading', { name: /super admin/i })).toBeVisible();
+  });
+});
+
 test.describe('login wall', () => {
   test('an anonymous request to the dashboard lands on sign-in', async ({ page }) => {
     await page.goto('/dashboard');

@@ -15,3 +15,4 @@ export * from './provisioning';
 export * from './sessions';
 export * from './reset-tokens';
 export * from './rate-limit';
+export * from './super-admins';

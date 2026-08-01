@@ -18,12 +18,11 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "npm run script -- prisma/seed.ts",
+    "_comment:tsx": "--conditions=react-server makes the `server-only` guard resolve to its empty stub, so CLI scripts can import the same server modules the app uses. Inlined rather than delegated to a shared script, because nesting `npm run` loses the quoting of forwarded arguments.",
+    "db:seed": "NODE_OPTIONS=--conditions=react-server tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "tenant:create": "npm run script -- scripts/create-tenant.ts",
-    "admin:create": "npm run script -- scripts/create-super-admin.ts",
-    "_comment:script": "--conditions=react-server makes the `server-only` guard resolve to its empty stub, so CLI scripts can import the same server modules the app uses.",
-    "script": "NODE_OPTIONS=--conditions=react-server tsx"
+    "tenant:create": "NODE_OPTIONS=--conditions=react-server tsx scripts/create-tenant.ts",
+    "admin:create": "NODE_OPTIONS=--conditions=react-server tsx scripts/create-super-admin.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
