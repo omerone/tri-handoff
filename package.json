@@ -6,6 +6,7 @@
     "node": ">=20.9.0"
   },
   "scripts": {
+    "prepare": "husky install",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -52,6 +53,7 @@
     "@typescript-eslint/parser": "^8.20.0",
     "eslint": "^9.18.0",
     "eslint-config-next": "^15.2.3",
+    "husky": "^9.1.7",
     "prettier": "^3.4.2",
     "prisma": "^6.2.1",
     "tailwindcss": "^4.0.0",
