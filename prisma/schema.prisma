@@ -430,6 +430,109 @@ model FxRate {
   @@map("fx_rates")
 }
 
+// ---------------------------------------------------------------------------
+// Audit Logging (Security & Compliance)
+// ---------------------------------------------------------------------------
+
+/// Authentication events: successful/failed logins, password changes, sessions
+model AuthEvent {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+
+  /// Event type: login_success, login_failed, password_changed, session_created, etc.
+  eventType String @map("event_type")
+
+  /// User-facing action description
+  description String
+
+  /// IP address that triggered the event (from X-Forwarded-For)
+  ipAddress String? @map("ip_address")
+
+  /// User agent string (browser/app identifier)
+  userAgent String? @map("user_agent")
+
+  /// Result: success, failure, blocked (rate limited), etc.
+  result String @default("success")
+
+  /// Additional context (e.g., failed login reason: "wrong_password", "account_locked")
+  details Json? @default("{}")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("auth_events")
+}
+
+/// Admin action audit log: who did what, when, for compliance
+model AdminAuditLog {
+  id String @id @default(cuid())
+
+  /// Who performed the action (super admin ID)
+  adminId String? @map("admin_id")
+
+  /// Which tenant/user was affected (optional, null for system actions)
+  tenantId String? @map("tenant_id")
+  userId String? @map("user_id")
+
+  /// Action type: create_tenant, suspend_tenant, create_user, reset_password, etc.
+  actionType String @map("action_type")
+
+  /// Human-readable description
+  description String
+
+  /// Changes made (JSON object with old/new values)
+  changes Json?
+
+  /// IP address of the admin
+  ipAddress String? @map("ip_address")
+
+  /// User agent (browser/app)
+  userAgent String? @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([adminId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([actionType])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}
+
+/// Data access log: who accessed what data, when (for GDPR compliance)
+model DataAccessLog {
+  id String @id @default(cuid())
+
+  /// User who accessed the data
+  userId String @map("user_id")
+
+  /// Action: export, access, list, download, etc.
+  action String
+
+  /// Resource accessed: user_profile, trades, finance_entries, etc.
+  resource String
+
+  /// Number of records accessed/exported
+  recordCount Int? @map("record_count")
+
+  /// Size of data in bytes (for exports)
+  dataSizeBytes Int? @map("data_size_bytes")
+
+  /// IP address
+  ipAddress String? @map("ip_address")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("data_access_logs")
+}
+
 /// Fixed-window counters for login, password reset and sync. Kept in the database rather
 /// than in memory so the limit still holds when the app runs more than one instance.
 model RateLimit {
