@@ -1,24 +1,29 @@
 import { Card } from '@/components/ui/card';
+import { KPI } from '@/components/ui/kpi';
 import { requireAdmin } from '@/lib/auth/admin-session';
-import { listTenants } from '@/lib/db/unscoped';
-import { adminSignOutAction, setTenantStatusAction } from './actions';
+import { platformStats, syncHealth } from '@/lib/db/unscoped';
+import { adminSignOutAction } from './actions';
 import { CreateTenantForm } from './create-tenant-form';
+import { HealthTable } from './health';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * P0 scope: create a client and enable/suspend one — enough to onboard the first customer.
- * The full panel (domain rebinding, sync monitoring, error triage) is P4.
+ * The operator panel (SPEC §6, phase 4).
+ *
+ * Ordered by what an operator opens it to find out: is anything broken, then who are my
+ * clients, then let me add one. The monitoring table is above the create form for that
+ * reason — creating a client is the rarer action.
  */
 export default async function AdminPage() {
   const admin = await requireAdmin();
-  const tenants = await listTenants();
+  const [stats, health] = await Promise.all([platformStats(), syncHealth()]);
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold">Clients</h1>
+          <h1 className="text-xl font-extrabold">TRi — operator</h1>
           <p className="text-dim text-xs">{admin.email}</p>
         </div>
         <form action={adminSignOutAction}>
@@ -31,67 +36,23 @@ export default async function AdminPage() {
         </form>
       </div>
 
-      <Card title="New client">
-        <CreateTenantForm />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <KPI label="Clients" value={String(stats.tenants)} />
+        <KPI label="Active" value={String(stats.active)} />
+        <KPI label="MT5 connected" value={String(stats.connected)} />
+        <KPI
+          label="Sync failing"
+          value={String(stats.failing)}
+          tone={stats.failing > 0 ? 'neg' : 'neutral'}
+        />
+      </div>
+
+      <Card title="Clients — most in need of attention first" pad={false}>
+        <HealthTable rows={health} />
       </Card>
 
-      <Card title={`${tenants.length} client${tenants.length === 1 ? '' : 's'}`} pad={false}>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[13px]">
-            <thead>
-              <tr className="text-dim text-[11px]">
-                {['Domain', 'Name', 'User', 'Status', 'Last sync', ''].map((header) => (
-                  <th
-                    key={header}
-                    className="border-line border-b px-3 py-2.5 text-start font-semibold"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {tenants.map((tenant) => (
-                <tr key={tenant.id} className="border-line border-b">
-                  <td className="tri-num px-3 py-2.5 font-bold">{tenant.domain}</td>
-                  <td className="px-3 py-2.5">{tenant.name}</td>
-                  <td className="text-dim px-3 py-2.5">{tenant.userEmail ?? '—'}</td>
-                  <td className="px-3 py-2.5">
-                    <span className={tenant.status === 'active' ? 'text-pos' : 'text-warn'}>
-                      {tenant.status}
-                    </span>
-                  </td>
-                  <td className="text-dim px-3 py-2.5">
-                    {tenant.lastSyncAt ? tenant.lastSyncAt.toISOString().slice(0, 16).replace('T', ' ') : '—'}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <form action={setTenantStatusAction}>
-                      <input type="hidden" name="tenantId" value={tenant.id} />
-                      <input
-                        type="hidden"
-                        name="status"
-                        value={tenant.status === 'active' ? 'suspended' : 'active'}
-                      />
-                      <button
-                        type="submit"
-                        className="border-line bg-raised text-brand rounded-lg border px-2 py-1 text-[11px]"
-                      >
-                        {tenant.status === 'active' ? 'Suspend' : 'Activate'}
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-              {tenants.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-dim px-3 py-6 text-center">
-                    No clients yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <Card title="New client">
+        <CreateTenantForm />
       </Card>
     </div>
   );

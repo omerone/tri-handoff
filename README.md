@@ -114,8 +114,33 @@ Expired `sessions` and `rate_limits` rows are swept hourly from inside the app
 
 ## Status
 
-Phase 0 (infrastructure) and Phase 1 (MT5 sync + analytics) are complete: connect an
-account, backfill its whole history, and read the dashboard, analytics, trades table and
-calendar in Hebrew or English. Phases 2–4 (personal finance, manual long positions, the full
-operator panel) are still ahead — see [`PLAN.md`](PLAN.md), which also lists what needs a
-decision from the client.
+All five phases in `SPEC.md` §6 are built:
+
+| Phase | What it covers | Where |
+|---|---|---|
+| P0 | Multi-tenancy, auth, i18n, provisioning | `src/lib/{tenant,auth,db}`, `src/app/(auth)` |
+| P1 | MT5 sync and the full analytics module | `src/lib/{mt5,analytics}`, `src/app/(app)/{dashboard,analytics,trades,calendar}` |
+| P2 | Personal finance | `src/lib/finance`, `src/app/(app)/finance` |
+| P3 | Manual long-term positions | `src/lib/positions`, `src/app/(app)/long` |
+| P4 | Operator panel with sync monitoring | `src/lib/db/admin.ts`, `src/app/admin` |
+
+[`PLAN.md`](PLAN.md) lists the handful of items that still need a decision from the client —
+none of them block anything that is built.
+
+## Where the money comes from
+
+Three sources, three currencies, and they are converted separately on purpose:
+
+- **Trading** — synced from MT5 in the broker's account currency. Net of commission and swap.
+- **Long positions** — entered by hand, each in its own currency, marked to market manually.
+- **Cash** — personal finance, ILS-native (SPEC §3.1).
+
+The total-wealth tile on `/finance` adds all three after converting each at its own rate.
+Sharing one rate between them is the kind of mistake that produces a believable wrong
+number, so the conversions are named apart in the code.
+
+**RR** — the client's headline metric — is `profit / risk`, where
+`risk = |entry − sl| × contract size × volume`, converted to the account currency. It is
+`null`, never zero, when a trade had no stop loss or the symbol's contract spec is unknown;
+those trades are excluded from RR averages and reported as reduced coverage. The rule and its
+reasoning live in [`src/lib/mt5/risk.ts`](src/lib/mt5/risk.ts).

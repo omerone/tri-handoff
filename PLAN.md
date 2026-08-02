@@ -72,18 +72,26 @@ both correct → responsive to 375px → `npm run check` green.
 
 ---
 
-## Phase 2 — Personal finance
-Income/expense entries (ILS-native), categories, recurring entries, monthly + yearly balance,
-"total wealth" combining trading equity + long positions + cash balance with live FX.
-Done when: the finance view matches the prototype, recurring entries materialise correctly,
-and every currency figure is FX-converted rather than hard-coded at 3.7.
+## Phase 2 — Personal finance ✅
+Income/expense entries (ILS-native), categories, recurring entries, monthly + year-to-date
+balance, expense breakdown, "total wealth" combining trading equity + long positions + cash
+with live FX.
 
-## Phase 3 — Manual long positions
-Entry form, manual current-value update with an "updated at" stamp, unrealized/realized P&L,
-close flow, roll-up into portfolio balance.
+Two corrections to the prototype, both documented in the code:
+- its "total wealth" added one month's *net* (a flow) to the trading balance (a stock);
+  wealth now uses cumulative recorded cash, and the monthly net keeps its own tile;
+- "year to date" summed all twelve months, which projected recurring entries into months
+  that had not happened.
 
-## Phase 4 — Super admin
-Tenant CRUD, domain binding, enable/suspend, sync monitoring across tenants, error triage.
+## Phase 3 — Manual long positions ✅
+Entry, manual mark-to-market with an "updated at" stamp, unrealized and realized P&L kept
+apart, close flow, roll-up into total wealth. The portfolio headline reports the *stalest*
+open price, since a hand-entered valuation is only as current as the last time it was typed.
+
+## Phase 4 — Super admin ✅
+Tenant list ordered worst-first by sync health, per-client detail with sync history, domain
+rebinding, rename, suspend/activate, operator-set password for a client who cannot receive
+their reset email, and deletion behind a typed confirmation.
 
 ---
 
