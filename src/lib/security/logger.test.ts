@@ -22,6 +22,7 @@ vi.mock('next/headers', () => ({
   headers: vi.fn(),
 }));
 
+// eslint-disable-next-line no-restricted-imports
 import { prisma } from '@/lib/db/prisma';
 import { headers } from 'next/headers';
 
@@ -30,6 +31,7 @@ describe('SecurityLogger', () => {
     vi.clearAllMocks();
 
     // Mock headers response
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (headers as any).mockResolvedValue({
       get: (name: string) => {
         const headerMap: Record<string, string | null> = {

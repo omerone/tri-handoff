@@ -1,4 +1,5 @@
 import 'server-only';
+// eslint-disable-next-line no-restricted-imports
 import { prisma } from '@/lib/db/prisma';
 import { headers } from 'next/headers';
 
@@ -23,21 +24,21 @@ import { headers } from 'next/headers';
  * - Retention: 12 months (auto-deleted by cleanup job)
  */
 
+/** What a Json column can actually hold. */
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+/**
+ * `null` rather than `undefined`: these go straight into nullable columns, and a request with
+ * no `X-Forwarded-For` should record "no address known" rather than leave the column to
+ * Prisma's default.
+ */
 interface LoggerContext {
   userId?: string;
-  ipAddress?: string;
-  userAgent?: string;
+  ipAddress: string | null;
+  userAgent: string | null;
 }
 
 class SecurityLogger {
-  private static async getContext(): Promise<LoggerContext> {
-    const headerStore = await headers();
-    return {
-      ipAddress: headerStore.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
-      userAgent: headerStore.get('user-agent')?.slice(0, 300) ?? null,
-    };
-  }
-
   /**
    * Log authentication event (login success/failure, password change)
    * Used for: rate limiting, breach investigation, account security
@@ -123,7 +124,12 @@ class SecurityLogger {
     userId?: string;
     actionType: string; // 'create_tenant', 'reset_password', 'suspend_user', etc.
     description: string;
-    changes?: Record<string, { from?: unknown; to: unknown }>; // Field-level changes
+    /**
+     * Field-level changes. Typed as JSON rather than `unknown`, because this lands in a Json
+     * column: `unknown` let a caller pass a Date or a class instance, which Prisma rejects at
+     * the type level and which would have been silently mangled had it not.
+     */
+    changes?: Record<string, { from?: JsonValue; to: JsonValue }>;
   }): Promise<void> {
     try {
       const context = await getContext();
@@ -135,7 +141,10 @@ class SecurityLogger {
           userId: opts.userId,
           actionType: opts.actionType,
           description: opts.description,
-          changes: opts.changes ? JSON.stringify(opts.changes) : null,
+          // `changes` is a Json column, so the object goes in as-is. Stringifying it first
+          // stored a quoted blob that no query could reach into, and `null` is not a value
+          // Prisma accepts for a Json field — omitting it leaves the column null.
+          changes: opts.changes ?? undefined,
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
         },
