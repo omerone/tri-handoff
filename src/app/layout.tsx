@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import { Heebo, IBM_Plex_Mono } from 'next/font/google';
+import { cookies } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { LOCALE_DIR } from '@/i18n/config';
 import { resolveLocale } from '@/i18n/request';
+import { asTheme, THEME_COOKIE } from '@/lib/theme';
 import './globals.css';
 
 // Heebo carries both Hebrew and Latin, so the UI keeps one voice across both locales.
@@ -28,7 +30,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0A0B0F',
+  // Matched to each theme's page colour, so the browser chrome on mobile does not stay
+  // black behind a light page.
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)', color: '#0A0B0F' },
+    { media: '(prefers-color-scheme: light)', color: '#F4F5F8' },
+  ],
   width: 'device-width',
   initialScale: 1,
 };
@@ -36,9 +43,12 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await resolveLocale();
   const messages = await getMessages();
+  // From the cookie, not the session: the sign-in screen has no session and should still
+  // honour the theme, and every page would otherwise pay for a query it does not need.
+  const theme = asTheme((await cookies()).get(THEME_COOKIE)?.value);
 
   return (
-    <html lang={locale} dir={LOCALE_DIR[locale]} data-theme="dark">
+    <html lang={locale} dir={LOCALE_DIR[locale]} data-theme={theme}>
       <body className={`${heebo.variable} ${plexMono.variable} min-h-screen bg-bg text-text`}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}

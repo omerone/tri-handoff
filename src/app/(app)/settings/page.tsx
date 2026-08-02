@@ -1,6 +1,7 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
-import { CurrencyChoice, LanguageChoice } from './choices';
+import { CurrencyChoice, LanguageChoice, ThemeChoice } from './choices';
+import { asTheme } from '@/lib/theme';
 import { Mt5Card, type ConnectedAccount } from './mt5-card';
 import { requireSession } from '@/lib/auth/session';
 import { getMt5Account } from '@/lib/db';
@@ -68,6 +69,13 @@ export default async function SettingsPage() {
 
       <Card title={t('language')}>
         <LanguageChoice current={session.user.locale} />
+      </Card>
+
+      <Card title={t('theme')}>
+        <ThemeChoice
+          current={asTheme(session.user.theme)}
+          labels={{ dark: t('themeDark'), light: t('themeLight'), system: t('themeSystem') }}
+        />
       </Card>
 
       <Card title={t('currency')}>

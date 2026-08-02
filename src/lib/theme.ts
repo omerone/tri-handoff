@@ -5,9 +5,31 @@
  * exists for the places that need a value in JS: SVG props in Recharts, and the heatmap /
  * R-strip which interpolate alpha at runtime.
  *
- * `TOKEN` gives the `var(--tri-*)` reference (theme-aware, use wherever CSS is accepted).
- * `RGB` gives the raw channels for building `rgba()` at a computed alpha.
+ * `TOKEN` gives the `var(--tri-*)` reference, which is theme-aware and usable wherever CSS
+ * is accepted. There is deliberately no raw-channel export: anything that needs a colour at
+ * a computed opacity uses `color-mix()` against the token, so it follows the theme instead
+ * of pinning one theme's palette into JavaScript.
  */
+
+export const THEMES = ['dark', 'light', 'system'] as const;
+export type Theme = (typeof THEMES)[number];
+
+export const DEFAULT_THEME: Theme = 'dark';
+
+export function isTheme(value: unknown): value is Theme {
+  return typeof value === 'string' && (THEMES as readonly string[]).includes(value);
+}
+
+export function asTheme(value: unknown): Theme {
+  return isTheme(value) ? value : DEFAULT_THEME;
+}
+
+/**
+ * The cookie exists so the *root layout* can pick a theme without a database round trip on
+ * every request — and, more importantly, so the sign-in screen honours the choice too, which
+ * it cannot read from a session that does not exist yet. The user row is the durable copy.
+ */
+export const THEME_COOKIE = 'tri_theme';
 
 export const TOKEN = {
   bg: 'var(--tri-bg)',
@@ -22,18 +44,6 @@ export const TOKEN = {
   neg: 'var(--tri-neg)',
   warn: 'var(--tri-warn)',
 } as const;
-
-export const RGB = {
-  bg: [10, 11, 15],
-  pos: [45, 212, 167],
-  neg: [255, 92, 122],
-  brand: [91, 140, 255],
-} as const satisfies Record<string, readonly [number, number, number]>;
-
-export function rgba(channels: readonly [number, number, number], alpha: number): string {
-  const [r, g, b] = channels;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
 
 /** Tone → token, used by KPI tiles and any figure that is coloured by sign. */
 export function toneColor(tone: 'pos' | 'neg' | 'neutral'): string {

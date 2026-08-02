@@ -30,6 +30,7 @@ export type TenantUser = {
   readonly email: string;
   readonly locale: Locale;
   readonly displayCurrency: string;
+  readonly theme: 'dark' | 'light' | 'system';
   /** Drives "sync on every login" — see components/shell/sync-status.tsx. */
   readonly lastLoginAt: Date | null;
 };

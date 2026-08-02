@@ -246,7 +246,11 @@
     "disconnectConfirm": "Disconnect the account? Trades already imported will stay.",
     "backfillNote": "The first connection pulls your entire account history from MT5.",
     "balance": "Balance",
-    "equity": "Equity"
+    "equity": "Equity",
+    "theme": "Theme",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "themeSystem": "System"
   },
   "calendar": {
     "weekdays": [

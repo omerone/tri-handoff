@@ -26,7 +26,14 @@ export async function getUser(ctx: TenantContext): Promise<TenantUser | null> {
   assertContext(ctx);
   const row = await prisma.user.findFirst({
     where: { id: ctx.userId, tenantId: ctx.tenantId },
-    select: { id: true, email: true, locale: true, displayCurrency: true, lastLoginAt: true },
+    select: {
+      id: true,
+      email: true,
+      locale: true,
+      displayCurrency: true,
+      theme: true,
+      lastLoginAt: true,
+    },
   });
   return row
     ? {
@@ -34,6 +41,7 @@ export async function getUser(ctx: TenantContext): Promise<TenantUser | null> {
         email: row.email,
         locale: row.locale,
         displayCurrency: row.displayCurrency,
+        theme: row.theme,
         lastLoginAt: row.lastLoginAt,
       }
     : null;
@@ -41,7 +49,7 @@ export async function getUser(ctx: TenantContext): Promise<TenantUser | null> {
 
 export async function updateUserPreferences(
   ctx: TenantContext,
-  data: { locale?: Locale; displayCurrency?: string },
+  data: { locale?: Locale; displayCurrency?: string; theme?: 'dark' | 'light' | 'system' },
 ): Promise<void> {
   assertContext(ctx);
   await prisma.user.updateMany({

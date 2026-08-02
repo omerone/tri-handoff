@@ -72,6 +72,28 @@ test.describe('login wall', () => {
   });
 });
 
+test.describe('theme', () => {
+  test('is dark by default and switches to light', async ({ page }) => {
+    // SPEC §1.1 asks for a light mode alongside the dark default. The theme is applied from
+    // a cookie in the root layout, so it is correct on the very first paint — including on
+    // the sign-in screen, before there is a session to read it from.
+    await page.goto('/login');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+    const background = () =>
+      page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
+    const dark = await background();
+
+    await page.context().addCookies([
+      { name: 'tri_theme', value: 'light', url: page.url() },
+    ]);
+    await page.reload();
+
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    expect(await background()).not.toBe(dark);
+  });
+});
+
 test.describe('language', () => {
   test('defaults to Hebrew RTL and switches to English LTR', async ({ page }) => {
     await page.goto('/login');

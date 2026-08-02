@@ -16,7 +16,7 @@ so nothing is silently dropped.
 | C1 | Registration | §4: "הרשמה, התחברות, שחזור סיסמה" | No public registration | §2 supersedes §4 — provisioning by super admin only; login + reset only | no |
 | C2 | Google login | §4 🔶 open | "No OAuth needed" | Not built | no |
 | C3 | Draggable/resizable dashboard grid | §1.1 — cards the user drags & resizes | not mentioned; prototype is a fixed grid | **Fixed responsive grid** (matches prototype). Drag/resize is a real scope item that the prototype dropped | **yes — flag** |
-| C4 | Light mode + custom palettes | §1.1 — "תמיכה גם במצב בהיר ופלטות מותאמות" | "Dark mode is the default" | Tokens go through CSS variables so a light theme is a later drop-in; only dark ships now | **yes — flag** |
+| C4 | Light mode + custom palettes | §1.1 — "תמיכה גם במצב בהיר ופלטות מותאמות" | "Dark mode is the default" | ✅ **Light mode built** (M1.10): dark / light / follow-system, dark still the default. **Custom palettes are still open** — see below | partly resolved |
 | C5 | Per-trade journal (notes, tags, rating, emotion, strategy) | §1.1 — adopted from tradeReport | absent from the minimum data model | ✅ **Built** (M1.9): trade report page with note, tags, rating, mood and strategy; strategy is also an analytics dimension and a trades filter | resolved |
 | C12 | Analytics timezone | §3.5 defines sessions as Asia/London/NY | — | One constant, `ANALYTICS_TIME_ZONE = 'Asia/Jerusalem'`, matching the prototype's session boundaries. Weekday, hour, session and the calendar all read from it | **flag** — a trader who relocates, or whose broker server sits elsewhere, would want this per-user. Deliberately one constant so it is a column plus a line to change |
 | C6 | Asset classes | §3.5 includes commodities (סחורות) | forex/crypto/indices/stocks | Enum includes `commodities`; symbol map classifies XAUUSD etc. | no |
@@ -65,6 +65,7 @@ log in, session persists, an unknown host is rejected, reset email flow works ag
 | 1.7 | Calendar | Month grid, daily P&L + trade count, month navigation |
 | 1.8 | Settings + FX | Language, display currency, MT5 account card w/ status + last sync. FX from `FX_API_URL` cached daily in DB, stale-tolerant fallback |
 | 1.9 | Per-trade journal (C5) ✅ | Trade report at `/trades/[id]`: note, tags, rating, mood, strategy, with suggestions drawn from what the trader has already written. The sync never writes these columns, so a refresh cannot erase them — asserted by test. Strategy becomes the by-strategy breakdown (SPEC §3.5's open 🔶) and a filter on the trades table |
+| 1.10 | Light mode (C4) ✅ | Dark / light / follow-system, chosen in settings, dark still the default. Applied from a cookie in the root layout so it is right on the first paint, including on the sign-in screen; `system` resolves in CSS alone, so there is no flash of the wrong theme. Every colour already went through a `--tri-*` variable, so this is a second palette rather than a second stylesheet — tests assert the two palettes define the same token set, that nothing pins a raw colour in JavaScript, and that `color-scheme` is declared so form controls follow |
 
 **P1 done when:** login on a tenant domain → sync runs automatically → dashboard, analytics,
 trades and calendar match the prototype in behaviour and design → Hebrew RTL and English LTR
@@ -94,6 +95,19 @@ rebinding, rename, suspend/activate, operator-set password for a client who cann
 their reset email, and deletion behind a typed confirmation.
 
 ---
+
+## Still open — the client's call
+
+Everything in SPEC §6 is built. These are the conflicts from the table above that remain
+deliberate decisions rather than gaps, listed with what each would actually cost.
+
+| # | Item | Where it stands |
+|---|---|---|
+| C4b | **Custom palettes** — the second half of §1.1's theme line | Light and dark ship. A user-defined palette means letting the user pick the accent, positive and negative colours, storing them per user and emitting them as an inline `<style>` in the root layout. The token layer already supports it; what is missing is a contrast check, since a trader who picks a pale green for profit makes their own numbers unreadable |
+| C3 | **Drag-and-resize dashboard grid** | The prototype dropped it and the grid is fixed and responsive. Adding it means a layout column per user, a drag library, and deciding what the layout does at 375px — where the cards have to stack regardless |
+| C10 | **Dividends on long positions** | SPEC §3.4 marks it open. The schema leaves room; the work is a dividend row per position and a decision on whether it feeds realized P&L or sits in the finance module as income |
+| C12 | **Per-user analytics timezone** | One constant today (`ANALYTICS_TIME_ZONE`), matching the prototype's session boundaries. Becomes a user column plus one line — but changing it re-buckets every historical trade by weekday, hour and session, so the numbers a user already knows will move |
+| — | **MetaApi against a real account** | `MetaApiProvider` is written and unit-tested against recorded shapes, but has never talked to MetaApi. It needs a subscription and a demo account. Until then `MT5_PROVIDER=mock` is the only proven path |
 
 ## Working rules
 

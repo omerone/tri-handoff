@@ -2,9 +2,11 @@
 
 /* ---------------------------------------------------------------------------
    TRi design tokens — extracted from docs/tri-prototype.jsx.
-   Every colour is routed through a CSS variable so that adding the light theme
-   promised in SPEC §1.1 is a matter of overriding this block, not touching
-   components. Dark is the default and the only theme that ships today.
+
+   Every colour is routed through a CSS variable, which is what made the light
+   theme in SPEC §1.1 a second block rather than a rewrite. Dark remains the
+   default; `system` follows the operating system and is resolved in CSS, not
+   JavaScript, so there is no flash of the wrong theme before hydration.
    --------------------------------------------------------------------------- */
 :root,
 [data-theme='dark'] {
@@ -26,7 +28,81 @@
   --tri-neg-soft: rgba(255, 92, 122, 0.14);
   --tri-neg-edge: rgba(255, 92, 122, 0.4);
 
+  /* The sticky header sits over scrolling content, so it needs the page colour at
+     near-opacity rather than `surface`. */
+  --tri-header: rgba(10, 11, 15, 0.9);
+  /* Text drawn on top of a saturated heat cell. */
+  --tri-on-heat: #0a0b0f;
+
   color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------------
+   Light theme.
+
+   Not the dark palette inverted. Two things change beyond lightness:
+
+   - The greens and reds are darkened. #2DD4A7 reads beautifully on near-black
+     and fails contrast on white — a P&L figure a trader squints at is the last
+     place to accept that. These pass AA for body text against `surface`.
+   - `bg` is a light grey rather than white, with `surface` white above it, so
+     cards still read as raised. The reverse (white page, grey cards) inverts
+     the depth cue the dark theme establishes.
+   --------------------------------------------------------------------------- */
+[data-theme='light'] {
+  --tri-bg: #f4f5f8;
+  --tri-surface: #ffffff;
+  --tri-raised: #eef0f5;
+  --tri-line: rgba(16, 18, 27, 0.1);
+  --tri-text: #14161c;
+  --tri-dim: #5b6376;
+  --tri-brand: #3b6fe0;
+  --tri-brand-2: #7b4de0;
+  --tri-pos: #0e8f6c;
+  --tri-neg: #d42a4d;
+  --tri-warn: #a9650a;
+
+  --tri-pos-soft: rgba(14, 143, 108, 0.13);
+  --tri-pos-edge: rgba(14, 143, 108, 0.35);
+  --tri-neg-soft: rgba(212, 42, 77, 0.12);
+  --tri-neg-edge: rgba(212, 42, 77, 0.35);
+
+  --tri-header: rgba(244, 245, 248, 0.9);
+  --tri-on-heat: #14161c;
+
+  color-scheme: light;
+}
+
+/*
+ * `system` resolves in CSS. Doing it in JavaScript would mean rendering one theme on the
+ * server and correcting it after hydration, which is a visible flash on every page load.
+ */
+[data-theme='system'] {
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-theme='system'] {
+    --tri-bg: #f4f5f8;
+    --tri-surface: #ffffff;
+    --tri-raised: #eef0f5;
+    --tri-line: rgba(16, 18, 27, 0.1);
+    --tri-text: #14161c;
+    --tri-dim: #5b6376;
+    --tri-brand: #3b6fe0;
+    --tri-brand-2: #7b4de0;
+    --tri-pos: #0e8f6c;
+    --tri-neg: #d42a4d;
+    --tri-warn: #a9650a;
+
+    --tri-pos-soft: rgba(14, 143, 108, 0.13);
+    --tri-pos-edge: rgba(14, 143, 108, 0.35);
+    --tri-neg-soft: rgba(212, 42, 77, 0.12);
+    --tri-neg-edge: rgba(212, 42, 77, 0.35);
+
+    --tri-header: rgba(244, 245, 248, 0.9);
+    --tri-on-heat: #14161c;
+  }
 }
 
 @theme inline {
@@ -41,6 +117,8 @@
   --color-pos: var(--tri-pos);
   --color-neg: var(--tri-neg);
   --color-warn: var(--tri-warn);
+  --color-header: var(--tri-header);
+  --color-on-heat: var(--tri-on-heat);
 
   --font-sans: var(--font-heebo), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
@@ -72,7 +150,8 @@ body {
   width: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2e3a;
+  /* Derived from the line colour so it works in both themes. */
+  background: color-mix(in srgb, var(--tri-dim) 45%, transparent);
   border-radius: 3px;
 }
 

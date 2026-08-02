@@ -246,7 +246,11 @@
     "disconnectConfirm": "לנתק את החשבון? העסקאות שכבר יובאו יישארו.",
     "backfillNote": "בחיבור הראשון נמשכת כל היסטוריית החשבון מ-MT5.",
     "balance": "יתרה",
-    "equity": "הון"
+    "equity": "הון",
+    "theme": "ערכת נושא",
+    "themeDark": "כהה",
+    "themeLight": "בהיר",
+    "themeSystem": "לפי המערכת"
   },
   "calendar": {
     "weekdays": [

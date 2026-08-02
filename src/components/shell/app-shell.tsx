@@ -29,7 +29,7 @@ export async function AppShell({
 
   return (
     <div className="min-h-screen">
-      <header className="border-line sticky top-0 z-20 border-b bg-[rgba(10,11,15,0.9)] backdrop-blur-[8px]">
+      <header className="border-line bg-header sticky top-0 z-20 border-b backdrop-blur-[8px]">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
             <div

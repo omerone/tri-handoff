@@ -51,6 +51,15 @@ enum Locale {
   en
 }
 
+/// SPEC §1.1 asks for a light mode alongside the dark default. `system` follows the
+/// operating system, which is resolved in CSS rather than JavaScript so there is no flash
+/// of the wrong theme on first paint.
+enum Theme {
+  dark
+  light
+  system
+}
+
 model User {
   id       String @id @default(cuid())
   /// Unique: one trader per tenant domain.
@@ -62,6 +71,7 @@ model User {
   /// ISO-4217 code the UI renders figures in. Trading data arrives in the MT5 account
   /// currency and finance data in ILS; both are converted for display.
   displayCurrency String @default("ILS") @map("display_currency")
+  theme           Theme  @default(dark)
 
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")

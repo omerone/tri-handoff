@@ -19,7 +19,6 @@ import { loadBook } from '@/lib/analytics/load';
 import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
-import { RGB, rgba } from '@/lib/theme';
 import { SESSIONS, WEEKDAYS } from '@/lib/analytics/dimensions';
 
 /**
@@ -221,10 +220,15 @@ function Row({
     <>
       <div className="text-dim flex items-center text-xs">{label}</div>
       {cells.map((cell) => {
-        // Alpha scales with magnitude relative to the strongest cell, plus a floor so an
+        // Intensity scales with magnitude relative to the strongest cell, plus a floor so an
         // empty square still reads as a square rather than a hole in the grid.
-        const alpha = (Math.min(Math.abs(cell.net) / maxAbs, 1) * 0.8 + 0.06).toFixed(3);
-        const background = rgba(cell.net >= 0 ? RGB.pos : RGB.neg, Number(alpha));
+        //
+        // `color-mix` against the semantic token rather than a hardcoded RGB triple: the
+        // light theme darkens its greens and reds for contrast, and a fixed triple would
+        // leave the heatmap tinted in the other theme's colours.
+        const intensity = (Math.min(Math.abs(cell.net) / maxAbs, 1) * 0.8 + 0.06) * 100;
+        const token = cell.net >= 0 ? 'var(--tri-pos)' : 'var(--tri-neg)';
+        const background = `color-mix(in srgb, ${token} ${intensity.toFixed(1)}%, transparent)`;
 
         return (
           <div
@@ -232,10 +236,10 @@ function Row({
             className="rounded-[10px] px-2.5 py-2 text-center"
             style={{ background }}
           >
-            <div className="text-xs font-bold" style={{ color: '#0A0B0F' }}>
+            <div className="text-on-heat text-xs font-bold">
               <Num>{money(cell.net, { signed: true })}</Num>
             </div>
-            <div className="text-[10px]" style={{ color: 'rgba(10,11,15,0.7)' }}>
+            <div className="text-on-heat/70 text-[10px]">
               {tradeCount(cell.count)}
             </div>
           </div>

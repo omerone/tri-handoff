@@ -90,6 +90,7 @@ function record(overrides: Partial<SessionRecord> = {}): SessionRecord {
     email: 'alice@example.test',
     locale: 'he',
     displayCurrency: 'ILS',
+    theme: 'dark',
     lastLoginAt: null,
     tenantName: TENANT.name,
     tenantDomain: TENANT.domain,
@@ -127,6 +128,7 @@ describe('getSession', () => {
       email: 'alice@example.test',
       locale: 'he',
       displayCurrency: 'ILS',
+      theme: 'dark',
       // Carried on the session so the shell can tell a login has happened since the last
       // sync without a second query — see components/shell/sync-status.tsx.
       lastLoginAt: null,
