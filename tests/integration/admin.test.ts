@@ -146,7 +146,9 @@ describe('sync health', () => {
 
 describe('platform stats', () => {
   it('counts clients, active clients, connections and failures', async () => {
-    const stats = await platformStats();
+    // Derived from rows the caller already has, rather than re-running the cross-tenant
+    // query the operator page has just run.
+    const stats = platformStats(await syncHealth());
     expect(stats.tenants).toBeGreaterThanOrEqual(4);
     expect(stats.connected).toBeGreaterThanOrEqual(2);
     expect(stats.failing).toBeGreaterThanOrEqual(1);

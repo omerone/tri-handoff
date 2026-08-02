@@ -42,13 +42,22 @@ export default async function LongPositionsPage() {
   const now = new Date();
   const display = asCurrency(session.user.displayCurrency);
 
-  // One rate per currency actually held, fetched once each.
+  // One rate per currency actually held, resolved in parallel.
+  //
+  // A missing rate used to fall back to 1:1 *per currency*, so a portfolio holding EUR and
+  // GBP with only one rate available produced totals that mixed converted and unconverted
+  // legs — a single number that was wrong in a way nothing on the page could reveal. Now a
+  // missing rate withholds the totals and says so.
   const currencies = [...new Set(positions.map((p) => p.currency))];
   const rates = new Map<string, number>();
-  for (const currency of currencies) {
-    const fx = await getFxRate(currency, display);
-    rates.set(currency, hasRate(fx) ? fx.rate : 1);
-  }
+  let allConverted = true;
+  await Promise.all(
+    currencies.map(async (currency) => {
+      const fx = await getFxRate(currency, display);
+      if (hasRate(fx)) rates.set(currency, fx.rate);
+      else allConverted = false;
+    }),
+  );
   const toDisplay = (amount: number, currency: string) => amount * (rates.get(currency) ?? 1);
 
   const money = (amount: number, currency: Currency, options: { signed?: boolean } = {}) =>
@@ -131,23 +140,35 @@ export default async function LongPositionsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KPI label={t('cost')} value={formatMoney(totals.cost, display, locale)} />
-        <KPI label={t('value')} value={formatMoney(totals.value, display, locale)} />
+        <KPI
+          label={t('cost')}
+          value={allConverted ? formatMoney(totals.cost, display, locale) : '—'}
+        />
+        <KPI
+          label={t('value')}
+          value={allConverted ? formatMoney(totals.value, display, locale) : '—'}
+        />
         <KPI
           label={t('unrealized')}
-          value={formatMoney(totals.unrealized, display, locale, { signed: true })}
+          value={
+            allConverted ? formatMoney(totals.unrealized, display, locale, { signed: true }) : '—'
+          }
           tone={totals.unrealized >= 0 ? 'pos' : 'neg'}
-          sub={formatPercent(totals.unrealizedPercent, locale)}
+          sub={allConverted ? formatPercent(totals.unrealizedPercent, locale) : undefined}
         />
         <KPI
           label={t('realized')}
-          value={formatMoney(totals.realized, display, locale, { signed: true })}
+          value={
+            allConverted ? formatMoney(totals.realized, display, locale, { signed: true }) : '—'
+          }
           tone={totals.realized >= 0 ? 'pos' : 'neg'}
           // The stalest price is the honest headline for how current the valuation is; an
           // average would hide a holding nobody has looked at since spring.
           sub={totals.openCount > 0 ? t('stalest', { days: totals.stalestPriceDays }) : undefined}
         />
       </div>
+
+      {allConverted ? null : <p className="text-warn text-xs">{t('fxUnavailable')}</p>}
 
       <Card title={t('title')}>
         <p className="text-dim mb-3 text-xs">{t('subtitle')}</p>

@@ -143,6 +143,77 @@ describe('portfolioTotals', () => {
   });
 });
 
+describe('portfolioTotals across currencies', () => {
+  /**
+   * The roll-up is deliberately currency-blind — `/long` and `/finance` convert each position
+   * into the display currency and only then total them. That contract has two halves, and
+   * both are load-bearing: the function must not start reading `currency` itself, and the
+   * caller must scale *every* money field. Forgetting one (fees is the easy one to miss)
+   * gives a total that is nearly right, which is the worst kind.
+   */
+  const rate = 3.71; // USD → ILS.
+  const scale = (position: LongPosition): LongPosition => ({
+    ...position,
+    buyPrice: position.buyPrice * rate,
+    currentPrice: position.currentPrice * rate,
+    fees: position.fees * rate,
+    realizedPnl: position.realizedPnl === null ? null : position.realizedPnl * rate,
+  });
+
+  const portfolio = [
+    position({ qty: 25, buyPrice: 182.4, currentPrice: 236.1, fees: 12, valueUpdatedAt: daysAgo(5) }),
+    position({ symbol: 'QQQ', qty: 10, buyPrice: 418, currentPrice: 512.3, fees: 7.5, valueUpdatedAt: daysAgo(20) }),
+    position({ symbol: 'KO', closedAt: daysAgo(9), realizedPnl: 640 }),
+  ];
+
+  it('does not look at the currency field', () => {
+    // Two portfolios that differ only in what currency they claim to be in must total the
+    // same, because by the time they get here they are both in the display currency.
+    const relabelled = portfolio.map((p) => ({ ...p, currency: 'EUR' }));
+    expect(portfolioTotals(relabelled, NOW)).toEqual(portfolioTotals(portfolio, NOW));
+  });
+
+  it('scales exactly with the rate, and leaves the percentage alone', () => {
+    const native = portfolioTotals(portfolio, NOW);
+    const converted = portfolioTotals(portfolio.map(scale), NOW);
+
+    expect(converted.cost).toBeCloseTo(native.cost * rate, 6);
+    expect(converted.value).toBeCloseTo(native.value * rate, 6);
+    expect(converted.unrealized).toBeCloseTo(native.unrealized * rate, 6);
+    expect(converted.realized).toBeCloseTo(native.realized * rate, 6);
+
+    // A return is a ratio: converting the portfolio must not change it. This is what catches
+    // a fee left in dollars while the prices went to shekels.
+    expect(converted.unrealizedPercent).toBeCloseTo(native.unrealizedPercent, 9);
+    expect(converted.stalestPriceDays).toBe(native.stalestPriceDays);
+  });
+
+  it('totals a mixed-currency book correctly only once each position is converted', () => {
+    // A dollar holding and a euro holding, both to be read in shekels.
+    const rates: Record<string, number> = { USD: 3.71, EUR: 4.02 };
+    const mixed = [
+      position({ symbol: 'AAPL', currency: 'USD', qty: 10, buyPrice: 200, currentPrice: 220, fees: 5 }),
+      position({ symbol: 'ASML', currency: 'EUR', qty: 4, buyPrice: 700, currentPrice: 780, fees: 9 }),
+    ];
+    const toIls = mixed.map((p) => ({
+      ...p,
+      buyPrice: p.buyPrice * rates[p.currency]!,
+      currentPrice: p.currentPrice * rates[p.currency]!,
+      fees: p.fees * rates[p.currency]!,
+    }));
+
+    const totals = portfolioTotals(toIls, NOW);
+
+    // 10×220×3.71 + 4×780×4.02
+    expect(totals.value).toBeCloseTo(8_162 + 12_542.4, 6);
+    expect(totals.cost).toBeCloseTo((2_000 + 5) * 3.71 + (2_800 + 9) * 4.02, 6);
+
+    // And the sum of the raw numbers — the mistake this guards against — is a different
+    // figure entirely, in no currency at all.
+    expect(portfolioTotals(mixed, NOW).value).not.toBeCloseTo(totals.value, 0);
+  });
+});
+
 describe('realizedPnlOnClose', () => {
   it('is proceeds minus the cost basis', () => {
     const holding = position({ qty: 25, buyPrice: 182.4, fees: 20 });

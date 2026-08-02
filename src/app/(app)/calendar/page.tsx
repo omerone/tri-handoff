@@ -4,6 +4,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
+import { parseYearMonth, stepMonth } from '@/lib/finance/bounds';
 import { dailyTotals } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
@@ -42,7 +43,7 @@ export default async function CalendarPage({
   // trader back from a break, would otherwise open on an empty grid.
   const newest = book.trades.at(-1)?.closeAt ?? new Date();
   const fallback = wallClock(newest);
-  const { year, month } = parseMonth(params.m) ?? { year: fallback.year, month: fallback.month };
+  const { year, month } = parseYearMonth(params.m) ?? { year: fallback.year, month: fallback.month };
 
   const weekdayNames = (await getTranslations('calendar')).raw('weekdays') as string[];
   const monthName = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
@@ -64,10 +65,8 @@ export default async function CalendarPage({
     .reduce((sum, [, day]) => sum + day.net, 0);
 
   const step = (delta: number) => {
-    const next = month + delta;
-    const y = next < 1 ? year - 1 : next > 12 ? year + 1 : year;
-    const m = next < 1 ? 12 : next > 12 ? 1 : next;
-    return `?m=${y}-${String(m).padStart(2, '0')}`;
+    const next = stepMonth({ year, month }, delta);
+    return `?m=${next.year}-${String(next.month).padStart(2, '0')}`;
   };
 
   const navButton =
@@ -147,13 +146,4 @@ export default async function CalendarPage({
       </div>
     </Card>
   );
-}
-
-function parseMonth(value: string | undefined): { year: number; month: number } | null {
-  const match = /^(\d{4})-(\d{2})$/.exec(value ?? '');
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  if (month < 1 || month > 12 || year < 1970 || year > 2999) return null;
-  return { year, month };
 }

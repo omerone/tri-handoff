@@ -21,7 +21,7 @@ export type DisplayMoney = {
   /** The serialisable half, for client components — see `MoneyDisplay`. */
   display: MoneyDisplay;
   /** The currency figures are actually being rendered in. */
-  currency: Currency;
+  currency: Currency | string;
   sourceCurrency: string;
   /** False when no rate was available and amounts are shown in the source currency. */
   converted: boolean;
@@ -42,7 +42,11 @@ export async function displayMoney(options: {
   const fx = await getFxRate(source, target);
   const converted = hasRate(fx);
 
-  const currency = converted ? target : asCurrency(source, target);
+  // With no rate the amount stays in its source currency, so the symbol must too — including
+  // when that currency is not one the user can choose to read in. `asCurrency` used to be
+  // here and silently substituted the *target* for any unrecognised code, which rendered a
+  // thousand Swiss francs as "$1,000": the exact failure this module exists to prevent.
+  const currency: Currency | string = converted ? target : source;
 
   const money: MoneyFormatter = (amount, opts) =>
     formatMoney(converted ? convert(amount, fx) : amount, currency, options.locale, opts);

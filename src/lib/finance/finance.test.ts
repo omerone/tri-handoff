@@ -297,3 +297,147 @@ describe('monthsWithActivity', () => {
     expect(monthsWithActivity([], { year: 2026, month: 7 })).toEqual([{ year: 2026, month: 7 }]);
   });
 });
+
+/**
+ * The corners of the expansion that a reasonable reading gets wrong.
+ *
+ * Each of these has two plausible answers and no error in either direction — the wrong one
+ * just produces a month that quietly does not add up.
+ */
+describe('series boundaries', () => {
+  it('treats recurringUntil as the last month, not the last day', () => {
+    // `endRecurringSeries` writes the last day of a month, but nothing stops a mid-month date
+    // getting in. The comparison is against the start of the month, so a series ending on the
+    // 15th still pays on the 20th that month — which is the intent: a series ends at the end
+    // of a month, and the alternative (dropping the last occurrence) would silently delete a
+    // salary the user was paid.
+    const salary = entry({
+      type: 'income',
+      amountIls: 12_000,
+      entryDate: day(2026, 1, 20),
+      isRecurring: true,
+      recurringUntil: day(2026, 3, 15),
+    });
+
+    const march = occurrencesInMonth([salary], 2026, 3);
+    expect(march).toHaveLength(1);
+    expect(march[0]!.occurrenceDate).toEqual(day(2026, 3, 20));
+    expect(monthBalance([salary], 2026, 3).income).toBe(12_000);
+
+    // …and the month after the bound is empty.
+    expect(occurrencesInMonth([salary], 2026, 4)).toHaveLength(0);
+  });
+
+  it('does not start a series in the month before its anchor, even mid-month', () => {
+    const entries = [entry({ entryDate: day(2026, 2, 15), isRecurring: true })];
+    expect(occurrencesInMonth(entries, 2026, 1)).toHaveLength(0);
+    expect(occurrencesInMonth(entries, 2026, 2)).toHaveLength(1);
+  });
+});
+
+describe('a series anchored on 29 February', () => {
+  // The one anchor day that exists in some years and not others. Clamping is the same rule
+  // as the 31st, but 29 February is the case where a leap-year-blind implementation looks
+  // correct for three years and then loses a month.
+  const leapDay = entry({ entryDate: day(2028, 2, 29), isRecurring: true, amountIls: 900 });
+
+  it('falls back to the 28th in a non-leap February', () => {
+    const february = occurrencesInMonth([leapDay], 2029, 2);
+    expect(february).toHaveLength(1);
+    expect(february[0]!.occurrenceDate).toEqual(day(2029, 2, 28));
+  });
+
+  it('returns to the 29th in the next leap year', () => {
+    expect(occurrencesInMonth([leapDay], 2032, 2)[0]!.occurrenceDate).toEqual(day(2032, 2, 29));
+  });
+
+  it('keeps the 29th in every month long enough to have one', () => {
+    expect(occurrencesInMonth([leapDay], 2028, 3)[0]!.occurrenceDate).toEqual(day(2028, 3, 29));
+    expect(occurrencesInMonth([leapDay], 2029, 1)[0]!.occurrenceDate).toEqual(day(2029, 1, 29));
+  });
+
+  it('is charged in every month, leap year or not', () => {
+    for (const [year, month] of [
+      [2028, 2],
+      [2029, 2],
+      [2030, 2],
+      [2031, 2],
+    ] as const) {
+      expect(monthBalance([leapDay], year, month).expenses, `${year}-${month}`).toBe(900);
+    }
+  });
+});
+
+describe('a generated occurrence and a one-off on the same day', () => {
+  const series = entry({
+    id: 'series',
+    type: 'income',
+    amountIls: 1_000,
+    entryDate: day(2026, 1, 5),
+    isRecurring: true,
+  });
+  const oneOff = entry({ id: 'oneoff', amountIls: 250, entryDate: day(2026, 3, 5) });
+
+  it('keeps both — neither collides with nor replaces the other', () => {
+    const march = occurrencesInMonth([series, oneOff], 2026, 3);
+
+    expect(march).toHaveLength(2);
+    expect(march.map((o) => o.id).sort()).toEqual(['oneoff', 'series']);
+    expect(monthBalance([series, oneOff], 2026, 3)).toMatchObject({
+      income: 1_000,
+      expenses: 250,
+      net: 750,
+    });
+  });
+
+  it('gives them distinct React keys', () => {
+    // The list is keyed on `id:occurrenceDate`, so two rows on one day sharing a key would
+    // make React drop one of them from the DOM while the totals still counted it.
+    const keys = occurrencesInMonth([series, oneOff], 2026, 3).map(
+      (o) => `${o.id}:${o.occurrenceDate.toISOString()}`,
+    );
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('orders same-day entries by the order they were read in', () => {
+    // The sort compares occurrence dates only, and a same-day tie therefore falls back to the
+    // repository's `entryDate asc`. That is deterministic, which is what the screen needs —
+    // rows that swap places between two renders of the same month look like a bug.
+    expect(occurrencesInMonth([series, oneOff], 2026, 3).map((o) => o.id)).toEqual([
+      'series',
+      'oneoff',
+    ]);
+    expect(occurrencesInMonth([oneOff, series], 2026, 3).map((o) => o.id)).toEqual([
+      'oneoff',
+      'series',
+    ]);
+  });
+});
+
+describe('cumulativeCash over a long history', () => {
+  it('terminates on a series anchored decades ago, and counts every month of it', () => {
+    // The loop walks month by month from the earliest entry. An entry backdated thirty years
+    // — a typo in the date field is enough — must still return, and return the right figure
+    // rather than stopping at some horizon.
+    const entries = [
+      entry({ type: 'income', amountIls: 100, entryDate: day(1995, 6, 1), isRecurring: true }),
+    ];
+
+    // June 1995 through August 2026 inclusive: 375 months.
+    expect(cumulativeCash(entries, { year: 2026, month: 8 })).toBe(37_500);
+  });
+
+  it('counts a one-off from decades ago exactly once', () => {
+    const entries = [entry({ type: 'income', amountIls: 5_000, entryDate: day(1999, 3, 3) })];
+    expect(cumulativeCash(entries, { year: 2026, month: 8 })).toBe(5_000);
+  });
+
+  it('is zero for a month before anything was recorded', () => {
+    // Browsing back past the first entry: nothing has been recorded yet, so there is no cash.
+    const entries = [
+      entry({ type: 'income', amountIls: 100, entryDate: day(2026, 6, 1), isRecurring: true }),
+    ];
+    expect(cumulativeCash(entries, { year: 2026, month: 5 })).toBe(0);
+    expect(cumulativeCash(entries, { year: 2025, month: 12 })).toBe(0);
+  });
+});

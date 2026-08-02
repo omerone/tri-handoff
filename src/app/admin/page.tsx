@@ -17,7 +17,8 @@ export const dynamic = 'force-dynamic';
  */
 export default async function AdminPage() {
   const admin = await requireAdmin();
-  const [stats, health] = await Promise.all([platformStats(), syncHealth()]);
+  const health = await syncHealth();
+  const stats = platformStats(health);
 
   return (
     <div className="flex flex-col gap-5">

@@ -10,6 +10,7 @@ export type EntryRowLabels = {
   deleteConfirm: string;
   endSeries: string;
   endSeriesConfirm: string;
+  deleteSeriesConfirm: string;
 };
 
 export type EntryRowData = {
@@ -68,9 +69,13 @@ export function EntryRow({
         </div>
 
         {/*
-          A recurring series is ended, not deleted: deleting the row would remove it from
-          every month it has already appeared in, silently rewriting last year's balance.
-          One-off entries have no such history, so those really are deleted.
+          A recurring series offers both actions, and they mean different things.
+
+          *End series* is the normal one: it stops the entry from here on and leaves every
+          month it has already appeared in untouched, so last year's balance does not change
+          because someone left a job. *Delete* removes it from every month — which is wrong
+          for a salary that ended, and exactly right for one that was entered by mistake.
+          Without it a mistyped recurring entry would be uncorrectable forever.
         */}
         {entry.isRecurring ? (
           <form action={endRecurringSeriesAction}>
@@ -89,22 +94,23 @@ export function EntryRow({
               <Repeat size={14} aria-hidden />
             </button>
           </form>
-        ) : (
-          <form action={deleteFinanceEntryAction}>
-            <input type="hidden" name="id" value={entry.id} />
-            <button
-              type="submit"
-              title={labels.delete}
-              aria-label={labels.delete}
-              onClick={(event) => {
-                if (!window.confirm(labels.deleteConfirm)) event.preventDefault();
-              }}
-              className="text-dim hover:text-neg"
-            >
-              <Trash2 size={14} aria-hidden />
-            </button>
-          </form>
-        )}
+        ) : null}
+
+        <form action={deleteFinanceEntryAction}>
+          <input type="hidden" name="id" value={entry.id} />
+          <button
+            type="submit"
+            title={labels.delete}
+            aria-label={labels.delete}
+            onClick={(event) => {
+              const message = entry.isRecurring ? labels.deleteSeriesConfirm : labels.deleteConfirm;
+              if (!window.confirm(message)) event.preventDefault();
+            }}
+            className="text-dim hover:text-neg"
+          >
+            <Trash2 size={14} aria-hidden />
+          </button>
+        </form>
       </div>
     </div>
   );

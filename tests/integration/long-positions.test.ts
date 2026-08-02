@@ -7,7 +7,7 @@ import {
   listLongPositions,
   updateCurrentPrice,
 } from '@/lib/db';
-import { realizedPnlOnClose, valuePosition } from '@/lib/positions/valuation';
+import { portfolioTotals, realizedPnlOnClose, valuePosition } from '@/lib/positions/valuation';
 import { cleanup, createTenantFixture, crossTenantContext, type Fixture } from '../helpers/fixtures';
 
 let alice: Fixture;
@@ -168,5 +168,99 @@ describe('tenant isolation', () => {
     const target = (await listLongPositions(alice.ctx))[0]!;
     expect(await deleteLongPosition(alice.ctx, target.id)).toBe(true);
     expect(await getLongPosition(alice.ctx, target.id)).toBeNull();
+  });
+});
+
+/**
+ * Selling a holding that was entered and then never marked to market.
+ *
+ * This is the ordinary case for anything bought and sold inside a few weeks, and it is the
+ * one where the manual-price design could go wrong quietly: `currentPrice` is still the buy
+ * price, so a close that leaned on it — rather than on the sell price the user typed — would
+ * realize zero and look like a position that went nowhere.
+ *
+ * Its own tenant, so the ordering the isolation tests above rely on is left alone.
+ */
+describe('closing a position whose price was never updated', () => {
+  let carol: Fixture;
+
+  beforeAll(async () => {
+    carol = await createTenantFixture();
+  });
+
+  it('realizes against the sell price, not the untouched current price', async () => {
+    const created = await seedPosition(carol, {
+      symbol: 'SHOP',
+      qty: 40,
+      buyPrice: 62.5,
+      fees: 18,
+    });
+    // Nothing has been marked: the position is still carrying its purchase price.
+    expect(created.currentPrice).toBe(62.5);
+
+    const realized = realizedPnlOnClose(created, 71);
+    const closedAt = new Date();
+    expect(
+      await closeLongPosition(carol.ctx, created.id, { sellPrice: 71, realizedPnl: realized, closedAt }),
+    ).toBe(true);
+
+    const closed = await getLongPosition(carol.ctx, created.id)!;
+    // 40 × 71 − (40 × 62.5 + 18) = 2840 − 2518
+    expect(closed!.realizedPnl).toBeCloseTo(322, 6);
+    expect(closed!.currentPrice).toBe(71);
+    // The stamp becomes the close: after a sale the last known price is the price it sold at,
+    // and it is exactly as old as the sale.
+    expect(closed!.valueUpdatedAt.getTime()).toBe(closedAt.getTime());
+  });
+
+  it('realizes the fees, and only the fees, when it sells for what it cost', async () => {
+    const created = await seedPosition(carol, { symbol: 'GOLD', qty: 5, buyPrice: 200, fees: 30 });
+
+    await closeLongPosition(carol.ctx, created.id, {
+      sellPrice: 200,
+      realizedPnl: realizedPnlOnClose(created, 200),
+      closedAt: new Date(),
+    });
+
+    // Flat on price is not flat on money.
+    expect((await getLongPosition(carol.ctx, created.id))!.realizedPnl).toBeCloseTo(-30, 6);
+  });
+
+  it('drops out of the open roll-up entirely once closed', async () => {
+    const before = portfolioTotals(await listLongPositions(carol.ctx), new Date());
+
+    const created = await seedPosition(carol, { symbol: 'RIVN', qty: 10, buyPrice: 15, fees: 0 });
+    const opened = portfolioTotals(await listLongPositions(carol.ctx), new Date());
+    expect(opened.openCount).toBe(before.openCount + 1);
+    expect(opened.cost).toBeCloseTo(before.cost + 150, 6);
+
+    await closeLongPosition(carol.ctx, created.id, {
+      sellPrice: 21,
+      realizedPnl: realizedPnlOnClose(created, 21),
+      closedAt: new Date(),
+    });
+
+    const after = portfolioTotals(await listLongPositions(carol.ctx), new Date());
+    expect(after.openCount).toBe(before.openCount);
+    expect(after.cost).toBeCloseTo(before.cost, 6);
+    expect(after.realized).toBeCloseTo(before.realized + 60, 6);
+  });
+
+  it('refuses to re-price a closed position', async () => {
+    // The stored price is the sale price and the realized figure was computed from it.
+    // Letting a stray price update through would leave the row describing a sale that did
+    // not happen, and `valueUpdatedAt` claiming the close was more recent than it was.
+    const created = await seedPosition(carol, { symbol: 'PLTR', qty: 20, buyPrice: 30, fees: 0 });
+    await closeLongPosition(carol.ctx, created.id, {
+      sellPrice: 45,
+      realizedPnl: realizedPnlOnClose(created, 45),
+      closedAt: new Date(),
+    });
+
+    expect(await updateCurrentPrice(carol.ctx, created.id, 999)).toBe(false);
+
+    const stored = await getLongPosition(carol.ctx, created.id);
+    expect(stored!.currentPrice).toBe(45);
+    expect(stored!.realizedPnl).toBeCloseTo(300, 6);
   });
 });

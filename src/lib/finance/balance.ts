@@ -104,27 +104,49 @@ export function cumulativeCash(
   entries: readonly FinanceEntry[],
   through: { year: number; month: number },
 ): number {
-  if (entries.length === 0) return 0;
-
-  const earliest = entries.reduce(
-    (min, entry) => (entry.entryDate < min ? entry.entryDate : min),
-    entries[0]!.entryDate,
-  );
-
+  const throughIndex = monthIndex(through.year, through.month);
   let total = 0;
-  let year = earliest.getUTCFullYear();
-  let month = earliest.getUTCMonth() + 1;
 
-  while (year < through.year || (year === through.year && month <= through.month)) {
-    total += monthBalance(entries, year, month).net;
-    month += 1;
-    if (month > 12) {
-      month = 1;
-      year += 1;
+  for (const entry of entries) {
+    const sign = entry.type === 'income' ? 1 : -1;
+    const start = monthIndexOf(entry.entryDate);
+    if (start > throughIndex) continue;
+
+    if (!entry.isRecurring) {
+      total += sign * entry.amountIls;
+      continue;
     }
+
+    const end = entry.recurringUntil ? monthIndexOf(entry.recurringUntil) : throughIndex;
+    const last = Math.min(end, throughIndex);
+    if (last < start) continue;
+
+    total += sign * entry.amountIls * (last - start + 1);
   }
 
   return total;
+}
+
+/**
+ * Months since year zero. Turns "how many times does this series fall between two months"
+ * into subtraction.
+ *
+ * The earlier version of `cumulativeCash` walked the calendar one month at a time from the
+ * oldest entry, re-scanning every entry each step. That is fine for a normal budget and a
+ * denial-of-service otherwise: a single entry backdated to the year 1 and a request for
+ * `?m=2999-12` produced ~36,000 iterations of a full scan — measured at ten seconds of
+ * blocking CPU on the event loop that serves every tenant. Counting instead of iterating
+ * makes it one pass over the entries regardless of the dates involved.
+ *
+ * The count must agree exactly with `occurrencesInMonth`, which includes a series in the
+ * month containing `recurringUntil` and in its own anchor month — hence inclusive bounds.
+ */
+function monthIndex(year: number, month: number): number {
+  return year * 12 + (month - 1);
+}
+
+function monthIndexOf(date: Date): number {
+  return monthIndex(date.getUTCFullYear(), date.getUTCMonth() + 1);
 }
 
 /**

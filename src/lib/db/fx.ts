@@ -29,6 +29,29 @@ export async function readCachedRate(
 }
 
 /**
+ * The newest rate published within the last `maxAgeDays`.
+ *
+ * Looking up *today* exactly was a design error: the feeds publish on business days, so on a
+ * Saturday `readCachedRate(today)` misses, the fetch stores the rate under its own Friday
+ * date, and the next request misses again — permanently, two days a week plus holidays, with
+ * a live HTTP call on every render in between. A short window absorbs the weekend without
+ * pretending a month-old rate is current.
+ */
+export async function readRecentRate(
+  base: string,
+  quote: string,
+  maxAgeDays: number,
+): Promise<CachedRate | null> {
+  const floor = new Date(Date.now() - maxAgeDays * 86_400_000);
+  const row = await prisma.fxRate.findFirst({
+    where: { base, quote, asOf: { gte: dayOf(floor) } },
+    orderBy: { asOf: 'desc' },
+    select: { rate: true, asOf: true, fetchedAt: true },
+  });
+  return row ? { rate: Number(row.rate), asOf: row.asOf, fetchedAt: row.fetchedAt } : null;
+}
+
+/**
  * The most recent rate we hold, whatever its date.
  *
  * The fallback when the rate API is unreachable: a rate from yesterday is a far better

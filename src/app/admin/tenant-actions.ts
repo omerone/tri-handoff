@@ -94,7 +94,6 @@ export async function setClientPasswordAction(
 
 const deleteSchema = z.object({
   tenantId: z.string().min(1),
-  domain: z.string().min(1),
   confirm: z.string().min(1),
 });
 
@@ -113,12 +112,17 @@ export async function deleteTenantAction(
 
   const parsed = deleteSchema.safeParse({
     tenantId: formData.get('tenantId'),
-    domain: formData.get('domain'),
     confirm: formData.get('confirm'),
   });
   if (!parsed.success) return { error: 'Type the domain to confirm.' };
 
-  if (parsed.data.confirm.trim().toLowerCase() !== parsed.data.domain.trim().toLowerCase()) {
+  // The domain is read from the database, not from the form. Comparing two fields of the
+  // same request only proves the request agrees with itself — a stale or tampered form could
+  // pair one tenant's id with another tenant's domain and pass.
+  const tenant = await getTenantDetail(parsed.data.tenantId);
+  if (!tenant) return { error: 'That client no longer exists.' };
+
+  if (parsed.data.confirm.trim().toLowerCase() !== tenant.domain.toLowerCase()) {
     return { error: 'That does not match the domain.' };
   }
 

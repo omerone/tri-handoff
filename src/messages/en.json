@@ -180,7 +180,11 @@
       "shopping": "Shopping",
       "tradingDeposit": "Deposit to trading",
       "other": "Other"
-    }
+    },
+    "fxUnavailable": "No exchange rate available — total wealth can't be computed right now.",
+    "fxStale": "The exchange rate is not from today.",
+    "deleteSeriesConfirm": "Delete the whole series? It disappears from every month, including past ones. To stop it from here on without changing history, use \"End series\".",
+    "yearToDateAsOfToday": "Year to date (as of today)"
   },
   "long": {
     "title": "Long-term positions",
@@ -213,7 +217,8 @@
     "staleWarning": "Price not updated for {days} days",
     "stalest": "Oldest price: {days} days",
     "priceToday": "Updated today",
-    "priceDays": "{days} days ago"
+    "priceDays": "{days} days ago",
+    "fxUnavailable": "No exchange rate for some currencies — totals are not shown."
   },
   "settings": {
     "language": "Language",

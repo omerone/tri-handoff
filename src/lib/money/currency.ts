@@ -16,6 +16,31 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
   GBP: '£',
 };
 
+/**
+ * The symbol for any ISO code, not just the four the user can choose to read in.
+ *
+ * An MT5 account can be denominated in anything — CHF, JPY, AUD. When no exchange rate is
+ * available, figures are shown in the account's own currency rather than converted, and they
+ * need a symbol that is not a lie. Unknown codes fall back to the code itself.
+ */
+const EXTRA_SYMBOLS: Record<string, string> = {
+  JPY: '¥',
+  CHF: 'CHF ',
+  AUD: 'A$',
+  CAD: 'C$',
+  NZD: 'NZ$',
+  SEK: 'kr ',
+  NOK: 'kr ',
+  PLN: 'zł ',
+  ZAR: 'R',
+};
+
+export function symbolFor(currency: string): string {
+  const code = currency.toUpperCase();
+  if (isSupportedCurrency(code)) return CURRENCY_SYMBOL[code];
+  return EXTRA_SYMBOLS[code] ?? `${code} `;
+}
+
 export function isSupportedCurrency(value: unknown): value is Currency {
   return typeof value === 'string' && (SUPPORTED_CURRENCIES as readonly string[]).includes(value);
 }
@@ -34,7 +59,8 @@ export function asCurrency(value: unknown, fallback: Currency = 'ILS'): Currency
  */
 export function formatMoney(
   amount: number,
-  currency: Currency,
+  /** Any ISO code — not only the four a user can pick to read in. See `symbolFor`. */
+  currency: Currency | string,
   locale: Locale,
   options: { decimals?: number; signed?: boolean } = {},
 ): string {
@@ -48,7 +74,7 @@ export function formatMoney(
   }).format(magnitude);
 
   const sign = rounded < 0 ? '-' : options.signed ? '+' : '';
-  return `${sign}${CURRENCY_SYMBOL[currency]}${digits}`;
+  return `${sign}${symbolFor(currency)}${digits}`;
 }
 
 /**
@@ -60,7 +86,7 @@ export function formatMoney(
  * formatting rule, two runtimes, no chance of the axis disagreeing with the KPI tile above it.
  */
 export type MoneyDisplay = {
-  currency: Currency;
+  currency: Currency | string;
   locale: Locale;
   /** Source currency → display currency. 1 when they are the same or no rate was available. */
   rate: number;

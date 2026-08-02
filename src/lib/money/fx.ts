@@ -1,6 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
-import { readCachedRate, readNewestRate, writeCachedRate } from '@/lib/db/fx';
+import { readNewestRate, readRecentRate, writeCachedRate } from '@/lib/db/fx';
 import { env } from '@/lib/env';
 
 /**
@@ -8,7 +8,9 @@ import { env } from '@/lib/env';
  *
  * The rule for how hard to try, in order:
  *   1. same currency — no rate needed, and no request;
- *   2. today's rate already in the database — the common case after the first user of the day;
+ *   2. a rate published within the last few days — the common case once anyone has loaded
+ *      a page today, and the rung that absorbs weekends and holidays, when the feeds publish
+ *      nothing and an exact-date lookup would miss on every single request;
  *   3. fetch it, store it;
  *   4. anything cached, however old.
  *
@@ -28,6 +30,14 @@ export type FxRate = {
   stale: boolean;
 };
 
+/**
+ * How old a cached rate may be and still count as current.
+ *
+ * Four days covers a Friday close through a Monday morning, plus a public holiday on either
+ * side. Beyond that the rate is served but flagged stale.
+ */
+const FRESH_WINDOW_DAYS = 4;
+
 const IDENTITY = (currency: string): FxRate => ({
   base: currency,
   quote: currency,
@@ -44,7 +54,7 @@ export const getFxRate = cache(async (base: string, quote: string): Promise<FxRa
 
   const today = new Date();
 
-  const cached = await readCachedRate(from, to, today);
+  const cached = await readRecentRate(from, to, FRESH_WINDOW_DAYS);
   if (cached) return { base: from, quote: to, rate: cached.rate, asOf: cached.asOf, stale: false };
 
   const fetched = await fetchRate(from, to);

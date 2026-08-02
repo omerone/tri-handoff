@@ -51,8 +51,10 @@ export async function listLongPositions(ctx: TenantContext): Promise<LongPositio
   assertContext(ctx);
   const rows = await prisma.longPosition.findMany({
     where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
-    // Open first, then most recently bought.
-    orderBy: [{ closedAt: 'asc' }, { buyDate: 'desc' }],
+    // Open first, then most recently bought. `nulls: 'first'` is load-bearing: Postgres
+    // sorts NULLs *last* on ASC, so a plain `closedAt: 'asc'` returned closed positions
+    // ahead of open ones — the opposite of what the ordering claims.
+    orderBy: [{ closedAt: { sort: 'asc', nulls: 'first' } }, { buyDate: 'desc' }],
   });
   return rows.map(toPosition);
 }

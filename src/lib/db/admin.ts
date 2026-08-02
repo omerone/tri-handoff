@@ -146,6 +146,9 @@ export async function syncHealth(): Promise<SyncHealth[]> {
       status: true,
       user: {
         select: {
+          // The user id comes back with the tenant it belongs to. An earlier version fetched
+          // every user on the platform separately to build the same mapping.
+          id: true,
           mt5Account: { select: { lastSyncAt: true, status: true } },
           syncLogs: {
             orderBy: { startedAt: 'desc' },
@@ -164,11 +167,8 @@ export async function syncHealth(): Promise<SyncHealth[]> {
   });
   const failuresByUser = new Map(failureCounts.map((row) => [row.userId, row._count._all]));
 
-  const userIds = await prisma.user.findMany({ select: { id: true, tenantId: true } });
-  const userByTenant = new Map(userIds.map((row) => [row.tenantId, row.id]));
-
   const rows: SyncHealth[] = tenants.map((tenant) => {
-    const userId = userByTenant.get(tenant.id);
+    const userId = tenant.user?.id;
     const account = tenant.user?.mt5Account ?? null;
     const lastLog = tenant.user?.syncLogs[0] ?? null;
 
@@ -288,14 +288,15 @@ export async function tenantSyncLogs(tenantId: string, limit = 25): Promise<Sync
   });
 }
 
-/** Platform-wide counts for the operator's header. */
-export async function platformStats(): Promise<{
-  tenants: number;
-  active: number;
-  connected: number;
-  failing: number;
-}> {
-  const health = await syncHealth();
+export type PlatformStats = { tenants: number; active: number; connected: number; failing: number };
+
+/**
+ * Platform-wide counts, derived from rows the caller already has.
+ *
+ * Takes the health rows rather than fetching them: the operator page renders both, and the
+ * earlier version re-ran the whole cross-tenant query to count them.
+ */
+export function platformStats(health: readonly SyncHealth[]): PlatformStats {
   return {
     tenants: health.length,
     active: health.filter((row) => row.status === 'active').length,

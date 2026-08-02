@@ -50,8 +50,21 @@ export async function updateUserPreferences(
   });
 }
 
+/**
+ * Sets a password and ends every session the user has, in one transaction.
+ *
+ * The revocation is inside this function rather than left to callers on purpose. The
+ * self-service reset already did it (`redeemResetToken`); the operator path called this and
+ * did not — so an operator resetting a password for the very reason the feature exists
+ * ("I can't receive my reset email", which is also what a compromised account looks like)
+ * believed they had locked an attacker out while the attacker's session rolled on. A caller
+ * cannot forget something it does not have to remember.
+ */
 export async function setPasswordHash(userId: string, passwordHash: string): Promise<void> {
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+    prisma.session.deleteMany({ where: { userId } }),
+  ]);
 }
 
 export async function touchLastLogin(ctx: TenantContext): Promise<void> {

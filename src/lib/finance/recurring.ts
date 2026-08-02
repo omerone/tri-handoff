@@ -100,8 +100,15 @@ export function monthsWithActivity(
   );
 
   const months: { year: number; month: number }[] = [];
-  let year = earliest.getUTCFullYear();
-  let month = earliest.getUTCMonth() + 1;
+  // Bounded so a single mistyped date cannot ask for a list thousands of entries long. Ten
+  // years of navigation is more than a personal budget needs, and the entries themselves are
+  // still all counted by `cumulativeCash`, which does not iterate.
+  const earliestAllowed = monthsBefore(through, MAX_NAVIGABLE_MONTHS);
+  let year = Math.max(earliest.getUTCFullYear(), earliestAllowed.year);
+  let month =
+    year === earliestAllowed.year && earliest.getUTCFullYear() <= earliestAllowed.year
+      ? earliestAllowed.month
+      : earliest.getUTCMonth() + 1;
 
   while (year < through.year || (year === through.year && month <= through.month)) {
     months.push({ year, month });
@@ -113,4 +120,15 @@ export function monthsWithActivity(
   }
 
   return months.reverse();
+}
+
+/** Ten years — the furthest back the month navigator will offer. */
+export const MAX_NAVIGABLE_MONTHS = 120;
+
+function monthsBefore(
+  from: { year: number; month: number },
+  count: number,
+): { year: number; month: number } {
+  const index = from.year * 12 + (from.month - 1) - count;
+  return { year: Math.floor(index / 12), month: (index % 12) + 1 };
 }

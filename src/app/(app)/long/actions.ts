@@ -13,15 +13,23 @@ import {
 } from '@/lib/db';
 import { realizedPnlOnClose } from '@/lib/positions/valuation';
 import { SUPPORTED_CURRENCIES } from '@/lib/money/currency';
+import { isPlausibleDate } from '@/lib/finance/bounds';
 
 export type PositionFormState = { error?: string; ok?: boolean };
 
+/**
+ * The columns are `Decimal(20,8)` — twelve integer digits. Anything larger is a Postgres
+ * numeric overflow thrown straight out of the action as a 500, so the bound is here rather
+ * than discovered at the database.
+ */
+const MAX_DECIMAL = 1e11;
+
 const createSchema = z.object({
   symbol: z.string().trim().min(1).max(24).toUpperCase(),
-  qty: z.coerce.number().positive().finite(),
-  buyPrice: z.coerce.number().positive().finite(),
-  buyDate: z.coerce.date(),
-  fees: z.coerce.number().min(0).finite().default(0),
+  qty: z.coerce.number().positive().finite().max(MAX_DECIMAL),
+  buyPrice: z.coerce.number().positive().finite().max(MAX_DECIMAL),
+  buyDate: z.coerce.date().refine((date) => isPlausibleDate(date)),
+  fees: z.coerce.number().min(0).finite().max(MAX_DECIMAL).default(0),
   currency: z.enum(SUPPORTED_CURRENCIES).default('USD'),
 });
 
@@ -49,7 +57,7 @@ export async function createPositionAction(
 
 const priceSchema = z.object({
   id: z.string().min(1),
-  currentPrice: z.coerce.number().positive().finite(),
+  currentPrice: z.coerce.number().positive().finite().max(MAX_DECIMAL),
 });
 
 export async function updatePriceAction(
@@ -72,7 +80,7 @@ export async function updatePriceAction(
 
 const closeSchema = z.object({
   id: z.string().min(1),
-  sellPrice: z.coerce.number().positive().finite(),
+  sellPrice: z.coerce.number().positive().finite().max(MAX_DECIMAL),
 });
 
 /**
