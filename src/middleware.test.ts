@@ -98,3 +98,44 @@ describe('content security policy', () => {
     }
   });
 });
+
+describe('security headers', () => {
+  const getHeader = (response: NextResponse, name: string) => response.headers.get(name);
+
+  it('sets X-Content-Type-Options to nosniff', () => {
+    const response = respond();
+    expect(getHeader(response, 'x-content-type-options')).toBe('nosniff');
+  });
+
+  it('sets X-Frame-Options to DENY', () => {
+    const response = respond();
+    expect(getHeader(response, 'x-frame-options')).toBe('DENY');
+  });
+
+  it('sets X-XSS-Protection for older browsers', () => {
+    const response = respond();
+    expect(getHeader(response, 'x-xss-protection')).toBe('1; mode=block');
+  });
+
+  it('sets Referrer-Policy to strict-origin-when-cross-origin', () => {
+    const response = respond();
+    expect(getHeader(response, 'referrer-policy')).toBe('strict-origin-when-cross-origin');
+  });
+
+  it('sets restrictive Permissions-Policy', () => {
+    const response = respond();
+    const policy = getHeader(response, 'permissions-policy');
+    expect(policy).toBeDefined();
+    expect(policy).toContain('camera=()');
+    expect(policy).toContain('microphone=()');
+    expect(policy).toContain('geolocation=()');
+  });
+
+  it('does not set HSTS in development', () => {
+    const response = respond();
+    // In dev, NODE_ENV is 'development', so HSTS should not be set
+    if (process.env.NODE_ENV !== 'production') {
+      expect(getHeader(response, 'strict-transport-security')).toBeNull();
+    }
+  });
+});
