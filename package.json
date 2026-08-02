@@ -28,7 +28,14 @@
     "secrets:rotate": "NODE_OPTIONS=--conditions=react-server tsx scripts/rotate-secrets.ts",
     "audit-logs:archive": "NODE_OPTIONS=--conditions=react-server tsx scripts/archive-audit-logs.ts",
     "audit-logs:archive:dry": "NODE_OPTIONS=--conditions=react-server tsx scripts/archive-audit-logs.ts --dry-run",
-    "pgaudit:setup": "bash scripts/setup-pgaudit.sh"
+    "pgaudit:setup": "bash scripts/setup-pgaudit.sh",
+    "waf:setup:cloudflare": "NODE_OPTIONS=--conditions=react-server tsx scripts/setup-cloudflare-waf.ts",
+    "waf:setup:aws": "NODE_OPTIONS=--conditions=react-server tsx scripts/setup-aws-waf.ts",
+    "waf:deploy": "NODE_OPTIONS=--conditions=react-server tsx scripts/deploy-waf.ts --provider cloudflare --environment log-only",
+    "waf:deploy:challenge": "NODE_OPTIONS=--conditions=react-server tsx scripts/deploy-waf.ts --provider cloudflare --environment challenge",
+    "waf:deploy:block": "NODE_OPTIONS=--conditions=react-server tsx scripts/deploy-waf.ts --provider cloudflare --environment block",
+    "waf:test": "vitest run tests/waf/",
+    "waf:dry-run": "NODE_OPTIONS=--conditions=react-server tsx scripts/deploy-waf.ts --provider cloudflare --environment log-only --dry-run"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
