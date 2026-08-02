@@ -1,5 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
+import { loadSecrets } from '@/lib/secrets/manager';
 
 /**
  * Server-side environment. Validated once at first import so a misconfigured
@@ -7,6 +8,14 @@ import { z } from 'zod';
  *
  * Nothing in this module may ever be imported from a client component — the
  * `server-only` import above turns that into a build error.
+ *
+ * Secrets are loaded from:
+ * 1. AWS Secrets Manager (production)
+ * 2. .env.local (local development, if .env not in git)
+ * 3. Environment variables (Docker, CI/CD, or .env during local setup)
+ *
+ * The loadSecrets() function is called during initialization to populate
+ * process.env from the secrets manager before validation.
  */
 
 const base64Bytes = (bytes: number, label: string) =>
@@ -49,13 +58,38 @@ const schema = z.object({
 
   FX_API_URL: z.string().url().default('https://api.frankfurter.app'),
 
+  /**
+   * Market data for long-term positions. `mock` is the default so a checkout with no vendor
+   * account still runs — including the end-to-end suite, which must never reach a network.
+   */
+  QUOTES_PROVIDER: z.enum(['mock', 'twelvedata']).default('mock'),
+  TWELVEDATA_API_KEY: z.string().optional().default(''),
+  /**
+   * Credits the refresh may spend per day, against the vendor's own daily allowance (800 on
+   * the free plan). The margin is deliberate: symbol search and a user pressing "refresh now"
+   * come out of the same budget, and running the *vendor's* limit dry returns errors for
+   * everything, while running this one dry only postpones a price to tomorrow.
+   */
+  QUOTES_DAILY_BUDGET: z.coerce.number().int().positive().default(700),
+
   APP_BASE_DOMAIN: z.string().default('localhost:3000'),
   APP_PROTOCOL: z.enum(['http', 'https']).default('http'),
 });
 
 export type Env = z.infer<typeof schema>;
 
-function load(): Env {
+async function load(): Promise<Env> {
+  // Load secrets from AWS Secrets Manager, .env.local, or environment variables
+  // This populates process.env with values from the secrets manager
+  const secrets = await loadSecrets();
+
+  // Merge loaded secrets into process.env for validation
+  Object.entries(secrets).forEach(([key, value]) => {
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  });
+
   const parsed = schema.safeParse(process.env);
   if (!parsed.success) {
     const issues = parsed.error.issues
@@ -66,12 +100,65 @@ function load(): Env {
   if (parsed.data.MT5_PROVIDER === 'metaapi' && !parsed.data.METAAPI_TOKEN) {
     throw new Error('MT5_PROVIDER=metaapi requires METAAPI_TOKEN to be set.');
   }
+  if (parsed.data.QUOTES_PROVIDER === 'twelvedata' && !parsed.data.TWELVEDATA_API_KEY) {
+    throw new Error('QUOTES_PROVIDER=twelvedata requires TWELVEDATA_API_KEY to be set.');
+  }
   return parsed.data;
 }
 
 let cached: Env | null = null;
+let loadPromise: Promise<Env> | null = null;
+let initError: Error | null = null;
 
 export function env(): Env {
-  cached ??= load();
-  return cached;
+  if (initError) {
+    throw initError;
+  }
+
+  if (cached) {
+    return cached;
+  }
+
+  // If load is still in progress, throw instructive error
+  if (loadPromise) {
+    throw new Error(
+      'Environment is still initializing. Call initializeEnv() and wait for it to complete ' +
+        'before accessing env(). Ensure initializeEnv() is called in instrumentation-node.ts ' +
+        'during application startup.',
+    );
+  }
+
+  // Should not reach here in normal operation (initializeEnv should be called during startup)
+  throw new Error(
+    'Environment not initialized. Ensure initializeEnv() is called during app startup ' +
+      '(see instrumentation-node.ts).',
+  );
+}
+
+/**
+ * Initialize environment asynchronously during app startup.
+ * This must be called once during application initialization.
+ * Call from: instrumentation-node.ts startMaintenanceSweep() function
+ *
+ * Returns the initialized environment. Safe to call multiple times (returns cached value).
+ */
+export async function initializeEnv(): Promise<Env> {
+  if (cached) {
+    return cached;
+  }
+
+  if (!loadPromise) {
+    loadPromise = load();
+  }
+
+  try {
+    cached = await loadPromise;
+    console.log('[Env] Environment initialized and validated');
+    return cached;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    initError = error instanceof Error ? error : new Error(message);
+    console.error(`[Env] Fatal error during initialization: ${message}`);
+    throw initError;
+  }
 }

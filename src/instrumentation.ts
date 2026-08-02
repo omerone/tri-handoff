@@ -9,5 +9,6 @@
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
   const { startMaintenanceSweep } = await import('./instrumentation-node');
-  startMaintenanceSweep();
+  // startMaintenanceSweep is now async and initializes the environment
+  await startMaintenanceSweep();
 }

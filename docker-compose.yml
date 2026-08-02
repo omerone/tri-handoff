@@ -29,19 +29,38 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # === Database ===
       DATABASE_URL: postgresql://${POSTGRES_USER:-tri}:${POSTGRES_PASSWORD:-tri}@postgres:5432/${POSTGRES_DB:-tri}?schema=public
+
+      # === Secrets Management ===
+      # Production: Set AWS_REGION to enable AWS Secrets Manager
+      # Local: Leave AWS_REGION unset to use .env.local or environment variables
+      # AWS_REGION: us-east-1
+      AWS_SECRETS_NAME: ${AWS_SECRETS_NAME:-tri/secrets}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+
+      # Fallback to environment variables if secrets manager is not available
+      # These are populated from .env in docker-compose up (local development)
       SESSION_SECRET: ${SESSION_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+      # === MT5 Broker ===
       MT5_PROVIDER: ${MT5_PROVIDER:-mock}
       METAAPI_TOKEN: ${METAAPI_TOKEN:-}
       METAAPI_REGION: ${METAAPI_REGION:-new-york}
+
+      # === Email ===
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-TRi <no-reply@example.com>}
+
+      # === Market Data ===
       FX_API_URL: ${FX_API_URL:-https://api.frankfurter.app}
+
+      # === App Configuration ===
       APP_BASE_DOMAIN: ${APP_BASE_DOMAIN}
       APP_PROTOCOL: ${APP_PROTOCOL:-https}
       NODE_ENV: production
@@ -49,6 +68,10 @@ services:
       HOSTNAME: '0.0.0.0'
     expose:
       - '3000'
+    # For local development with AWS Secrets Manager emulator:
+    # Uncomment the volumes section and start LocalStack
+    # volumes:
+    #   - ./.env.local:/app/.env.local:ro
 
   # Caddy terminates TLS and obtains a certificate per tenant domain automatically.
   # Adding a client = adding their domain to caddy/Caddyfile (or the on-demand TLS ask

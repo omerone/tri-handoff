@@ -31,10 +31,24 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+
+# AWS SDK and secrets management libraries
+# These are included in node_modules from the deps stage
+COPY --from=builder /app/node_modules/@aws-sdk ./node_modules/@aws-sdk
+COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
+
+# Docker entrypoint script with environment initialization support
 COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
+
+# Secrets management instructions (for troubleshooting)
+# COPY --from=builder /app/docs/SECRETS_MANAGEMENT.md ./docs/SECRETS_MANAGEMENT.md
 
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME=0.0.0.0
 
+# Environment initialization:
+# - AWS Secrets Manager (production: set AWS_REGION)
+# - .env.local fallback (development: copy .env.local into container)
+# - Environment variables (Docker, CI/CD)
 ENTRYPOINT ["/bin/sh", "./docker-entrypoint.sh"]
