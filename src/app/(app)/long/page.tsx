@@ -114,6 +114,16 @@ export default async function LongPositionsPage() {
   };
 
   const labels = {
+    // Repeated on every cell so the stacked mobile layout can label each figure — see the
+    // `tri-stack` rule in globals.css.
+    columns: {
+      qty: t('qty'),
+      buyPrice: t('buyPrice'),
+      currentValue: t('currentValue'),
+      value: t('value'),
+      unrealized: t('unrealized'),
+      updated: t('updated'),
+    },
     update: t('update'),
     newPrice: t('newPrice'),
     close: t('close'),
@@ -192,7 +202,7 @@ export default async function LongPositionsPage() {
           <EmptyState>{t('empty')}</EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[13px]">
+            <table className="tri-stack w-full border-collapse text-[13px]">
               <thead>
                 <tr className="text-dim text-[11px]">
                   {headers.map((header, index) => (
@@ -213,7 +223,7 @@ export default async function LongPositionsPage() {
 
               {closed.length > 0 ? (
                 <>
-                  <thead>
+                  <thead className="tri-stack-keep">
                     <tr>
                       <th
                         colSpan={headers.length}

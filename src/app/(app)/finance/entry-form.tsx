@@ -118,10 +118,19 @@ export function EntryForm({
         </SubmitButton>
       </div>
 
-      <label className="text-dim flex items-center gap-2 text-xs">
-        <input type="checkbox" name="isRecurring" className="accent-brand" />
-        {labels.recurring}
-        <span className="text-dim/70">· {labels.recurringHint}</span>
+      {/* The box itself was 13px square. Sized up to the 20px the platform draws a checkbox
+          at, with the whole label as the hit area — which is what a <label> already gives,
+          once it is tall enough to aim at. */}
+      <label className="text-dim flex min-h-11 items-start gap-2 py-1 text-xs sm:min-h-0 sm:items-center">
+        <input
+          type="checkbox"
+          name="isRecurring"
+          className="accent-brand mt-0.5 h-5 w-5 shrink-0 sm:mt-0 sm:h-4 sm:w-4"
+        />
+        <span>
+          {labels.recurring}
+          <span className="text-dim/70"> · {labels.recurringHint}</span>
+        </span>
       </label>
     </form>
   );

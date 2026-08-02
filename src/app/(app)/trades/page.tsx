@@ -82,7 +82,7 @@ export default async function TradesPage({
   return (
     <div className="flex flex-col gap-4">
       <Card title={t('table.filter')}>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
           <TradeFilters
             current={{
               class: params.class ?? 'all',
@@ -93,6 +93,12 @@ export default async function TradesPage({
             options={{
               all: t('table.all'),
               allStrategies: t('table.allStrategies'),
+              names: {
+                class: t('table.assetClass'),
+                direction: t('table.direction'),
+                style: t('table.style'),
+                strategy: t('table.strategy'),
+              },
               classes: ASSET_CLASSES.map((key) => [key, t(`enum.assetClass.${key}`)] as const),
               directions: DIRECTIONS.map((key) => [key, t(`enum.direction.${key}`)] as const),
               styles: STYLES.map((key) => [key, t(`enum.style.${key}`)] as const),
@@ -100,7 +106,7 @@ export default async function TradesPage({
             }}
           />
 
-          <div className="text-dim flex gap-4 text-xs ms-auto">
+          <div className="text-dim col-span-2 flex gap-4 text-xs sm:col-span-1 sm:ms-auto">
             <span>{t('kpi.tradesCount', { count: metrics.count })}</span>
             <span className={metrics.net >= 0 ? 'text-pos' : 'text-neg'}>
               <Num>{money(metrics.net, { signed: true })}</Num>
@@ -114,7 +120,91 @@ export default async function TradesPage({
         {rows.length === 0 ? (
           <EmptyState>{t('table.empty')}</EmptyState>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/*
+             * On a phone the table is 660 pixels wide inside a 340 pixel scroller, which puts
+             * P&L and RR — the two numbers this screen exists for — off the right edge behind
+             * a sideways scroll nobody discovers. Below the tablet breakpoint the same rows
+             * are a list instead, with the figures where the eye already is, and the whole
+             * row tappable rather than a 14-pixel notebook icon.
+             */}
+            <ul className="md:hidden">
+              {rows.map((trade) => (
+                <li key={trade.id} className="border-line border-b last:border-b-0">
+                  <Link
+                    href={`/trades/${trade.id}`}
+                    className="hover:bg-raised/60 flex flex-col gap-1 px-4 py-3"
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="flex min-w-0 items-center gap-2">
+                        {/*
+                          `dir="ltr"` so a symbol too long for the row loses its tail rather
+                          than its head. Inside the Hebrew layout the ellipsis lands at the
+                          logical end, which is the *left* — "XAUUSD.MICRO.LONGNAME" rendered
+                          as "…CRO.LONGNAME", hiding the one part that identifies the
+                          instrument. A ticker is a left-to-right run, like every number here.
+                        */}
+                        <span dir="ltr" className="truncate text-[15px] font-bold">
+                          {trade.symbol}
+                        </span>
+                        <Chip>{t(`enum.assetClass.${trade.assetClass}`)}</Chip>
+                      </span>
+                      <span
+                        className={`shrink-0 text-[15px] font-bold ${
+                          trade.profit >= 0 ? 'text-pos' : 'text-neg'
+                        }`}
+                      >
+                        <Num>{money(trade.profit, { signed: true })}</Num>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1 text-xs ${
+                          trade.direction === 'long' ? 'text-pos' : 'text-neg'
+                        }`}
+                      >
+                        {trade.direction === 'long' ? (
+                          <ArrowUpRight size={13} aria-hidden />
+                        ) : (
+                          <ArrowDownRight size={13} aria-hidden />
+                        )}
+                        {t(`enum.direction.${trade.direction}`)}
+                        <span className="text-dim">· {t(`enum.style.${trade.style}`)}</span>
+                      </span>
+                      {trade.rr === null ? (
+                        <Chip tone="dim">—</Chip>
+                      ) : (
+                        <Chip tone={trade.rr >= 0 ? 'pos' : 'neg'}>
+                          <Num>
+                            {trade.rr >= 0 ? '+' : ''}
+                            {formatNumber(trade.rr, locale, 2)}R
+                          </Num>
+                        </Chip>
+                      )}
+                    </div>
+
+                    <div className="text-dim flex items-center justify-between gap-2 text-[11px]">
+                      <Num>
+                        {trade.closeAt
+                          ? `${dateTime.format(trade.closeAt)} · ${time.format(trade.closeAt)}`
+                          : '—'}
+                      </Num>
+                      <span className="flex items-center gap-2">
+                        <span>
+                          {t('table.risk')} <Num>{trade.risk === null ? '—' : money(trade.risk)}</Num>
+                        </span>
+                        {hasJournal(trade) ? (
+                          <NotebookPen size={13} className="text-brand" aria-label={t('journal.title')} />
+                        ) : null}
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full border-collapse text-[13px]">
               <thead>
                 <tr className="text-dim text-[11px]">
@@ -212,7 +302,8 @@ export default async function TradesPage({
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </Card>
 

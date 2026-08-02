@@ -161,10 +161,129 @@ button {
   outline: none;
 }
 
+/*
+ * Sixteen pixels is not a design choice on a phone, it is the threshold below which iOS
+ * Safari zooms the page when a field takes focus. The zoom is not undone when the field
+ * blurs, so one tap on the amount field in the finance form leaves the trader scrolled
+ * sideways through a layout that no longer fits, with no obvious way back.
+ *
+ * The type scale is unchanged from the tablet breakpoint up, where the pointer is a mouse
+ * and the behaviour does not exist.
+ */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/*
+ * Touch targets.
+ *
+ * The design came from a desktop prototype, so the header buttons landed at 39×27 and the
+ * nav links at 32 high — fine for a cursor, under half the area a fingertip needs. Apple's
+ * HIG says 44pt and WCAG 2.5.8 says 24 CSS px as an absolute floor; this reaches 44 without
+ * changing how anything looks, by growing the hit area past the painted box rather than
+ * inflating the control itself.
+ *
+ * `coarse` rather than a width query: it is the input device that decides this, so a tablet
+ * or a touchscreen laptop gets it and a small desktop window does not.
+ */
+@media (pointer: coarse) {
+  :where(a, button, [role='button'], summary).tri-tap {
+    position: relative;
+  }
+  :where(a, button, [role='button'], summary).tri-tap::after {
+    content: '';
+    position: absolute;
+    /* Centred on the control, so the extra area is symmetrical whatever the box size. */
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    min-width: 44px;
+    min-height: 44px;
+    width: 100%;
+    height: 100%;
+  }
+}
+
 :where(a, button, input, select, textarea):focus-visible {
   outline: 2px solid var(--tri-brand);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/*
+ * Chart value axes are numbers, so they are a left-to-right run.
+ *
+ * Recharts positions each tick itself and then anchors the text with `text-anchor: start`.
+ * Inside the Hebrew layout "start" resolves to the *right* edge, so the glyphs ran leftwards
+ * from the anchor — straight over the plot — and the bars painted on top of them. What you
+ * saw was an axis reading "3K", "5K", "8K": real numbers with their leading digits buried
+ * under a bar, which is worse than no axis because it still looks authoritative.
+ *
+ * This is the same rule as the `Num` component applies to every figure in the product: a
+ * number is its own bidi context. Only the value axis is targeted — the category axis holds
+ * Hebrew words, and their direction is correct as inherited.
+ */
+.recharts-yAxis .recharts-cartesian-axis-tick text {
+  direction: ltr;
+}
+
+/*
+ * A table that becomes a list of cards on a phone.
+ *
+ * The long-positions table is 725 pixels wide; a phone gives it 310, so the value and the
+ * unrealised P&L sat off the right edge behind a sideways scroll. Every row is also an
+ * interactive form — update price, close, delete — so rendering a second mobile-only markup
+ * tree would mean maintaining that behaviour twice and letting the two drift.
+ *
+ * Instead the same cells restack, each labelled with the column heading it lost. The label
+ * comes from `data-label` on the cell rather than from the `thead`, because CSS cannot read
+ * across the table and a heading repeated in the markup would be read out twice by a screen
+ * reader on the desktop layout.
+ */
+@media (max-width: 767px) {
+  table.tri-stack,
+  table.tri-stack tbody,
+  table.tri-stack tr,
+  table.tri-stack td {
+    display: block;
+  }
+  table.tri-stack thead:not(.tri-stack-keep) {
+    /* `clip` rather than `display: none`: the headings stay available to a screen reader. */
+    position: absolute;
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  table.tri-stack tr {
+    padding: 0.35rem 0;
+  }
+  table.tri-stack td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.3rem;
+    text-align: start;
+  }
+  table.tri-stack td[data-label]::before {
+    content: attr(data-label);
+    color: var(--tri-dim);
+    font-size: 11px;
+    flex: none;
+  }
+  /* The symbol is the row's title, so it spans rather than sitting opposite a label. */
+  table.tri-stack td[data-title] {
+    font-size: 15px;
+    padding-top: 0.5rem;
+  }
+  table.tri-stack td:empty {
+    display: none;
+  }
 }
 
 /*

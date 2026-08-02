@@ -100,10 +100,44 @@ export function formatDisplayMoney(
   return formatMoney(amount * display.rate, display.currency, display.locale, options);
 }
 
+/**
+ * A money value short enough for a chart's value axis: `₪18K`.
+ *
+ * The axis reserved 56 pixels for a full `₪18,344`, which fits at a desktop width and gets
+ * clipped to `,344` on a phone once the plot squeezes it — an axis of numbers missing their
+ * leading digits is worse than no axis, because it still looks authoritative. The tooltip and
+ * the captions below the chart carry the exact figures.
+ */
+export function formatCompactMoney(value: number, display: MoneyDisplay): string {
+  const amount = value * display.rate;
+  const digits = new Intl.NumberFormat(LOCALE_TAG[display.locale], {
+    notation: 'compact',
+    maximumFractionDigits: Math.abs(amount) < 10_000 ? 1 : 0,
+  }).format(amount);
+  const symbol = CURRENCY_SYMBOL[display.currency as Currency] ?? '';
+  return `${symbol}${digits}`;
+}
+
 export function formatNumber(value: number, locale: Locale, decimals = 0): string {
   return new Intl.NumberFormat(LOCALE_TAG[locale], {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
+  }).format(value);
+}
+
+/**
+ * A signed figure short enough for a calendar square on a phone: `+1.2K`, `-492`.
+ *
+ * Seven columns on a 375px screen leave about forty pixels of text per day, and `+₪1,165`
+ * needs sixty — so it wrapped, one line per glyph run, and neighbouring days ran into each
+ * other. The currency symbol is dropped rather than the digits: the month total above the
+ * grid names the currency once, and which day was good is what the squares are for.
+ */
+export function formatCompactSigned(value: number, locale: Locale): string {
+  return new Intl.NumberFormat(LOCALE_TAG[locale], {
+    notation: 'compact',
+    maximumFractionDigits: Math.abs(value) < 1000 ? 0 : 1,
+    signDisplay: 'exceptZero',
   }).format(value);
 }
 

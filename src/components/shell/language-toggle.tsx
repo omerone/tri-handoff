@@ -15,7 +15,7 @@ export function LanguageToggle({ current }: { current: Locale }) {
       disabled={pending}
       onClick={() => startTransition(() => setLocaleAction(next))}
       aria-label={next === 'en' ? 'Switch to English' : 'החלף לעברית'}
-      className="border-line bg-raised text-text rounded-full border px-3 py-1.5 text-xs disabled:opacity-60"
+      className="tri-tap border-line bg-raised text-text rounded-full border px-3 py-1.5 text-xs disabled:opacity-60"
     >
       {next === 'en' ? 'EN' : 'עב'}
     </button>

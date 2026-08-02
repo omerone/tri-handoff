@@ -12,7 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { TOKEN } from '@/lib/theme';
-import { formatDisplayMoney, type MoneyDisplay } from '@/lib/money/currency';
+import { formatCompactMoney, formatDisplayMoney, type MoneyDisplay } from '@/lib/money/currency';
 import { ChartTooltip } from './chart-tooltip';
 
 export type BreakdownDatum = {
@@ -41,6 +41,8 @@ export function BreakdownChart({
   display: MoneyDisplay;
 }) {
   const format = (value: number) => formatDisplayMoney(value, display);
+  // The axis gets the short form; the tooltip keeps the exact figure.
+  const axisFormat = (value: number) => formatCompactMoney(value, display);
   return (
     <>
       <div style={{ height: 180 }}>
@@ -58,8 +60,8 @@ export function BreakdownChart({
             <YAxis
               stroke={TOKEN.dim}
               fontSize={10}
-              width={56}
-              tickFormatter={format}
+              width={44}
+              tickFormatter={axisFormat}
               orientation={rtl ? 'right' : 'left'}
             />
             <Tooltip

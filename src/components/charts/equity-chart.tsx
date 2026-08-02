@@ -11,7 +11,7 @@ import {
   YAxis,
 } from 'recharts';
 import { TOKEN } from '@/lib/theme';
-import { formatDisplayMoney, type MoneyDisplay } from '@/lib/money/currency';
+import { formatCompactMoney, formatDisplayMoney, type MoneyDisplay } from '@/lib/money/currency';
 import { ChartTooltip } from './chart-tooltip';
 
 export type EquityDatum = { index: number; balance: number; label: string };
@@ -38,6 +38,8 @@ export function EquityChart({
   display: MoneyDisplay;
 }) {
   const format = (value: number) => formatDisplayMoney(value, display);
+  // The axis gets the short form; the tooltip keeps the exact figure.
+  const axisFormat = (value: number) => formatCompactMoney(value, display);
   return (
     <div style={{ height: 240 }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -54,8 +56,8 @@ export function EquityChart({
           <YAxis
             stroke={TOKEN.dim}
             fontSize={11}
-            width={64}
-            tickFormatter={format}
+            width={48}
+            tickFormatter={axisFormat}
             domain={['dataMin - 200', 'dataMax + 200']}
             orientation={rtl ? 'right' : 'left'}
           />

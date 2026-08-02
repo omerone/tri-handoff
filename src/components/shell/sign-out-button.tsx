@@ -12,7 +12,7 @@ export function SignOutButton({ label }: { label: string }) {
         type="submit"
         title={label}
         aria-label={label}
-        className="border-line bg-raised text-dim hover:text-text flex items-center rounded-full border px-3 py-1.5 text-xs"
+        className="tri-tap border-line bg-raised text-dim hover:text-text flex items-center rounded-full border px-3 py-1.5 text-xs"
       >
         <LogOut size={13} aria-hidden />
       </button>

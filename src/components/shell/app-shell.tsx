@@ -42,7 +42,9 @@ export async function AppShell({
             </div>
             <div>
               <div className="text-base leading-none font-extrabold">{t('app.name')}</div>
-              <div className="text-dim text-[11px]">{t('app.tagline')}</div>
+              {/* Decoration, and at 320px it wraps to two lines and grows the sticky header
+                  that every screen then scrolls under. */}
+              <div className="text-dim hidden text-[11px] min-[360px]:block">{t('app.tagline')}</div>
             </div>
           </div>
 

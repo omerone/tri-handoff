@@ -8,7 +8,7 @@ import { parseYearMonth, stepMonth } from '@/lib/finance/bounds';
 import { dailyTotals } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
-import { formatNumber } from '@/lib/money/currency';
+import { formatCompactSigned, formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { ANALYTICS_TIME_ZONE, wallClock } from '@/lib/time/zone';
 
@@ -31,7 +31,7 @@ export default async function CalendarPage({
   const params = await searchParams;
 
   const book = await loadBook(session.ctx);
-  const { money } = await displayMoney({
+  const { money, display } = await displayMoney({
     source: book.accountCurrency,
     display: session.user.displayCurrency,
     locale,
@@ -95,7 +95,7 @@ export default async function CalendarPage({
         </div>
       }
     >
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-1 md:gap-1.5">
         {weekdayNames.map((name, index) => (
           <div key={index} className="text-dim p-1 text-center text-[11px]">
             {name}
@@ -122,18 +122,40 @@ export default async function CalendarPage({
           return (
             <div
               key={key}
-              className="rounded-xl border px-2 py-1.5"
-              style={{ background, borderColor: border, minHeight: 66 }}
+              className="rounded-xl border px-1 py-1.5 md:px-2"
+              style={{ background, borderColor: border }}
+              title={
+                total
+                  ? `${money(total.net, { signed: true })} · ${t('kpi.tradesCount', { count: total.count })}`
+                  : undefined
+              }
             >
               <div className="text-dim text-[11px]">{day}</div>
               {total ? (
                 <>
-                  <div className={`text-xs font-bold ${total.net >= 0 ? 'text-pos' : 'text-neg'}`}>
-                    <Num>{money(total.net, { signed: true })}</Num>
+                  {/*
+                   * Two renderings of the same number. A phone gives each square about forty
+                   * pixels of text, which `+₪1,165` does not fit into — it wrapped mid-figure
+                   * and collided with the next day. The compact form fits; the full one comes
+                   * back as soon as there is room for it.
+                   */}
+                  <div className={`font-bold ${total.net >= 0 ? 'text-pos' : 'text-neg'}`}>
+                    {/* The visibility class goes on the wrapper: `Num` sets its own
+                        `inline-block`, which would win over `hidden` on the same element. */}
+                    <span className="text-[13px] md:hidden">
+                      <Num>{formatCompactSigned(total.net * display.rate, locale)}</Num>
+                    </span>
+                    <span className="hidden text-xs md:inline">
+                      <Num>{money(total.net, { signed: true })}</Num>
+                    </span>
                   </div>
                   <div className="text-dim text-[10px]">
                     <Num>
-                      {total.count} · {formatNumber((total.wins / total.count) * 100, locale, 0)}%
+                      {total.count}
+                      <span className="hidden md:inline">
+                        {' · '}
+                        {formatNumber((total.wins / total.count) * 100, locale, 0)}%
+                      </span>
                     </Num>
                   </div>
                 </>

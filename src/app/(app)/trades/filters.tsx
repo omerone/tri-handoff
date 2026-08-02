@@ -19,6 +19,8 @@ export function TradeFilters({
   options: {
     all: string;
     allStrategies: string;
+    /** What each dropdown filters by. See `Filter` below for why these are not optional. */
+    names: { class: string; direction: string; style: string; strategy: string };
     classes: readonly Option[];
     directions: readonly Option[];
     styles: readonly Option[];
@@ -40,73 +42,79 @@ export function TradeFilters({
     startTransition(() => router.push(query ? `${pathname}?${query}` : pathname));
   };
 
-  const select =
-    'border-line bg-raised text-text rounded-[10px] border px-2.5 py-1.5 text-xs disabled:opacity-60';
+  /**
+   * One dropdown, with its name attached.
+   *
+   * The name is visible rather than only an `aria-label`, because three dropdowns all
+   * reading "All" side by side do not say which is which — on a phone, where they wrap onto
+   * their own row, that is the entire filter bar. The previous `aria-label` was the first
+   * *option's* text, so a screen reader announced the asset-class filter as "Forex".
+   */
+  const Filter = ({
+    name,
+    value,
+    param,
+    empty,
+    items,
+  }: {
+    name: string;
+    value: string;
+    param: string;
+    empty: string;
+    items: readonly Option[];
+  }) => (
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className="text-dim text-[10px] leading-none">{name}</span>
+      <select
+        value={value}
+        disabled={pending}
+        onChange={(event) => update(param, event.target.value)}
+        className="border-line bg-raised text-text min-h-9 w-full rounded-[10px] border px-2.5 py-1.5 text-xs disabled:opacity-60"
+      >
+        <option value="all">{empty}</option>
+        {items.map(([key, label]) => (
+          <option key={key} value={key}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   return (
     <>
-      <select
-        aria-label={options.classes[0]?.[1]}
+      <Filter
+        name={options.names.class}
         value={current.class}
-        disabled={pending}
-        onChange={(event) => update('class', event.target.value)}
-        className={select}
-      >
-        <option value="all">{options.all}</option>
-        {options.classes.map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
-
-      <select
-        aria-label={options.directions[0]?.[1]}
+        param="class"
+        empty={options.all}
+        items={options.classes}
+      />
+      <Filter
+        name={options.names.direction}
         value={current.dir}
-        disabled={pending}
-        onChange={(event) => update('dir', event.target.value)}
-        className={select}
-      >
-        <option value="all">{options.all}</option>
-        {options.directions.map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
-
-      <select
-        aria-label={options.styles[0]?.[1]}
+        param="dir"
+        empty={options.all}
+        items={options.directions}
+      />
+      <Filter
+        name={options.names.style}
         value={current.style}
-        disabled={pending}
-        onChange={(event) => update('style', event.target.value)}
-        className={select}
-      >
-        <option value="all">{options.all}</option>
-        {options.styles.map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
+        param="style"
+        empty={options.all}
+        items={options.styles}
+      />
 
       {/* Only shown once the trader has actually labelled something — an empty dropdown is
           noise, and until then there is nothing to filter by. */}
       {options.strategies.length > 0 ? (
-        <select
-          aria-label={options.allStrategies}
+        <Filter
+          name={options.names.strategy}
           value={current.strategy}
-          disabled={pending}
-          onChange={(event) => update('strategy', event.target.value)}
-          className={select}
-        >
-          <option value="all">{options.allStrategies}</option>
-          {options.strategies.map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+          param="strategy"
+          empty={options.allStrategies}
+          items={options.strategies}
+        />
       ) : null}
     </>
   );

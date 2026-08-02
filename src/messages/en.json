@@ -124,6 +124,7 @@
     "filter": "Filter",
     "all": "All",
     "symbol": "Symbol",
+    "assetClass": "Asset class",
     "direction": "Side",
     "style": "Style",
     "risk": "Risk",

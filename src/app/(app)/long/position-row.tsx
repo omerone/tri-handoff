@@ -11,6 +11,15 @@ import {
 } from './actions';
 
 export type PositionRowLabels = {
+  /** The column headings, repeated on each cell so the mobile card layout can label them. */
+  columns: {
+    qty: string;
+    buyPrice: string;
+    currentValue: string;
+    value: string;
+    unrealized: string;
+    updated: string;
+  };
   update: string;
   newPrice: string;
   close: string;
@@ -57,18 +66,18 @@ export function PositionRow({
 
   return (
     <tr className="border-line border-b last:border-b-0">
-      <td className={`${cell} font-bold`}>
+      <td data-title className={`${cell} font-bold`}>
         {position.symbol}
         {position.closed ? <span className="text-dim ms-2 text-[10px]">·</span> : null}
       </td>
-      <td className={cell}>
+      <td data-label={labels.columns.qty} className={cell}>
         <Num className="text-xs">{position.qty}</Num>
       </td>
-      <td className={cell}>
+      <td data-label={labels.columns.buyPrice} className={cell}>
         <Num className="text-xs">{position.buyPrice}</Num>
       </td>
 
-      <td className={cell}>
+      <td data-label={labels.columns.currentValue} className={cell}>
         {mode === 'price' ? (
           <PriceForm
             id={position.id}
@@ -92,11 +101,11 @@ export function PositionRow({
         )}
       </td>
 
-      <td className={cell}>
+      <td data-label={labels.columns.value} className={cell}>
         <Num className="text-xs">{position.value}</Num>
       </td>
 
-      <td className={cell}>
+      <td data-label={labels.columns.unrealized} className={cell}>
         {position.closed ? (
           <span className={`font-bold ${position.realizedPositive ? 'text-pos' : 'text-neg'}`}>
             <Num>{position.realized ?? '—'}</Num>
@@ -111,7 +120,7 @@ export function PositionRow({
         )}
       </td>
 
-      <td className={`${cell} text-dim text-[11px]`}>
+      <td data-label={labels.columns.updated} className={`${cell} text-dim text-[11px]`}>
         <span className="inline-flex items-center gap-1">
           {position.staleMessage ? (
             <TriangleAlert size={11} className="text-warn" aria-hidden />

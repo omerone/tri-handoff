@@ -3,6 +3,8 @@ import { LOCALES } from '@/i18n/config';
 import {
   asCurrency,
   CURRENCY_SYMBOL,
+  formatCompactMoney,
+  formatCompactSigned,
   formatMoney,
   formatNumber,
   formatPercent,
@@ -142,5 +144,40 @@ describe('currency guards', () => {
     expect(isSupportedCurrency('JPY')).toBe(false);
     expect(isSupportedCurrency(42)).toBe(false);
     expect(isSupportedCurrency(undefined)).toBe(false);
+  });
+});
+
+describe('compact figures, for places a full one does not fit', () => {
+  it('keeps a calendar square to a few characters and always shows the sign', () => {
+    // Seven columns on a 375px screen leave about forty pixels of text. `+₪1,165` needs
+    // sixty, so it wrapped mid-figure and ran into the neighbouring day.
+    expect(formatCompactSigned(1165, 'en')).toBe('+1.2K');
+    expect(formatCompactSigned(-492, 'en')).toBe('-492');
+    expect(formatCompactSigned(0, 'en')).toBe('0');
+    expect(formatCompactSigned(2883, 'en')).toBe('+2.9K');
+    for (const value of [1, -1, 999, -999, 1_000_000, -1_000_000]) {
+      expect(formatCompactSigned(value, 'en').length).toBeLessThanOrEqual(7);
+    }
+  });
+
+  it('signs everything except zero, so a loss cannot read as a gain', () => {
+    expect(formatCompactSigned(-1, 'en').startsWith('-')).toBe(true);
+    expect(formatCompactSigned(1, 'en').startsWith('+')).toBe(true);
+    expect(formatCompactSigned(0, 'en').startsWith('+')).toBe(false);
+  });
+
+  it('shortens a chart axis tick and keeps the currency symbol', () => {
+    const display = { currency: 'ILS' as const, locale: 'en' as const, rate: 1 };
+    expect(formatCompactMoney(18344, display)).toBe('₪18K');
+    expect(formatCompactMoney(0, display)).toBe('₪0');
+    expect(formatCompactMoney(2750, display)).toBe('₪2.8K');
+    // The axis is drawn in a fixed 44px gutter, so the tick has to stay short at every scale.
+    for (const value of [12, 999, 9_999, 250_000, 9_999_999]) {
+      expect(formatCompactMoney(value, display).length).toBeLessThanOrEqual(8);
+    }
+  });
+
+  it('applies the display rate, like every other figure on the screen', () => {
+    expect(formatCompactMoney(1000, { currency: 'USD', locale: 'en', rate: 3.7 })).toBe('$3.7K');
   });
 });
