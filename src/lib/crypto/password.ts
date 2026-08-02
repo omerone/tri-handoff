@@ -1,5 +1,6 @@
 import 'server-only';
 import { hash, verify, type Options } from '@node-rs/argon2';
+import { zxcvbn, zxcvbnOptions } from 'zxcvbn';
 
 /**
  * `Algorithm` is an ambient `const enum`, which `isolatedModules` forbids importing as a
@@ -22,7 +23,15 @@ const OPTIONS = {
   parallelism: 1,
 } as const;
 
-export const MIN_PASSWORD_LENGTH = 10;
+export const MIN_PASSWORD_LENGTH = 12; // Increased from 10 to 12 for strength validation
+export const MIN_PASSWORD_STRENGTH_SCORE = 3; // zxcvbn score: 3 = good, 4 = strong
+
+// Configure zxcvbn for password strength analysis
+zxcvbnOptions({
+  dictionary: {
+    userInputs: [],
+  },
+});
 
 export function hashPassword(plain: string): Promise<string> {
   return hash(plain, OPTIONS);
@@ -37,5 +46,83 @@ export async function verifyPassword(storedHash: string, plain: string): Promise
     return await verify(storedHash, plain, OPTIONS);
   } catch {
     return false;
+  }
+}
+
+/**
+ * Password Strength Validation using zxcvbn
+ *
+ * Validates password against multiple attack vectors:
+ * - Dictionary attacks (common words, patterns)
+ * - Spatial patterns (adjacent keyboard keys)
+ * - Repeating/sequential characters
+ * - User-related information (email, username)
+ *
+ * Score explanation:
+ * - 0: Too weak (< 3 guesses) ❌
+ * - 1: Weak (3-6 guesses) ❌
+ * - 2: Fair (6-8 guesses) ❌
+ * - 3: Good (8-10 guesses) ✅ minimum acceptable for TRi
+ * - 4: Strong (> 10 guesses) ✅
+ */
+
+export interface PasswordStrengthResult {
+  score: 0 | 1 | 2 | 3 | 4;
+  feedback: {
+    warning: string;
+    suggestions: string[];
+  };
+  isStrong: boolean;
+  guessesLog10: number;
+}
+
+/**
+ * Analyze password strength
+ * Does not throw; caller decides what to do with result
+ */
+export function analyzePasswordStrength(
+  password: string,
+  userInputs: string[] = []
+): PasswordStrengthResult {
+  // Quick check: minimum length
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return {
+      score: 0,
+      feedback: {
+        warning: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+        suggestions: [],
+      },
+      isStrong: false,
+      guessesLog10: 0,
+    };
+  }
+
+  // Run zxcvbn analysis
+  const result = zxcvbn(password, userInputs);
+
+  return {
+    score: result.score as 0 | 1 | 2 | 3 | 4,
+    feedback: result.feedback,
+    isStrong: result.score >= MIN_PASSWORD_STRENGTH_SCORE,
+    guessesLog10: result.guessesLog10,
+  };
+}
+
+/**
+ * Assert password meets strength requirements
+ * Throws if password fails strength check
+ *
+ * Usage: validatePasswordStrength(password, [userEmail])
+ */
+export function validatePasswordStrength(password: string, userInputs: string[] = []): void {
+  const result = analyzePasswordStrength(password, userInputs);
+
+  if (!result.isStrong) {
+    const msg = result.feedback.warning || 'Password is not strong enough';
+    const suggestion =
+      result.feedback.suggestions[0] ||
+      'Try using a mix of uppercase, lowercase, numbers, and symbols';
+
+    throw new Error(`${msg}. ${suggestion}`);
   }
 }

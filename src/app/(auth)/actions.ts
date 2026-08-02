@@ -6,7 +6,12 @@ import { z } from 'zod';
 import { burnPasswordVerification } from '@/lib/auth/anti-timing';
 import { clientIp, limitKey, LIMITS } from '@/lib/auth/limits';
 import { startSession } from '@/lib/auth/session';
-import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from '@/lib/crypto/password';
+import {
+  hashPassword,
+  MIN_PASSWORD_LENGTH,
+  verifyPassword,
+  validatePasswordStrength,
+} from '@/lib/crypto/password';
 import { generateToken, hashToken } from '@/lib/crypto/tokens';
 import { consumeRateLimit, resetRateLimit, touchLastLogin } from '@/lib/db';
 import {
@@ -195,6 +200,14 @@ export async function completeResetAction(
     return { error: t('passwordTooShort', { min: MIN_PASSWORD_LENGTH }) };
   }
   if (password !== confirm) return { error: t('passwordsDontMatch') };
+
+  // Validate password strength using zxcvbn (score >= 3 required)
+  try {
+    validatePasswordStrength(password, [record.email]);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Password is not strong enough';
+    return { error: message };
+  }
 
   const parsed = completeResetSchema.safeParse({ token, password, confirm });
   if (!parsed.success) return { error: t('resetLinkInvalid') };

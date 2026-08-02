@@ -11,7 +11,12 @@ import {
   startAdminSession,
 } from '@/lib/auth/admin-session';
 import { clientIp, limitKey, LIMITS } from '@/lib/auth/limits';
-import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from '@/lib/crypto/password';
+import {
+  hashPassword,
+  MIN_PASSWORD_LENGTH,
+  verifyPassword,
+  validatePasswordStrength,
+} from '@/lib/crypto/password';
 import { consumeRateLimit } from '@/lib/db';
 import { findSuperAdminByEmail, provisionTenant, setTenantStatus } from '@/lib/db/unscoped';
 
@@ -98,6 +103,14 @@ export async function createTenantAction(
           : field === 'domain'
             ? 'A domain is required.'
             : 'A client name is required.';
+    return { error: message };
+  }
+
+  // Validate password strength (zxcvbn score >= 3)
+  try {
+    validatePasswordStrength(parsed.data.password, [parsed.data.email]);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Password is not strong enough';
     return { error: message };
   }
 
