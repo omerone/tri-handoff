@@ -6,10 +6,11 @@ import { Card } from '@/components/ui/card';
 import { Chip, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { getMt5Account, getTrade, listJournalVocabulary } from '@/lib/db';
-import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
+import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { JournalForm } from './journal-form';
+import { formatDateTimeAt } from '@/lib/time/format';
 
 /**
  * One trade, everything about it, plus the journal (SPEC §1.1 — the "trade report" adopted
@@ -40,11 +41,6 @@ export default async function TradeDetailPage({ params }: { params: Promise<{ id
     source: account?.accountCurrency ?? 'USD',
     display: session.user.displayCurrency,
     locale,
-  });
-
-  const dateTime = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
-    dateStyle: 'medium',
-    timeStyle: 'short',
   });
 
   const price = (value: number | null) =>
@@ -108,10 +104,10 @@ export default async function TradeDetailPage({ params }: { params: Promise<{ id
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title={t('journal.details')}>
           <dl className="grid grid-cols-2 gap-y-2 text-xs">
-            <Row label={t('journal.opened')} value={dateTime.format(trade.openAt)} />
+            <Row label={t('journal.opened')} value={formatDateTimeAt(trade.openAt)} />
             <Row
               label={t('journal.closed')}
-              value={trade.closeAt ? dateTime.format(trade.closeAt) : '—'}
+              value={trade.closeAt ? formatDateTimeAt(trade.closeAt) : '—'}
             />
             <Row label={t('journal.entry')} value={price(trade.entryPrice)} />
             <Row label={t('journal.exit')} value={price(trade.exitPrice)} />

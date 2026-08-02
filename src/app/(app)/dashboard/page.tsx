@@ -11,9 +11,10 @@ import { loadBook } from '@/lib/analytics/load';
 import { getDashboardLayout } from '@/lib/db';
 import { normalizeLayout, type WidgetId } from '@/lib/dashboard/layout';
 import { DashboardGrid } from './grid';
-import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
+import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { displayMoney } from '@/lib/money/display';
 import { formatNumber, formatPercent } from '@/lib/money/currency';
+import { formatDayMonthAt, formatTimeAt } from '@/lib/time/format';
 
 /**
  * The dashboard from the prototype: six KPI tiles, the R-strip, the equity curve and the
@@ -50,13 +51,6 @@ export default async function DashboardPage() {
   const curve = equityCurve(book.trades, book.startBalance);
   const drawdown = maxDrawdown(curve, book.startBalance);
   const balance = book.startBalance + metrics.net;
-
-  const dateTime = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 
   const recent = [...book.trades].slice(-6).reverse();
   const strip = book.trades.slice(-60);
@@ -130,7 +124,7 @@ export default async function DashboardPage() {
           data={curve.map((point) => ({
             index: point.index,
             balance: point.balance,
-            label: dateTime.format(point.closeAt),
+            label: `${formatDayMonthAt(point.closeAt)} ${formatTimeAt(point.closeAt)}`,
           }))}
           startBalance={book.startBalance}
           rtl={rtl}

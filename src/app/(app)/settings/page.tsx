@@ -6,8 +6,8 @@ import { Mt5Card, type ConnectedAccount } from './mt5-card';
 import { requireSession } from '@/lib/auth/session';
 import { getMt5Account } from '@/lib/db';
 import type { Locale } from '@/i18n/config';
-import { LOCALE_TAG } from '@/i18n/config';
 import { asCurrency, formatMoney } from '@/lib/money/currency';
+import { formatDateTimeAt } from '@/lib/time/format';
 
 export default async function SettingsPage() {
   const session = await requireSession();
@@ -32,10 +32,7 @@ export default async function SettingsPage() {
         server: account.server,
         status: account.status,
         lastSync: account.lastSyncAt
-          ? new Intl.DateTimeFormat(LOCALE_TAG[locale], {
-              dateStyle: 'short',
-              timeStyle: 'short',
-            }).format(account.lastSyncAt)
+          ? formatDateTimeAt(account.lastSyncAt)
           : null,
         balance: money(account.balance),
         equity: money(account.equity),

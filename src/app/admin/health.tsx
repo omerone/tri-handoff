@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { SyncHealth } from '@/lib/db/unscoped';
+import { formatDateTimeAt } from '@/lib/time/format';
 
 /**
  * The monitoring table (SPEC §2: "ניטור סנכרונים ותקלות").
@@ -46,7 +47,7 @@ export function HealthTable({ rows }: { rows: SyncHealth[] }) {
               <td className={`px-3 py-2.5 text-xs ${row.tone}`}>{row.label}</td>
               <td className="px-3 py-2.5">{row.name}</td>
               <td className="text-dim tri-num px-3 py-2.5 text-xs whitespace-nowrap">
-                {row.lastSyncAt ? row.lastSyncAt.toISOString().slice(0, 16).replace('T', ' ') : '—'}
+                {row.lastSyncAt ? formatDateTimeAt(row.lastSyncAt) : '—'}
               </td>
               <td className="text-neg max-w-[22rem] truncate px-3 py-2.5 text-xs" title={row.lastError ?? ''}>
                 {row.lastError ?? ''}

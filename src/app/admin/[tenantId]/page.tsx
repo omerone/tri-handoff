@@ -7,6 +7,7 @@ import { requireAdmin } from '@/lib/auth/admin-session';
 import { getTenantDetail, tenantSyncLogs } from '@/lib/db/unscoped';
 import { setTenantStatusAction } from '../actions';
 import { DangerZone, EditTenantForm, SetPasswordForm } from './forms';
+import { formatDateTimeAt } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,7 @@ export default async function TenantDetailPage({
   if (!tenant) notFound();
 
   const stamp = (date: Date | null) =>
-    date ? date.toISOString().slice(0, 16).replace('T', ' ') : '—';
+    date ? formatDateTimeAt(date) : '—';
 
   return (
     <div className="flex flex-col gap-5">

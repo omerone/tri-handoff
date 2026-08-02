@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { DateField } from '@/components/ui/date-field';
 import { FormMessage, SubmitButton } from '@/components/ui/form';
 import { createFinanceEntryAction, type FinanceFormState } from './actions';
 
@@ -99,17 +100,13 @@ export function EntryForm({
           />
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-dim text-[11px] font-semibold">{labels.date}</span>
-          <input
-            name="entryDate"
-            type="date"
-            defaultValue={defaultDate}
-            required
-            dir="ltr"
-            className={`${field} w-40`}
-          />
-        </label>
+        <DateField
+          name="entryDate"
+          defaultValue={defaultDate}
+          label={labels.date}
+          required
+          className={`${field} w-40`}
+        />
 
         <SubmitButton>
           <span className="inline-flex items-center gap-1.5">

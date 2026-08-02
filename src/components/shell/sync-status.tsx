@@ -1,9 +1,8 @@
-import { getLocale, getTranslations } from 'next-intl/server';
-import type { Locale } from '@/i18n/config';
-import { LOCALE_TAG } from '@/i18n/config';
+import { getTranslations } from 'next-intl/server';
 import { getMt5Account } from '@/lib/db';
 import type { TenantSession } from '@/lib/tenant/context';
 import { SyncPill } from './sync-pill';
+import { formatTimeAt } from '@/lib/time/format';
 
 /**
  * Server half of the sync pill: reads the account, decides whether a login-triggered sync is
@@ -17,7 +16,6 @@ export async function SyncStatus({
   lastLoginAt: Date | null;
 }) {
   const t = await getTranslations('sync');
-  const locale = (await getLocale()) as Locale;
   const account = await getMt5Account(session.ctx);
 
   // "Sync on every login": true from the moment of a login until a sync completes, and false
@@ -27,11 +25,9 @@ export async function SyncStatus({
     (account.lastSyncAt === null ||
       (lastLoginAt !== null && lastLoginAt.getTime() > account.lastSyncAt.getTime()));
 
-  const lastSyncedAt = account?.lastSyncAt
-    ? new Intl.DateTimeFormat(LOCALE_TAG[locale], { hour: '2-digit', minute: '2-digit' }).format(
-        account.lastSyncAt,
-      )
-    : null;
+  // A time only — the pill means "synced today at", and a date here would push the header
+  // wider on a phone for information the settings page already carries in full.
+  const lastSyncedAt = account?.lastSyncAt ? formatTimeAt(account.lastSyncAt) : null;
 
   return (
     <SyncPill

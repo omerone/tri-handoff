@@ -9,8 +9,9 @@ import { computeMetrics, toAnalyticsTrades } from '@/lib/analytics';
 import { countTrades, listClosedTrades, pageTrades, type TradeFilter } from '@/lib/db';
 import { ASSET_CLASSES, DIRECTIONS, STYLES } from '@/lib/analytics/dimensions';
 import { getMt5Account, listJournalVocabulary } from '@/lib/db';
-import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
+import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
+import { formatDateAt, formatTimeAt } from '@/lib/time/format';
 import { displayMoney } from '@/lib/money/display';
 import { TradeFilters } from './filters';
 import { Pager } from './pager';
@@ -70,11 +71,7 @@ export default async function TradesPage({
     locale,
   });
 
-  const dateTime = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
-    day: '2-digit',
-    month: '2-digit',
-  });
-  const time = new Intl.DateTimeFormat(LOCALE_TAG[locale], { hour: '2-digit', minute: '2-digit' });
+  const closedAt = (at: Date) => `${formatDateAt(at)} · ${formatTimeAt(at)}`;
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const align = rtl ? 'text-right' : 'text-left';
@@ -187,7 +184,7 @@ export default async function TradesPage({
                     <div className="text-dim flex items-center justify-between gap-2 text-[11px]">
                       <Num>
                         {trade.closeAt
-                          ? `${dateTime.format(trade.closeAt)} · ${time.format(trade.closeAt)}`
+                          ? closedAt(trade.closeAt)
                           : '—'}
                       </Num>
                       <span className="flex items-center gap-2">
@@ -234,7 +231,7 @@ export default async function TradesPage({
                     <td className="text-dim px-3.5 py-2.5 text-xs whitespace-nowrap">
                       <Num>
                         {trade.closeAt
-                          ? `${dateTime.format(trade.closeAt)} · ${time.format(trade.closeAt)}`
+                          ? closedAt(trade.closeAt)
                           : '—'}
                       </Num>
                     </td>

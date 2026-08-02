@@ -92,6 +92,7 @@ the server request certificates for domains it doesn't serve.
 | Auth | `src/lib/auth/**` | argon2id, HMAC-signed session cookie over a random token, sessions scoped to the tenant that issued them |
 | Secrets | `src/lib/crypto/secretbox.ts` | AES-256-GCM envelope for the MT5 investor password |
 | Design tokens | `src/app/globals.css` | One `--tri-*` variable set per theme (dark, light, follow-system). Nothing pins a raw colour in JavaScript — anything needing a computed opacity uses `color-mix()` against the token |
+| Dates | `src/lib/time/format.ts` | One format, `dd/mm/yyyy`, everywhere — not the reader's locale, which disagreed screen by screen and is ambiguous for any day before the 13th. Month and weekday *names* stay localised. A test fails the build if anything formats a date on its own |
 | Responsive rules | `src/app/globals.css`, `e2e/mobile.spec.ts` | Phone-specific rules live together at the bottom of the stylesheet: 16px form fields (below which iOS zooms), 44px hit areas on touch pointers, and `tri-stack` for tables that become labelled cards. The e2e sweep measures every route at phone width |
 | Dashboard layout | `src/lib/dashboard/layout.ts` | Pure: the widget list, the span ladder, and `normalizeLayout`, which turns any stored shape into something that renders |
 | i18n | `src/i18n/**`, `src/messages/*.json` | he (RTL, default) and en (LTR); language is a cookie plus a user column, not a URL prefix |

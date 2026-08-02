@@ -9,13 +9,14 @@ import { getMt5Account, listFinanceEntries, listLongPositions } from '@/lib/db';
 import { portfolioTotals } from '@/lib/positions/valuation';
 import { cumulativeCash, expensesByCategory, monthBalance, totalWealth, yearBalance } from '@/lib/finance/balance';
 import { isKnownCategory, suggestedCategories } from '@/lib/finance/categories';
-import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
+import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { getFxRate, hasRate } from '@/lib/money/fx';
-import { ANALYTICS_TIME_ZONE, wallClock } from '@/lib/time/zone';
+import { wallClock } from '@/lib/time/zone';
 import { EntryForm } from './entry-form';
 import { EntryRow } from './entry-row';
+import { formatDayMonthAt, formatMonthName } from '@/lib/time/format';
 
 /**
  * The personal-finance screen (SPEC §3.1) — the module that makes TRi more than a trading
@@ -128,17 +129,7 @@ export default async function FinancePage({
   const categoryLabel = (category: string): string =>
     isKnownCategory(category) ? t(`categories.${category}`) : category;
 
-  const monthName = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
-    month: 'long',
-    year: 'numeric',
-    timeZone: ANALYTICS_TIME_ZONE,
-  }).format(new Date(Date.UTC(year, month - 1, 15)));
-
-  const dayFormat = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone: 'UTC',
-  });
+  const monthName = formatMonthName({ year, month }, locale);
 
   const step = (delta: number) => {
     const next = stepMonth({ year, month }, delta);
@@ -236,7 +227,8 @@ export default async function FinancePage({
                   label: occurrence.label,
                   category: categoryLabel(occurrence.category),
                   amount: money(fromIls(occurrence.amountIls)),
-                  date: dayFormat.format(occurrence.occurrenceDate),
+                  // Stored as UTC midnight: a calendar date, not an instant.
+                  date: formatDayMonthAt(occurrence.occurrenceDate, 'UTC'),
                   isRecurring: occurrence.isRecurring,
                   generated: occurrence.generated,
                 }}

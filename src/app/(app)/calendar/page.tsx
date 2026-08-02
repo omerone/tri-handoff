@@ -7,10 +7,11 @@ import { requireSession } from '@/lib/auth/session';
 import { parseYearMonth, stepMonth } from '@/lib/finance/bounds';
 import { dailyTotals } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
-import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
+import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { formatCompactSigned, formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
-import { ANALYTICS_TIME_ZONE, wallClock } from '@/lib/time/zone';
+import { wallClock } from '@/lib/time/zone';
+import { formatMonthName } from '@/lib/time/format';
 
 /**
  * The month calendar: daily P&L, trade count and win rate per square (SPEC §1.1).
@@ -46,11 +47,7 @@ export default async function CalendarPage({
   const { year, month } = parseYearMonth(params.m) ?? { year: fallback.year, month: fallback.month };
 
   const weekdayNames = (await getTranslations('calendar')).raw('weekdays') as string[];
-  const monthName = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
-    month: 'long',
-    year: 'numeric',
-    timeZone: ANALYTICS_TIME_ZONE,
-  }).format(new Date(Date.UTC(year, month - 1, 15)));
+  const monthName = formatMonthName({ year, month }, locale);
 
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();

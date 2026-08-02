@@ -9,7 +9,7 @@ import {
   valuePosition,
   type LongPosition,
 } from '@/lib/positions/valuation';
-import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
+import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import {
   asCurrency,
   formatMoney,
@@ -22,6 +22,7 @@ import { getFxRate, hasRate } from '@/lib/money/fx';
 import { wallClock } from '@/lib/time/zone';
 import { AddPositionForm } from './add-form';
 import { PositionRow } from './position-row';
+import { formatDateAt } from '@/lib/time/format';
 
 /**
  * Long-term positions (SPEC §3.4): the holdings that live outside MT5 and are marked to
@@ -74,12 +75,6 @@ export default async function LongPositionsPage() {
   }));
   const totals = portfolioTotals(converted, now);
 
-  const dateFormat = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-  });
-
   const today = wallClock(now);
   const defaultDate = `${today.year}-${String(today.month).padStart(2, '0')}-${String(today.day).padStart(2, '0')}`;
 
@@ -100,7 +95,7 @@ export default async function LongPositionsPage() {
       unrealized: money(valuation.unrealized, currency, { signed: true }),
       unrealizedPositive: valuation.unrealized >= 0,
       unrealizedPercent: formatPercent(valuation.unrealizedPercent, locale),
-      updatedAt: dateFormat.format(position.valueUpdatedAt),
+      updatedAt: formatDateAt(position.valueUpdatedAt),
       staleMessage: isStale(valuation)
         ? t('staleWarning', { days: valuation.priceAgeDays })
         : null,
