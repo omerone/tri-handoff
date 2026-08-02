@@ -18,6 +18,8 @@ export { getUser, updateUserPreferences, touchLastLogin } from './users';
 export * from './mt5-accounts';
 export * from './trades';
 export * from './sync-logs';
+export * from './finance';
+export * from './fx';
 
 // Not tenant data — counters keyed by an opaque string. Safe for any caller.
 export * from './rate-limit';
