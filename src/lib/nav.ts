@@ -27,7 +27,7 @@ export const NAV: readonly NavDefinition[] = [
   { key: 'trades', href: '/trades', label: 'trades', enabled: true }, // M1.6
   { key: 'calendar', href: '/calendar', label: 'calendar', enabled: true }, // M1.7
   { key: 'finance', href: '/finance', label: 'finance', enabled: true },
-  { key: 'long', href: '/long', label: 'long', enabled: false }, // P3
+  { key: 'long', href: '/long', label: 'long', enabled: true },
   { key: 'settings', href: '/settings', label: 'settings', enabled: true },
 ];
 

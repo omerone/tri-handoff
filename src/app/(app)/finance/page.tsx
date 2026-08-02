@@ -4,7 +4,8 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
-import { getMt5Account, listFinanceEntries } from '@/lib/db';
+import { getMt5Account, listFinanceEntries, listLongPositions } from '@/lib/db';
+import { portfolioTotals } from '@/lib/positions/valuation';
 import { cumulativeCash, expensesByCategory, monthBalance, totalWealth, yearBalance } from '@/lib/finance/balance';
 import { isKnownCategory, suggestedCategories } from '@/lib/finance/categories';
 import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
@@ -34,9 +35,10 @@ export default async function FinancePage({
   const rtl = LOCALE_DIR[locale] === 'rtl';
   const params = await searchParams;
 
-  const [entries, account] = await Promise.all([
+  const [entries, account, positions] = await Promise.all([
     listFinanceEntries(session.ctx),
     getMt5Account(session.ctx),
+    listLongPositions(session.ctx),
   ]);
 
   const today = wallClock(new Date());
@@ -62,10 +64,27 @@ export default async function FinancePage({
     formatMoney(amount, display, locale, options);
 
   const tradingValue = account?.equity ?? account?.balance ?? 0;
+
+  // Long positions can be held in several currencies, so each is converted before the
+  // portfolio is totalled. One rate per currency actually held, not one per position.
+  const positionRates = new Map<string, number>();
+  for (const currency of new Set(positions.map((position) => position.currency))) {
+    const fx = await getFxRate(currency, display);
+    positionRates.set(currency, hasRate(fx) ? fx.rate : 1);
+  }
+  const longValue = portfolioTotals(
+    positions.map((position) => ({
+      ...position,
+      buyPrice: position.buyPrice * (positionRates.get(position.currency) ?? 1),
+      currentPrice: position.currentPrice * (positionRates.get(position.currency) ?? 1),
+      fees: position.fees * (positionRates.get(position.currency) ?? 1),
+    })),
+    new Date(),
+  ).value;
+
   const wealth = totalWealth({
     trading: fromTrading(tradingValue),
-    // P3 fills this in; until then it is honestly zero rather than quietly absent.
-    longPositions: 0,
+    longPositions: longValue,
     cash: fromIls(cash),
   });
 
@@ -114,7 +133,13 @@ export default async function FinancePage({
         <KPI
           label={t('totalWealth')}
           value={money(wealth)}
-          sub={`${t('trading')} ${money(fromTrading(tradingValue))} · ${t('cash')} ${money(fromIls(cash))}`}
+          sub={[
+            `${t('trading')} ${money(fromTrading(tradingValue))}`,
+            longValue > 0 ? `${t('longPositions')} ${money(longValue)}` : null,
+            `${t('cash')} ${money(fromIls(cash))}`,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
           title={t('cashNote')}
         />
       </div>
