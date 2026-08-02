@@ -74,6 +74,18 @@
     "recent": "Recent trades",
     "empty": "No trades yet. Connect your MT5 account to get started."
   },
+  "layout": {
+    "edit": "Edit layout",
+    "done": "Done",
+    "reset": "Reset to default",
+    "hint": "Drag a card to rearrange, or focus its handle and use the arrow keys.",
+    "hintWidth": "Widths apply on wide screens only.",
+    "move": "Move {name}, position {position} of {total}",
+    "wider": "Widen {name}",
+    "narrower": "Narrow {name}",
+    "saved": "Layout saved",
+    "notSaved": "The layout was not saved. Reload the page and try again."
+  },
   "analytics": {
     "insights": "Where you are most profitable",
     "byWeekday": "P&L by weekday",

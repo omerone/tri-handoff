@@ -92,6 +92,7 @@ the server request certificates for domains it doesn't serve.
 | Auth | `src/lib/auth/**` | argon2id, HMAC-signed session cookie over a random token, sessions scoped to the tenant that issued them |
 | Secrets | `src/lib/crypto/secretbox.ts` | AES-256-GCM envelope for the MT5 investor password |
 | Design tokens | `src/app/globals.css` | One `--tri-*` variable set per theme (dark, light, follow-system). Nothing pins a raw colour in JavaScript — anything needing a computed opacity uses `color-mix()` against the token |
+| Dashboard layout | `src/lib/dashboard/layout.ts` | Pure: the widget list, the span ladder, and `normalizeLayout`, which turns any stored shape into something that renders |
 | i18n | `src/i18n/**`, `src/messages/*.json` | he (RTL, default) and en (LTR); language is a cookie plus a user column, not a URL prefix |
 
 ## Deployment

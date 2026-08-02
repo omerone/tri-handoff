@@ -14,7 +14,13 @@ import 'server-only';
  */
 
 export type { Mt5Status, SyncStatus, SyncTrigger, TenantStatus } from './enums';
-export { getUser, updateUserPreferences, touchLastLogin } from './users';
+export {
+  getUser,
+  updateUserPreferences,
+  touchLastLogin,
+  getDashboardLayout,
+  saveDashboardLayout,
+} from './users';
 export * from './mt5-accounts';
 export * from './trades';
 export * from './sync-logs';

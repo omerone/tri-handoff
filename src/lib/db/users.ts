@@ -1,4 +1,5 @@
 import 'server-only';
+import { Prisma } from '@prisma/client';
 import type { Locale } from '@/i18n/config';
 import type { TenantContext, TenantUser } from '@/lib/tenant/context';
 import { assertContext } from './context';
@@ -55,6 +56,39 @@ export async function updateUserPreferences(
   await prisma.user.updateMany({
     where: { id: ctx.userId, tenantId: ctx.tenantId },
     data,
+  });
+}
+
+/**
+ * The dashboard arrangement (SPEC §1.1).
+ *
+ * It is read on its own rather than through `getUser` so it stays out of the session
+ * payload: it is a list that only one page needs, and it would otherwise be carried on
+ * every request the app serves.
+ *
+ * The value is returned raw. Interpreting it is `normalizeLayout`'s job, which the caller
+ * runs — that keeps the tolerance for stale shapes in one place, tested without a database.
+ */
+export async function getDashboardLayout(ctx: TenantContext): Promise<unknown> {
+  assertContext(ctx);
+  const row = await prisma.user.findFirst({
+    where: { id: ctx.userId, tenantId: ctx.tenantId },
+    select: { dashboardLayout: true },
+  });
+  return row?.dashboardLayout ?? null;
+}
+
+/** Saves an arrangement, or clears it (`null`) to fall back to the default. */
+export async function saveDashboardLayout(
+  ctx: TenantContext,
+  layout: readonly { id: string; span: number }[] | null,
+): Promise<void> {
+  assertContext(ctx);
+  await prisma.user.updateMany({
+    where: { id: ctx.userId, tenantId: ctx.tenantId },
+    // Prisma reads `null` on a Json column as "SQL NULL or JSON null?", so it wants the
+    // intent spelled out. Clearing the column is what restores the default.
+    data: { dashboardLayout: layout === null ? Prisma.DbNull : [...layout] },
   });
 }
 

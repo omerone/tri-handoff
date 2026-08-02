@@ -72,6 +72,10 @@ model User {
   /// currency and finance data in ILS; both are converted for display.
   displayCurrency String @default("ILS") @map("display_currency")
   theme           Theme  @default(dark)
+  /// The dashboard arrangement the user built (SPEC §1.1). An ordered `[{id, span}]` list;
+  /// null means "never touched it, use the default". Read through `normalizeLayout`, which
+  /// tolerates any shape — this column outlives the code that wrote it.
+  dashboardLayout Json?  @map("dashboard_layout")
 
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")

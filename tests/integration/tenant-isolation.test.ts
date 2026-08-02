@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { getUser, updateUserPreferences } from '@/lib/db';
+import { getDashboardLayout, getUser, saveDashboardLayout, updateUserPreferences } from '@/lib/db';
 import { findUserForLogin, lookupTenantByDomain, provisionTenant } from '@/lib/db/unscoped';
 import { assertContext, makeTenantContext } from '@/lib/db/context';
 import { cleanup, createTenantFixture, crossTenantContext, testDb, type Fixture } from '../helpers/fixtures';
@@ -50,6 +50,35 @@ describe('cross-tenant writes', () => {
     const victim = await testDb.user.findUniqueOrThrow({ where: { id: bob.userId } });
     expect(victim.locale).toBe('he');
     expect(victim.displayCurrency).toBe('ILS');
+  });
+
+  it("does not write a dashboard layout onto another tenant's user", async () => {
+    await saveDashboardLayout(bob.ctx, [{ id: 'equity', span: 12 }]);
+    await saveDashboardLayout(crossTenantContext(alice, bob), [{ id: 'recent', span: 2 }]);
+
+    const victim = await testDb.user.findUniqueOrThrow({ where: { id: bob.userId } });
+    expect(victim.dashboardLayout).toEqual([{ id: 'equity', span: 12 }]);
+    expect(await getDashboardLayout(crossTenantContext(alice, bob))).toBeNull();
+  });
+
+  it('round-trips and clears the caller\'s own dashboard layout', async () => {
+    await saveDashboardLayout(alice.ctx, [{ id: 'recent', span: 4 }]);
+    expect(await getDashboardLayout(alice.ctx)).toEqual([{ id: 'recent', span: 4 }]);
+
+    // Clearing is what "reset" does, and it has to leave a SQL NULL rather than a JSON one:
+    // the row must read as never-been-arranged so it keeps following the default.
+    await saveDashboardLayout(alice.ctx, null);
+    expect(await getDashboardLayout(alice.ctx)).toBeNull();
+
+    // Asked of the database, not of Prisma. Prisma hands back a plain `null` for both
+    // `DbNull` and `JsonNull`, so the assertion above passes just as happily for a column
+    // holding the JSON value `null` — and "has this user ever arranged their dashboard?" is
+    // a question answered with IS NULL. Swapping `Prisma.DbNull` for `Prisma.JsonNull` would
+    // otherwise leave the whole suite green.
+    const [row] = await testDb.$queryRaw<{ cleared: boolean }[]>`
+      SELECT dashboard_layout IS NULL AS cleared FROM users WHERE id = ${alice.userId}
+    `;
+    expect(row?.cleared).toBe(true);
   });
 
   it("does modify the caller's own user", async () => {

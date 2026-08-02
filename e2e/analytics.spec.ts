@@ -30,6 +30,136 @@ test.describe('dashboard', () => {
     await expect(page.getByText('Recent trades')).toBeVisible();
   });
 
+  test('lets the user rearrange the grid, and remembers it', async ({ page }) => {
+    // SPEC §1.1: the user builds their own layout. What a unit test cannot check is that the
+    // arrangement actually survives the round trip through the database and comes back on
+    // the next page load, which is the whole point of storing it.
+    //
+    // The arrangement is stored on the shared demo account, so this test starts by putting it
+    // back to the default rather than assuming it. Otherwise one failed run leaves the layout
+    // half-moved and every run after it fails for a reason that has nothing to do with the code.
+    await page.goto('/dashboard');
+    const order = () =>
+      page
+        .locator('[data-widget]')
+        .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.widget));
+    const edit = page.getByRole('button', { name: 'Edit layout' });
+    const resetToDefault = page.getByRole('button', { name: 'Reset to default' });
+    const saved = page.getByText('Layout saved');
+
+    await edit.click();
+    if (await resetToDefault.isEnabled()) {
+      await resetToDefault.click(); // Resetting also leaves edit mode.
+      await expect(saved).toBeAttached();
+      await edit.click();
+    }
+
+    const before = await order();
+    expect(before[0]).toBe('balance');
+
+    const handle = page.getByRole('button', { name: /^Move Account balance/ });
+    await expect(handle).toBeVisible();
+
+    // Two nudges with the keyboard. The drag has nothing to fall back on for anyone not using
+    // a mouse, so this is the path that has to keep working.
+    await handle.press('ArrowRight');
+    await handle.press('ArrowRight');
+    expect(await order()).toEqual(['netPnl', 'winRate', 'balance', ...before.slice(3)]);
+
+    // Width is a desktop decision — at 375px a 3-of-12 tile would be 90 pixels wide — so
+    // below the breakpoint the control is not offered at all rather than offered and inert.
+    // An enabled button that changes a readout and saves while the card in front of the user
+    // does not move is worse than no button.
+    const widen = page.getByRole('button', { name: /^Widen Account balance/ });
+    const wide = (page.viewportSize()?.width ?? 0) >= 1024;
+    if (wide) await widen.click();
+    else await expect(widen).toHaveCount(0);
+
+    // The arrangement is written on a trailing debounce, so reloading straight away would
+    // race the request rather than test it. The status line is what tells the user it landed.
+    await expect(saved).toBeAttached();
+    await page.getByRole('button', { name: 'Done' }).click();
+
+    await page.reload();
+    expect(await order()).toEqual(['netPnl', 'winRate', 'balance', ...before.slice(3)]);
+    await expect(page.locator('[data-widget="balance"]')).toHaveCSS(
+      'grid-column-start',
+      wide ? 'span 3' : 'span 6',
+    );
+
+    await edit.click();
+    await resetToDefault.click();
+    await expect(saved).toBeAttached();
+    await page.reload();
+    expect(await order()).toEqual(before);
+  });
+
+  test('takes the width back from the user below the desktop breakpoint', async ({ page }) => {
+    // Order is the user's at every size; width is theirs only where there is room. The rung
+    // values are unit-tested, but only the browser can show that the media queries actually
+    // produce them — and nothing else in the suite ever renders at the tablet tier, where a
+    // panel dropping to half width puts the equity chart's axis labels on top of each other.
+    //
+    // Independent of the stored arrangement on purpose: below 1024px the chosen span is not
+    // read at all, so these hold whatever the demo account's layout happens to be.
+    await page.goto('/dashboard');
+    const kpi = page.locator('[data-widget="balance"]');
+    const panel = page.locator('[data-widget="equity"]');
+
+    await page.setViewportSize({ width: 800, height: 900 });
+    await expect(kpi).toHaveCSS('grid-column-start', 'span 4'); // three-up on a tablet
+    await expect(panel).toHaveCSS('grid-column-start', 'span 12');
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await expect(kpi).toHaveCSS('grid-column-start', 'span 6'); // two-up on a phone
+    await expect(panel).toHaveCSS('grid-column-start', 'span 12');
+  });
+
+  test('keeps an arrangement the user navigates away from before the debounce fires', async ({
+    page,
+  }) => {
+    // The write is on a trailing debounce and leaving the page cancels the timer, so without
+    // the flush on unmount this is a rearrangement the user watched happen and then lost.
+    // The test above always waits for "Layout saved" first, so it only ever covers the
+    // debounce path; this is the other one, and deleting the flush must fail something.
+    await page.goto('/dashboard');
+    const order = () =>
+      page
+        .locator('[data-widget]')
+        .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.widget));
+
+    const edit = page.getByRole('button', { name: 'Edit layout' });
+    const resetToDefault = page.getByRole('button', { name: 'Reset to default' });
+
+    await edit.click();
+    if (await resetToDefault.isEnabled()) {
+      await resetToDefault.click();
+      await expect(page.getByText('Layout saved')).toBeAttached();
+      await edit.click();
+    }
+    const before = await order();
+
+    // Matched by the server-action header rather than by URL: the flush happens while the
+    // router is already unmounting, so the request carries whichever route it has arrived at
+    // by then. Waiting on it is what makes this a test of the write rather than a race.
+    const written = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.request().headers()['next-action'] !== undefined,
+    );
+    await page.getByRole('button', { name: /^Move Account balance/ }).press('ArrowRight');
+    // Exact, or this also matches "Long Trades".
+    await page.getByRole('link', { name: 'Trades', exact: true }).click(); // inside the window
+    await written;
+
+    await page.goto('/dashboard');
+    expect(await order()).toEqual([before[1], before[0], ...before.slice(2)]);
+
+    await edit.click();
+    await resetToDefault.click();
+    await expect(page.getByText('Layout saved')).toBeAttached();
+  });
+
   test('reports RR coverage next to the RR figure', async ({ page }) => {
     // RR is the client's headline metric; a coverage figure that stopped rendering would
     // leave an average over an unknown share of the book looking authoritative.

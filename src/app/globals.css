@@ -167,6 +167,42 @@ button {
   border-radius: 6px;
 }
 
+/*
+ * The dashboard grid the user arranges (SPEC §1.1).
+ *
+ * Three widths per widget, because the user's chosen span is a desktop decision. Below the
+ * large breakpoint the app picks the width: at 375px a card the user set to two of twelve
+ * columns would be 60 pixels wide, which is not a layout, it is a bug the user built for
+ * themselves. Order is theirs at every size; width is theirs only where there is room.
+ *
+ * These are custom properties rather than Tailwind's `col-span-*` because the value is data
+ * — it comes out of the database and cannot be enumerated at build time.
+ */
+.tri-widget {
+  grid-column: span var(--tri-span-base) / span var(--tri-span-base);
+  /*
+   * The widget is wrapped so the drag handle has something to anchor to, and the wrapper is
+   * now the grid item — so it, not the card, is what stretches to the row height. Without
+   * this the tiles in a row stop lining up the moment one of them has a sub-line and the
+   * next does not. The handle is absolutely positioned and out of flow, so it is unaffected.
+   */
+  display: flex;
+  flex-direction: column;
+}
+.tri-widget > * {
+  flex: 1 1 auto;
+}
+@media (min-width: 768px) {
+  .tri-widget {
+    grid-column: span var(--tri-span-md) / span var(--tri-span-md);
+  }
+}
+@media (min-width: 1024px) {
+  .tri-widget {
+    grid-column: span var(--tri-span) / span var(--tri-span);
+  }
+}
+
 @keyframes tri-spin {
   to {
     transform: rotate(360deg);
