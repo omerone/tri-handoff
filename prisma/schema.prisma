@@ -348,12 +348,25 @@ model LongPosition {
   buyPrice Decimal  @map("buy_price") @db.Decimal(20, 8)
   buyDate  DateTime @map("buy_date") @db.Date
 
-  /// Latest **per-unit** price, entered by hand (SPEC §3.4 — no market-data feed).
+  /// Latest **per-unit** price. Entered by hand, or written by the quote refresh when the
+  /// position is tracked (see `priceSource`).
   /// The brief calls this `current_value`; it is stored per unit rather than as a position
   /// total because that is what the prototype's update field takes and what the user reads
   /// off their broker. Position value is `currentPrice × qty`.
   currentPrice   Decimal  @map("current_price") @db.Decimal(20, 8)
   valueUpdatedAt DateTime @map("value_updated_at")
+
+  /// `auto` — the refresh writes `currentPrice` from the quote feed.
+  /// `manual` — the user owns the price and nothing overwrites it. The default, because a
+  /// position whose symbol the feed does not carry must keep working exactly as before.
+  /// Typing a price by hand always drops a position back to `manual`: the user correcting a
+  /// number and the feed overwriting it a minute later is the one outcome nobody wants.
+  priceSource String @default("manual") @map("price_source")
+
+  /// Market Identifier Code of the listing this position tracks (`XNGS` for Apple on
+  /// NASDAQ). Load-bearing rather than decorative: `AAPL` is listed on six exchanges in four
+  /// currencies, so the symbol alone does not identify a price. Empty for crypto pairs.
+  micCode String @default("") @map("mic_code")
 
   fees Decimal @default(0) @db.Decimal(20, 8)
 
@@ -371,6 +384,7 @@ model LongPosition {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, closedAt])
+  @@index([priceSource, closedAt])
   @@map("long_positions")
 }
 
@@ -428,6 +442,39 @@ model FxRate {
   @@unique([base, quote, asOf])
   @@index([base, quote, asOf])
   @@map("fx_rates")
+}
+
+/// The market-price cache.
+///
+/// Shared, not tenant data — Apple closed at one price for everybody — and that sharing is
+/// the point: two positions in the same symbol cost one API credit between them, whoever
+/// holds them. Keyed by (symbol, micCode) for the same reason the column exists on
+/// `LongPosition`: one ticker, several listings, different currencies.
+model Quote {
+  id String @id @default(cuid())
+
+  symbol  String
+  /// Empty for crypto pairs, which are not listed on an exchange.
+  micCode String @map("mic_code")
+
+  /// Null when the provider had nothing for this listing. The row still exists, because it
+  /// carries `fetchedAt`: without it a ticker the vendor does not carry has nothing to stamp
+  /// and is retried on every single tick, forever. Nullable rather than zero so that a
+  /// missing price can never be read as a price of nothing.
+  price    Decimal? @db.Decimal(20, 8)
+  /// The currency the *quote* is in. A position priced in another one is left alone rather
+  /// than silently marked to market at the wrong scale.
+  currency String?
+
+  /// When the market produced this price — the close it came from, not when we asked. This
+  /// is what decides whether a refresh is owed.
+  asOf DateTime? @map("as_of")
+  /// When we last asked. Separate from `asOf` so a feed that keeps returning the same close
+  /// (a holiday, a delisting) cannot put the refresh into a loop.
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@unique([symbol, micCode])
+  @@map("quotes")
 }
 
 // ---------------------------------------------------------------------------
@@ -546,4 +593,135 @@ model RateLimit {
 
   @@index([expiresAt])
   @@map("rate_limits")
+}
+
+// ---------------------------------------------------------------------------
+// Database Audit Logging (Production Compliance & Security)
+// ---------------------------------------------------------------------------
+
+/// Comprehensive database operation audit log
+/// Captures: table, operation (INSERT/UPDATE/DELETE), old/new values, user, timestamp
+/// Retention: 12 months (auto-archived to S3 after 90 days)
+/// Used for: compliance, forensics, detecting data tampering
+model DatabaseAuditLog {
+  id String @id @default(cuid())
+
+  /// Table being audited: users, trades, mt5_accounts, sessions, etc.
+  tableName String @map("table_name")
+
+  /// Operation type: INSERT, UPDATE, DELETE
+  operation String
+
+  /// Primary key of the affected row
+  recordId String @map("record_id")
+
+  /// For UPDATE operations: previous values (JSON)
+  /// For DELETE operations: complete row (JSON)
+  oldValues Json? @map("old_values")
+
+  /// For INSERT/UPDATE operations: new values (JSON)
+  newValues Json? @map("new_values")
+
+  /// User who triggered the operation (from session/context)
+  userId String? @map("user_id")
+
+  /// Tenant that owned the record (for multi-tenancy audit)
+  tenantId String? @map("tenant_id")
+
+  /// IP address that triggered the operation
+  ipAddress String? @map("ip_address")
+
+  /// User agent (browser/client)
+  userAgent String? @map("user_agent")
+
+  /// Query execution time in milliseconds
+  executionTimeMs Int? @map("execution_time_ms")
+
+  /// Whether this operation was flagged as suspicious
+  suspicious Boolean @default(false)
+
+  /// Reason if flagged: "large_result_set", "slow_query", "bulk_delete", etc.
+  suspicionReason String? @map("suspicion_reason")
+
+  /// Timestamp of the operation
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// Whether this has been archived to cold storage (S3)
+  archived Boolean @default(false)
+
+  /// S3 path if archived
+  archivePath String? @map("archive_path") @db.VarChar(500)
+
+  @@index([tableName])
+  @@index([operation])
+  @@index([userId])
+  @@index([tenantId])
+  @@index([createdAt])
+  @@index([archived, createdAt])
+  @@index([suspicious])
+  @@map("database_audit_logs")
+}
+
+/// Audit log for data changes (detailed change tracking)
+/// Used to answer: "What changed? When? Who changed it? Old vs new value?"
+model DataChangeLog {
+  id String @id @default(cuid())
+
+  /// Reference to the database audit log entry
+  auditLogId String? @map("audit_log_id")
+
+  /// Table being audited
+  tableName String @map("table_name")
+
+  /// Operation type
+  operation String
+
+  /// Primary key of affected row
+  recordId String @map("record_id")
+
+  /// Column name that changed (for UPDATE operations)
+  columnName String? @map("column_name")
+
+  /// Previous value (stringified)
+  oldValue String? @map("old_value") @db.Text
+
+  /// New value (stringified)
+  newValue String? @map("new_value") @db.Text
+
+  /// Whether this is a sensitive field (password, token, key)
+  sensitive Boolean @default(false)
+
+  /// User who made the change
+  userId String? @map("user_id")
+
+  /// Timestamp
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([auditLogId])
+  @@index([tableName])
+  @@index([recordId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("data_change_logs")
+}
+
+/// Audit log for schema changes (structure modifications)
+model SchemaAuditLog {
+  id String @id @default(cuid())
+
+  /// DDL statement executed (ALTER TABLE, CREATE INDEX, etc.)
+  statement String @db.Text
+
+  /// User who executed the change (admin)
+  adminId String? @map("admin_id")
+
+  /// Result: success or error message
+  result String
+
+  /// Timestamp
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([adminId])
+  @@index([createdAt])
+  @@map("schema_audit_logs")
 }

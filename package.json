@@ -25,7 +25,10 @@
     "db:studio": "prisma studio",
     "tenant:create": "NODE_OPTIONS=--conditions=react-server tsx scripts/create-tenant.ts",
     "admin:create": "NODE_OPTIONS=--conditions=react-server tsx scripts/create-super-admin.ts",
-    "secrets:rotate": "NODE_OPTIONS=--conditions=react-server tsx scripts/rotate-secrets.ts"
+    "secrets:rotate": "NODE_OPTIONS=--conditions=react-server tsx scripts/rotate-secrets.ts",
+    "audit-logs:archive": "NODE_OPTIONS=--conditions=react-server tsx scripts/archive-audit-logs.ts",
+    "audit-logs:archive:dry": "NODE_OPTIONS=--conditions=react-server tsx scripts/archive-audit-logs.ts --dry-run",
+    "pgaudit:setup": "bash scripts/setup-pgaudit.sh"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

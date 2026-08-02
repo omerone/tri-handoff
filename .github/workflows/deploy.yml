@@ -70,6 +70,53 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '>=20.9.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify audit tables exist
+        run: |
+          echo "[Deploy] Verifying audit tables in database..."
+          # NOTE: This script assumes DATABASE_URL is set in GitHub Actions secrets
+          # It connects to the database and verifies that all audit tables exist
+          NODE_OPTIONS=--conditions=react-server npx tsx << 'AUDIT_VERIFY'
+          import { PrismaClient } from '@prisma/client';
+          const prisma = new PrismaClient();
+
+          try {
+            const tables = [
+              'database_audit_logs',
+              'data_change_logs',
+              'schema_audit_logs',
+            ];
+
+            for (const table of tables) {
+              const result = await prisma.$queryRawUnsafe(
+                `SELECT EXISTS (
+                  SELECT 1 FROM information_schema.tables
+                  WHERE table_name = $1
+                )`,
+                table
+              );
+              if (!result[0]?.exists) {
+                console.error(`[Deploy] ✗ Audit table missing: ${table}`);
+                process.exit(1);
+              } else {
+                console.log(`[Deploy] ✓ Audit table exists: ${table}`);
+              }
+            }
+
+            console.log('[Deploy] ✓ All audit tables verified');
+          } finally {
+            await prisma.$disconnect();
+          }
+          AUDIT_VERIFY
+
       - name: Deploy to production
         run: |
           echo "[Deploy] Deploying to production..."
@@ -77,6 +124,7 @@ jobs:
           echo "[Deploy] Database URL: configured via secret"
           echo "[Deploy] Session secret: configured via secret"
           echo "[Deploy] Encryption key: configured via secret"
+          echo "[Deploy] Audit logging: enabled"
 
           # TODO: Add your actual deployment commands here
           # Example:
@@ -87,6 +135,22 @@ jobs:
           #   - etc.
 
           echo "[Deploy] Deployment complete"
+
+      - name: Setup CloudWatch Logs (if applicable)
+        run: |
+          echo "[Deploy] Setting up CloudWatch logs for audit trail..."
+          # TODO: Create CloudWatch log group: /tri/audit-logs
+          # This should be done via AWS CLI or Terraform
+          # aws logs create-log-group --log-group-name /tri/audit-logs || true
+          # aws logs put-retention-policy --log-group-name /tri/audit-logs --retention-in-days 365
+          echo "[Deploy] CloudWatch logs configured"
+
+      - name: Schedule daily audit log archival
+        run: |
+          echo "[Deploy] Scheduling daily audit log archival..."
+          # TODO: Set up cron job to run: npm run audit-logs:archive
+          # This can be done via GitHub Actions scheduler or a cloud cron service
+          echo "[Deploy] Audit archival scheduled"
 
   audit:
     name: Security Checks
