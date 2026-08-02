@@ -478,6 +478,53 @@ model Quote {
 }
 
 // ---------------------------------------------------------------------------
+// Compliance & Consent Management (GDPR)
+// ---------------------------------------------------------------------------
+
+/// User consent tracking for GDPR compliance
+/// Tracks user consent for data processing, marketing, analytics, and cookies
+/// All consent changes are logged for audit trail
+model UserConsent {
+  id String @id @default(cuid())
+
+  /// User who gave consent
+  userId String @map("user_id")
+
+  /// Consent type: gdpr_processing, marketing_email, analytics_cookies, preference_cookies, essential_cookies, terms_of_service, privacy_policy
+  type String
+
+  /// Whether consent was granted (true) or revoked (false)
+  granted Boolean
+
+  /// When consent was granted/revoked
+  grantedAt DateTime @default(now()) @map("granted_at")
+
+  /// When this consent record expires (typically 1 year from grantedAt)
+  expiresAt DateTime? @map("expires_at")
+
+  /// IP address of the user when consent was given (for audit trail)
+  ipAddress String? @map("ip_address")
+
+  /// User agent string (browser/app identifier)
+  userAgent String? @map("user_agent")
+
+  /// Source of consent: banner, settings, implicit, api
+  source String @default("api")
+
+  /// Optional notes (e.g., "Accepted v1.0", "Revoked via settings")
+  notes String?
+
+  /// Timestamp
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([type])
+  @@index([grantedAt])
+  @@index([expiresAt])
+  @@map("user_consents")
+}
+
+// ---------------------------------------------------------------------------
 // Audit Logging (Security & Compliance)
 // ---------------------------------------------------------------------------
 
