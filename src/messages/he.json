@@ -125,7 +125,9 @@
     "to": "עד תאריך",
     "prev": "הקודם",
     "next": "הבא",
-    "page": "עמוד {page} מתוך {total}"
+    "page": "עמוד {page} מתוך {total}",
+    "strategy": "אסטרטגיה",
+    "allStrategies": "כל האסטרטגיות"
   },
   "finance": {
     "income": "הכנסות",
@@ -277,5 +279,39 @@
     "created": "נוצר",
     "active": "פעיל",
     "suspended": "מושבת"
+  },
+  "journal": {
+    "title": "דוח עסקה",
+    "note": "הערות",
+    "notePlaceholder": "מה ראית, מה עבד, מה לא",
+    "tags": "תגיות",
+    "tagsHint": "מופרדות בפסיק",
+    "rating": "ציון",
+    "ratingNone": "ללא ציון",
+    "mood": "מצב רגשי",
+    "moodPlaceholder": "רגוע · לחוץ · נקמני…",
+    "strategy": "אסטרטגיה",
+    "strategyPlaceholder": "פריצה · חזרה לממוצע…",
+    "save": "שמירה",
+    "saved": "נשמר.",
+    "invalid": "לא הצלחנו לשמור. בדוק את השדות ונסה שוב.",
+    "back": "חזרה לעסקאות",
+    "details": "פרטי העסקה",
+    "entry": "כניסה",
+    "exit": "יציאה",
+    "stopLoss": "סטופ לוס",
+    "takeProfit": "טייק פרופיט",
+    "volume": "נפח",
+    "commission": "עמלה",
+    "swap": "סוואפ",
+    "opened": "נפתחה",
+    "closed": "נסגרה",
+    "held": "משך החזקה",
+    "ticket": "מספר עסקה",
+    "noRr": "אין RR — לעסקה לא היה סטופ לוס",
+    "empty": "עדיין לא נכתב דבר על העסקה הזו.",
+    "unlabelled": "ללא אסטרטגיה",
+    "byStrategy": "לפי אסטרטגיה",
+    "journalled": "{count} עסקאות עם יומן"
   }
 }

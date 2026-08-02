@@ -15,8 +15,15 @@ export function TradeFilters({
   current,
   options,
 }: {
-  current: { class: string; dir: string; style: string };
-  options: { all: string; classes: readonly Option[]; directions: readonly Option[]; styles: readonly Option[] };
+  current: { class: string; dir: string; style: string; strategy: string };
+  options: {
+    all: string;
+    allStrategies: string;
+    classes: readonly Option[];
+    directions: readonly Option[];
+    styles: readonly Option[];
+    strategies: readonly Option[];
+  };
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -82,6 +89,25 @@ export function TradeFilters({
           </option>
         ))}
       </select>
+
+      {/* Only shown once the trader has actually labelled something — an empty dropdown is
+          noise, and until then there is nothing to filter by. */}
+      {options.strategies.length > 0 ? (
+        <select
+          aria-label={options.allStrategies}
+          value={current.strategy}
+          disabled={pending}
+          onChange={(event) => update('strategy', event.target.value)}
+          className={select}
+        >
+          <option value="all">{options.allStrategies}</option>
+          {options.strategies.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      ) : null}
     </>
   );
 }

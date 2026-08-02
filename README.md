@@ -119,7 +119,7 @@ All five phases in `SPEC.md` §6 are built:
 | Phase | What it covers | Where |
 |---|---|---|
 | P0 | Multi-tenancy, auth, i18n, provisioning | `src/lib/{tenant,auth,db}`, `src/app/(auth)` |
-| P1 | MT5 sync and the full analytics module | `src/lib/{mt5,analytics}`, `src/app/(app)/{dashboard,analytics,trades,calendar}` |
+| P1 | MT5 sync, the full analytics module, and the per-trade journal | `src/lib/{mt5,analytics}`, `src/app/(app)/{dashboard,analytics,trades,calendar}` |
 | P2 | Personal finance | `src/lib/finance`, `src/app/(app)/finance` |
 | P3 | Manual long-term positions | `src/lib/positions`, `src/app/(app)/long` |
 | P4 | Operator panel with sync monitoring | `src/lib/db/admin.ts`, `src/app/admin` |

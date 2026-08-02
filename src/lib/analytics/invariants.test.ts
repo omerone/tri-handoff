@@ -55,6 +55,9 @@ const FIXTURE: AnalyticsTrade[] = generateMockDeals()
       profit: deal.profit + deal.commission + deal.swap,
       risk,
       rr,
+      // The mock book is un-journalled, which is the honest default: a freshly synced
+      // account has no strategies on it until the trader writes them.
+      strategy: null,
     } satisfies AnalyticsTrade;
   });
 
@@ -446,6 +449,7 @@ function trade(overrides: Partial<AnalyticsTrade> = {}): AnalyticsTrade {
     profit: 0,
     risk: 100,
     rr: 0,
+    strategy: null,
     ...overrides,
   };
 }

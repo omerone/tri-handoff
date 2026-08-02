@@ -22,6 +22,11 @@ export type AnalyticsTrade = {
   risk: number | null;
   /** Null when the trade had no stop loss — excluded from RR aggregates, see risk.ts. */
   rr: number | null;
+  /**
+   * The trader's own label for how they took the trade (SPEC §3.5 asks for this dimension).
+   * Null until they write one — an unlabelled trade is its own bucket, not a missing row.
+   */
+  strategy: string | null;
 };
 
 export type Metrics = {

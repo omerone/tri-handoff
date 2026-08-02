@@ -27,6 +27,7 @@ export function toAnalyticsTrades(records: readonly TradeRecord[]): AnalyticsTra
       profit: record.profit,
       risk: record.risk,
       rr: record.rr,
+      strategy: record.strategy,
     });
   }
 

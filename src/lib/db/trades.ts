@@ -128,6 +128,10 @@ export async function upsertTrades(
   });
   const known = new Set(existing.map((row) => row.ticket));
 
+  // Note what is *not* here: note, tags, rating, mood and strategy. The sync owns what the
+  // broker reports and rewrites it every run; the journal columns are the user's own words
+  // about the trade, and a routine re-sync silently erasing a month of them would be
+  // unrecoverable. `TradeUpsert` omits them at the type level so this cannot drift.
   const data = (trade: TradeUpsert) => ({
     kind: trade.kind,
     symbol: trade.symbol,
@@ -173,6 +177,8 @@ export type TradeFilter = {
   direction?: Direction;
   style?: TradeStyle;
   symbol?: string;
+  strategy?: string;
+  tag?: string;
   from?: Date;
   to?: Date;
 };
@@ -198,6 +204,8 @@ function whereClause(
     ...(filter.direction ? { direction: filter.direction } : {}),
     ...(filter.style ? { style: filter.style } : {}),
     ...(filter.symbol ? { symbol: filter.symbol } : {}),
+    ...(filter.strategy ? { strategy: filter.strategy } : {}),
+    ...(filter.tag ? { tags: { has: filter.tag } } : {}),
     ...(Object.keys(closeAt).length > 0 ? { closeAt } : {}),
   };
 }
@@ -253,6 +261,73 @@ export async function deleteAllTrades(ctx: TenantContext): Promise<number> {
     where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
   });
   return count;
+}
+
+export async function getTrade(ctx: TenantContext, id: string): Promise<TradeRecord | null> {
+  assertContext(ctx);
+  const row = await prisma.trade.findFirst({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+  });
+  return row ? toRecord(row) : null;
+}
+
+/**
+ * The journal fields a trader writes themselves (SPEC §1.1, adopted from tradeReport).
+ *
+ * Deliberately a separate write path from the sync. The sync owns everything the broker
+ * reports and overwrites it on every run; these columns are the only ones it must never
+ * touch, because they are the one part of a trade the broker does not know about — and
+ * losing a month of trade notes to a routine re-sync would be unrecoverable.
+ */
+export type TradeJournal = {
+  note: string | null;
+  tags: string[];
+  rating: number | null;
+  mood: string | null;
+  strategy: string | null;
+};
+
+export async function updateTradeJournal(
+  ctx: TenantContext,
+  id: string,
+  journal: TradeJournal,
+): Promise<boolean> {
+  assertContext(ctx);
+  const { count } = await prisma.trade.updateMany({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    data: journal,
+  });
+  return count > 0;
+}
+
+/**
+ * Strategies and tags the user has already used, for autocomplete.
+ *
+ * Without suggestions "Breakout", "breakout" and "break-out" become three strategies by the
+ * third week, and the by-strategy breakdown stops meaning anything — the same reasoning as
+ * the finance categories.
+ */
+export async function listJournalVocabulary(
+  ctx: TenantContext,
+): Promise<{ strategies: string[]; tags: string[]; moods: string[] }> {
+  assertContext(ctx);
+  const rows = await prisma.trade.findMany({
+    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, kind: 'trade' },
+    select: { strategy: true, tags: true, mood: true },
+  });
+
+  const strategies = new Set<string>();
+  const tags = new Set<string>();
+  const moods = new Set<string>();
+
+  for (const row of rows) {
+    if (row.strategy) strategies.add(row.strategy);
+    if (row.mood) moods.add(row.mood);
+    for (const tag of row.tags) tags.add(tag);
+  }
+
+  const sorted = (set: Set<string>) => [...set].sort((a, b) => a.localeCompare(b));
+  return { strategies: sorted(strategies), tags: sorted(tags), moods: sorted(moods) };
 }
 
 export async function newestCloseAt(ctx: TenantContext): Promise<Date | null> {

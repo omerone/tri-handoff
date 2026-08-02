@@ -17,7 +17,7 @@ so nothing is silently dropped.
 | C2 | Google login | §4 🔶 open | "No OAuth needed" | Not built | no |
 | C3 | Draggable/resizable dashboard grid | §1.1 — cards the user drags & resizes | not mentioned; prototype is a fixed grid | **Fixed responsive grid** (matches prototype). Drag/resize is a real scope item that the prototype dropped | **yes — flag** |
 | C4 | Light mode + custom palettes | §1.1 — "תמיכה גם במצב בהיר ופלטות מותאמות" | "Dark mode is the default" | Tokens go through CSS variables so a light theme is a later drop-in; only dark ships now | **yes — flag** |
-| C5 | Per-trade journal (notes, tags, rating, emotion, strategy) | §1.1 — adopted from tradeReport | absent from the minimum data model | Schema carries the columns from P1 (`note`, `tags`, `rating`, `mood`, `strategy`); **UI deferred to a P1.9 milestone** | **yes — confirm priority** |
+| C5 | Per-trade journal (notes, tags, rating, emotion, strategy) | §1.1 — adopted from tradeReport | absent from the minimum data model | ✅ **Built** (M1.9): trade report page with note, tags, rating, mood and strategy; strategy is also an analytics dimension and a trades filter | resolved |
 | C12 | Analytics timezone | §3.5 defines sessions as Asia/London/NY | — | One constant, `ANALYTICS_TIME_ZONE = 'Asia/Jerusalem'`, matching the prototype's session boundaries. Weekday, hour, session and the calendar all read from it | **flag** — a trader who relocates, or whose broker server sits elsewhere, would want this per-user. Deliberately one constant so it is a column plus a line to change |
 | C6 | Asset classes | §3.5 includes commodities (סחורות) | forex/crypto/indices/stocks | Enum includes `commodities`; symbol map classifies XAUUSD etc. | no |
 | C7 | Deposits/withdrawals | §3.2 🔶 open | — | MT5 deal types `balance`/`credit` are stored and excluded from trade stats; surfaced in P2 balance view | no |
@@ -64,7 +64,7 @@ log in, session persists, an unknown host is rejected, reset email flow works ag
 | 1.6 | Trades table | Filters (class/direction/style + date range), server-side pagination, live filtered KPI summary |
 | 1.7 | Calendar | Month grid, daily P&L + trade count, month navigation |
 | 1.8 | Settings + FX | Language, display currency, MT5 account card w/ status + last sync. FX from `FX_API_URL` cached daily in DB, stale-tolerant fallback |
-| 1.9 | Per-trade journal (C5) | Trade detail drawer: note, tags, rating, mood, strategy. *Ships only if the client confirms the priority* |
+| 1.9 | Per-trade journal (C5) ✅ | Trade report at `/trades/[id]`: note, tags, rating, mood, strategy, with suggestions drawn from what the trader has already written. The sync never writes these columns, so a refresh cannot erase them — asserted by test. Strategy becomes the by-strategy breakdown (SPEC §3.5's open 🔶) and a filter on the trades table |
 
 **P1 done when:** login on a tenant domain → sync runs automatically → dashboard, analytics,
 trades and calendar match the prototype in behaviour and design → Hebrew RTL and English LTR

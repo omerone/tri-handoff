@@ -81,6 +81,23 @@ export function byAssetClass(trades: readonly AnalyticsTrade[]): Bucket<AssetCla
   return bucketBy(trades, ASSET_CLASSES, (trade) => trade.assetClass);
 }
 
+/**
+ * By strategy — the dimension SPEC §3.5 left open with a 🔶.
+ *
+ * `UNLABELLED` is a real bucket rather than an exclusion. A trader who has journalled forty
+ * trades and not the other three hundred needs to see that the comparison rests on forty; if
+ * unlabelled trades simply vanished, the strategy breakdown would sum to less than the book
+ * and there would be nothing on screen to say so. It also keeps the partition invariant
+ * intact, which is what the tests check.
+ */
+export const UNLABELLED = '__unlabelled__';
+
+export function byStrategy(trades: readonly AnalyticsTrade[]): Bucket<string>[] {
+  const named = [...new Set(trades.map((t) => t.strategy).filter((s): s is string => !!s))].sort();
+  const keys = trades.some((t) => !t.strategy) ? [...named, UNLABELLED] : named;
+  return bucketBy(trades, keys, (trade) => trade.strategy || UNLABELLED);
+}
+
 export function bySymbol(trades: readonly AnalyticsTrade[]): Bucket<string>[] {
   const symbols = [...new Set(trades.map((t) => t.symbol))].sort();
   return bucketBy(trades, symbols, (trade) => trade.symbol);
@@ -144,7 +161,7 @@ export function dailyTotals(trades: readonly AnalyticsTrade[]): Map<string, Dail
 
 export type Insight = {
   /** Translation-ready descriptor rather than a formatted string. */
-  dimension: 'weekday' | 'session' | 'assetClass' | 'direction' | 'style';
+  dimension: 'weekday' | 'session' | 'assetClass' | 'direction' | 'style' | 'strategy';
   key: string;
   metrics: Metrics;
 };
@@ -170,6 +187,11 @@ export function bestConditions(
     ...byAssetClass(trades).map((b) => ({ dimension: 'assetClass' as const, key: b.key, metrics: b.metrics })),
     ...byDirection(trades).map((b) => ({ dimension: 'direction' as const, key: b.key, metrics: b.metrics })),
     ...byStyle(trades).map((b) => ({ dimension: 'style' as const, key: b.key, metrics: b.metrics })),
+    // Only *named* strategies compete here. "Unlabelled" winning the ranking would tell the
+    // trader nothing they could act on.
+    ...byStrategy(trades)
+      .filter((b) => b.key !== UNLABELLED)
+      .map((b) => ({ dimension: 'strategy' as const, key: b.key, metrics: b.metrics })),
   ];
 
   return candidates

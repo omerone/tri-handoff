@@ -125,7 +125,9 @@
     "to": "To",
     "prev": "Previous",
     "next": "Next",
-    "page": "Page {page} of {total}"
+    "page": "Page {page} of {total}",
+    "strategy": "Strategy",
+    "allStrategies": "All strategies"
   },
   "finance": {
     "income": "Income",
@@ -277,5 +279,39 @@
     "created": "Created",
     "active": "Active",
     "suspended": "Suspended"
+  },
+  "journal": {
+    "title": "Trade report",
+    "note": "Notes",
+    "notePlaceholder": "What you saw, what worked, what didn't",
+    "tags": "Tags",
+    "tagsHint": "comma separated",
+    "rating": "Rating",
+    "ratingNone": "Not rated",
+    "mood": "Mood",
+    "moodPlaceholder": "calm · anxious · revenge…",
+    "strategy": "Strategy",
+    "strategyPlaceholder": "breakout · mean reversion…",
+    "save": "Save",
+    "saved": "Saved.",
+    "invalid": "Couldn't save that. Check the fields and try again.",
+    "back": "Back to trades",
+    "details": "Trade details",
+    "entry": "Entry",
+    "exit": "Exit",
+    "stopLoss": "Stop loss",
+    "takeProfit": "Take profit",
+    "volume": "Volume",
+    "commission": "Commission",
+    "swap": "Swap",
+    "opened": "Opened",
+    "closed": "Closed",
+    "held": "Held for",
+    "ticket": "Ticket",
+    "noRr": "No RR — this trade had no stop loss",
+    "empty": "Nothing written about this trade yet.",
+    "unlabelled": "No strategy",
+    "byStrategy": "By strategy",
+    "journalled": "{count} trades journalled"
   }
 }

@@ -8,8 +8,10 @@ import {
   byAssetClass,
   byDirection,
   bySession,
+  byStrategy,
   byWeekday,
   heatmap,
+  UNLABELLED,
   type Bucket,
   type Metrics,
 } from '@/lib/analytics';
@@ -92,6 +94,20 @@ export default async function AnalyticsPage() {
     },
   ];
 
+  /*
+   * By strategy — SPEC §3.5's open question, answered.
+   *
+   * Only rendered once the trader has labelled something: before that the chart is one bar
+   * called "no strategy", which is a worse way of saying "you have not started journalling"
+   * than simply not being there. The unlabelled bucket stays in the chart when it exists,
+   * because a comparison resting on 40 of 300 trades needs to show the other 260.
+   */
+  const strategies = byStrategy(book.trades);
+  const hasStrategies = strategies.some((bucket) => bucket.key !== UNLABELLED);
+  const strategyData = hasStrategies
+    ? toData(strategies, (key) => (key === UNLABELLED ? t('journal.unlabelled') : key))
+    : [];
+
   const insights = bestConditions(book.trades);
   const cells = heatmap(book.trades);
   const maxAbs = Math.max(1, ...cells.map((cell) => Math.abs(cell.net)));
@@ -101,6 +117,7 @@ export default async function AnalyticsPage() {
     if (dimension === 'session') return t(`enum.session.${key}`);
     if (dimension === 'assetClass') return t(`enum.assetClass.${key}`);
     if (dimension === 'direction') return t(`enum.direction.${key}`);
+    if (dimension === 'strategy') return key;
     return t(`enum.style.${key}`);
   };
 
@@ -148,6 +165,12 @@ export default async function AnalyticsPage() {
           </Card>
         ))}
       </div>
+
+      {hasStrategies ? (
+        <Card title={t('journal.byStrategy')}>
+          <BreakdownChart data={strategyData} rtl={rtl} display={display} />
+        </Card>
+      ) : null}
 
       <Card title={t('analytics.heatmap')}>
         <div className="overflow-x-auto">

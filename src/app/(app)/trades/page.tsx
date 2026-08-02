@@ -1,12 +1,14 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import Link from 'next/link';
+import { NotebookPen } from 'lucide-react';
 import { Chip, EmptyState, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { computeMetrics, toAnalyticsTrades } from '@/lib/analytics';
 import { countTrades, listClosedTrades, pageTrades, type TradeFilter } from '@/lib/db';
 import { ASSET_CLASSES, DIRECTIONS, STYLES } from '@/lib/analytics/dimensions';
-import { getMt5Account } from '@/lib/db';
+import { getMt5Account, listJournalVocabulary } from '@/lib/db';
 import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
@@ -19,6 +21,7 @@ type SearchParams = {
   class?: string;
   dir?: string;
   style?: string;
+  strategy?: string;
   page?: string;
 };
 
@@ -45,17 +48,19 @@ export default async function TradesPage({
     ...(isAssetClass(params.class) ? { assetClass: params.class } : {}),
     ...(isDirection(params.dir) ? { direction: params.dir } : {}),
     ...(isStyle(params.style) ? { style: params.style } : {}),
+    ...(params.strategy ? { strategy: params.strategy } : {}),
   };
 
   const page = Math.max(1, Number(params.page) || 1);
 
-  const [total, rows, filteredRecords, account] = await Promise.all([
+  const [total, rows, filteredRecords, account, vocabulary] = await Promise.all([
     countTrades(session.ctx, filter),
     pageTrades(session.ctx, filter, { offset: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE }),
     // The summary bar reflects the *filter*, not the page — the whole point of narrowing to
     // "short crypto" is seeing what short crypto did overall.
     listClosedTrades(session.ctx, filter),
     getMt5Account(session.ctx),
+    listJournalVocabulary(session.ctx),
   ]);
 
   const metrics = computeMetrics(toAnalyticsTrades(filteredRecords));
@@ -79,12 +84,19 @@ export default async function TradesPage({
       <Card title={t('table.filter')}>
         <div className="flex flex-wrap items-center gap-2">
           <TradeFilters
-            current={{ class: params.class ?? 'all', dir: params.dir ?? 'all', style: params.style ?? 'all' }}
+            current={{
+              class: params.class ?? 'all',
+              dir: params.dir ?? 'all',
+              style: params.style ?? 'all',
+              strategy: params.strategy ?? 'all',
+            }}
             options={{
               all: t('table.all'),
+              allStrategies: t('table.allStrategies'),
               classes: ASSET_CLASSES.map((key) => [key, t(`enum.assetClass.${key}`)] as const),
               directions: DIRECTIONS.map((key) => [key, t(`enum.direction.${key}`)] as const),
               styles: STYLES.map((key) => [key, t(`enum.style.${key}`)] as const),
+              strategies: vocabulary.strategies.map((value) => [value, value] as const),
             }}
           />
 
@@ -115,6 +127,7 @@ export default async function TradesPage({
                     t('table.risk'),
                     t('table.rr'),
                     t('table.pnl'),
+                    '',
                   ].map((header, index) => (
                     <th
                       key={index}
@@ -180,6 +193,21 @@ export default async function TradesPage({
                     >
                       <Num>{money(trade.profit, { signed: true })}</Num>
                     </td>
+                    <td className="px-3.5 py-2.5 text-end">
+                      {/*
+                        A filled icon means there is already something written here, so a
+                        trader working through a week can see at a glance which trades they
+                        have been through.
+                      */}
+                      <Link
+                        href={`/trades/${trade.id}`}
+                        aria-label={t('journal.title')}
+                        title={trade.strategy ?? t('journal.title')}
+                        className={`inline-flex ${hasJournal(trade) ? 'text-brand' : 'text-dim/50 hover:text-text'}`}
+                      >
+                        <NotebookPen size={14} aria-hidden />
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -200,6 +228,18 @@ export default async function TradesPage({
         />
       ) : null}
     </div>
+  );
+}
+
+function hasJournal(trade: {
+  note: string | null;
+  tags: string[];
+  rating: number | null;
+  mood: string | null;
+  strategy: string | null;
+}): boolean {
+  return Boolean(
+    trade.note || trade.tags.length > 0 || trade.rating || trade.mood || trade.strategy,
   );
 }
 
