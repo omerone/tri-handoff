@@ -59,7 +59,12 @@ export function DateField({
           aria-describedby={describedBy}
           value={text}
           onChange={(event) => setText(event.target.value)}
-          className={`${className} pe-9`}
+          // Physical `pr`, not logical `pe`. The field is `dir="ltr"` so the date reads
+          // correctly, which makes its logical end the *right*; the button below sits at the
+          // wrapper's logical end, which inside the Hebrew layout is the *left*. Reserving
+          // space on one side and drawing the icon on the other is what put the calendar on
+          // top of the "0" in "02/08/2026". Both are physical now, so they cannot disagree.
+          className={`${className} pr-9`}
         />
 
         {/* The value the rest of the app sees. Kept in sync rather than parsed on the server,
@@ -84,7 +89,7 @@ export function DateField({
           type="button"
           onClick={() => picker.current?.showPicker?.()}
           aria-label={label}
-          className="text-dim hover:text-text absolute end-1 inline-flex p-1.5"
+          className="text-dim hover:text-text absolute right-1 inline-flex p-1.5"
         >
           <CalendarDays size={15} aria-hidden />
         </button>
@@ -96,7 +101,7 @@ export function DateField({
           aria-hidden
           value={iso}
           onChange={(event) => setText(isoToDisplay(event.target.value))}
-          className="pointer-events-none absolute end-1 h-px w-px opacity-0"
+          className="pointer-events-none absolute right-1 h-px w-px opacity-0"
         />
       </span>
 

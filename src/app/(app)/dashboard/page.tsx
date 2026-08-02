@@ -6,7 +6,7 @@ import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { EquityChart } from '@/components/charts/equity-chart';
 import { RStrip } from '@/components/charts/r-strip';
 import { requireSession } from '@/lib/auth/session';
-import { computeMetrics, equityCurve, maxDrawdown } from '@/lib/analytics';
+import { computeMetrics, equityCurve, maxDrawdown, recentDailyR } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { getDashboardLayout } from '@/lib/db';
 import { normalizeLayout, type WidgetId } from '@/lib/dashboard/layout';
@@ -14,7 +14,10 @@ import { DashboardGrid } from './grid';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { displayMoney } from '@/lib/money/display';
 import { formatNumber, formatPercent } from '@/lib/money/currency';
-import { formatDayMonthAt, formatTimeAt } from '@/lib/time/format';
+
+/** SPEC §1.1's strip, in days. Thirty is a month a trader can hold in their head. */
+const R_STRIP_DAYS = 30;
+import { formatDayMonthAt, formatTimeAt, isoToDayMonth, isoToWeekdayDate } from '@/lib/time/format';
 
 /**
  * The dashboard from the prototype: six KPI tiles, the R-strip, the equity curve and the
@@ -53,7 +56,11 @@ export default async function DashboardPage() {
   const balance = book.startBalance + metrics.net;
 
   const recent = [...book.trades].slice(-6).reverse();
-  const strip = book.trades.slice(-60);
+
+  // Thirty calendar days rather than the last sixty trades: "the last sixty" is a different
+  // span every time it is read, and six bars could be six days or one busy afternoon.
+  const days = recentDailyR(book.trades, R_STRIP_DAYS);
+  const tradingDays = days.filter((day) => day.count > 0).length;
 
   const widgets: Record<WidgetId, ReactNode> = {
     balance: (
@@ -106,15 +113,29 @@ export default async function DashboardPage() {
       />
     ),
     rStrip: (
-      <Card title={t('dash.rStrip')}>
+      <Card
+        title={t('dash.rStrip', { days: R_STRIP_DAYS })}
+        action={
+          <span className="text-dim text-[11px]">
+            {t('dash.rStripTradingDays', { count: tradingDays })}
+          </span>
+        }
+      >
         <RStrip
-          trades={strip.map((trade) => ({
-            id: trade.id,
-            symbol: trade.symbol,
-            rr: trade.rr,
-            profit: trade.profit,
-          }))}
-          formatRr={(rr) => `${formatNumber(rr, locale, 2)}R`}
+          days={days}
+          labels={{
+            formatDayMonth: isoToDayMonth,
+            formatLongDate: (date) => isoToWeekdayDate(date, locale),
+            formatR: (value) => `${value >= 0 ? '+' : ''}${formatNumber(value, locale, 2)}R`,
+            formatMoney: (value) => money(value, { signed: true }),
+            formatPercent: (value) => formatPercent(value, locale),
+            tradeCount: (count) => t('kpi.tradesCount', { count }),
+            noTrades: t('dash.noTrades'),
+            netR: t('dash.dayNetR'),
+            netPnl: t('kpi.netPnl'),
+            winRate: t('kpi.winRate'),
+            rrCoverage: (counted, total) => t('dash.dayRrCoverage', { counted, total }),
+          }}
         />
       </Card>
     ),
@@ -179,7 +200,7 @@ export default async function DashboardPage() {
     avgRr: t('kpi.avgRR'),
     profitFactor: t('kpi.profitFactor'),
     maxDd: t('kpi.maxDD'),
-    rStrip: t('dash.rStrip'),
+    rStrip: t('dash.rStrip', { days: R_STRIP_DAYS }),
     equity: t('dash.equity'),
     recent: t('dash.recent'),
   };

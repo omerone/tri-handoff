@@ -1,4 +1,5 @@
 import { sessionOfHour, wallClock, zonedDateKey, type Session } from '@/lib/time/zone';
+import { toIsoDate } from '@/lib/time/format';
 import type { AssetClass, Direction, TradeStyle } from '@/lib/mt5/types';
 import { computeMetrics } from './metrics';
 import type { AnalyticsTrade, Bucket, HeatCell, Metrics } from './types';
@@ -157,6 +158,73 @@ export function dailyTotals(trades: readonly AnalyticsTrade[]): Map<string, Dail
   }
 
   return days;
+}
+
+/**
+ * The last N calendar days, one entry each, most recent last.
+ *
+ * The R-strip used to be one bar per trade. A trader reading it could not tell whether six
+ * bars were six days or one busy afternoon, and the window slid with activity rather than
+ * with the calendar — "the last sixty trades" is a different span every time you look. Days
+ * are a span a person can hold: this week against last week.
+ *
+ * Quiet days are *included*, with zero trades. That is the point of a strip rather than a
+ * list: the gaps are information. A week off looks like a week off.
+ *
+ * `netR` sums only the trades that had a stop loss, because a trade without one has no R —
+ * the same rule the rest of the product follows. `rrTrades` reports how many contributed, so
+ * a day whose R is computed from half its trades can say so instead of looking complete.
+ *
+ * The window ends on the most recent trade's day, not on today: a demo account, or a trader
+ * back from a break, would otherwise open on thirty empty columns.
+ */
+export type DailyR = {
+  /** `YYYY-MM-DD` in the analytics timezone. */
+  date: string;
+  /** Sum of R over the day's trades that had a stop loss. */
+  netR: number;
+  /** How many of the day's trades contributed an R. */
+  rrTrades: number;
+  count: number;
+  wins: number;
+  net: number;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function recentDailyR(trades: readonly AnalyticsTrade[], days = 30): DailyR[] {
+  if (trades.length === 0 || days <= 0) return [];
+
+  const byDate = new Map<string, DailyR>();
+  let newest = '';
+  for (const trade of trades) {
+    const date = zonedDateKey(trade.closeAt);
+    if (date > newest) newest = date;
+    const day = byDate.get(date) ?? { date, netR: 0, rrTrades: 0, count: 0, wins: 0, net: 0 };
+    day.count += 1;
+    day.net += trade.profit;
+    if (trade.profit > 0) day.wins += 1;
+    if (trade.rr !== null) {
+      day.netR += trade.rr;
+      day.rrTrades += 1;
+    }
+    byDate.set(date, day);
+  }
+
+  // A `YYYY-MM-DD` key is a calendar date, so stepping it as UTC midnight is exact — no
+  // daylight-saving arithmetic, and no dependency on where the server happens to be.
+  const end = Date.parse(`${newest}T00:00:00Z`);
+  const window: DailyR[] = [];
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const stepped = new Date(end - offset * DAY_MS);
+    const date = toIsoDate({
+      year: stepped.getUTCFullYear(),
+      month: stepped.getUTCMonth() + 1,
+      day: stepped.getUTCDate(),
+    });
+    window.push(byDate.get(date) ?? { date, netR: 0, rrTrades: 0, count: 0, wins: 0, net: 0 });
+  }
+  return window;
 }
 
 export type Insight = {

@@ -21,13 +21,27 @@ test.describe('dashboard', () => {
   test('shows the KPI row, the R-strip and the equity curve', async ({ page }) => {
     await page.goto('/dashboard');
 
-    for (const label of ['Account balance', 'Net P&L', 'Win rate', 'Avg RR', 'Profit factor', 'Max drawdown']) {
-      await expect(page.getByText(label, { exact: true })).toBeVisible();
+    // Scoped to each tile rather than searched page-wide: the strip's hover cards reuse
+    // these same labels, so a bare `getByText('Net P&L')` now matches nineteen elements.
+    for (const [widget, label] of [
+      ['balance', 'Account balance'],
+      ['netPnl', 'Net P&L'],
+      ['winRate', 'Win rate'],
+      ['avgRr', 'Avg RR'],
+      ['profitFactor', 'Profit factor'],
+      ['maxDd', 'Max drawdown'],
+    ] as const) {
+      await expect(
+        page.locator(`[data-widget="${widget}"]`).getByText(label, { exact: true }),
+      ).toBeVisible();
     }
 
-    await expect(page.getByText(/Last 60 trades/)).toBeVisible();
-    await expect(page.getByText('Equity curve')).toBeVisible();
-    await expect(page.getByText('Recent trades')).toBeVisible();
+    // Days, not trades: "the last sixty trades" was a different span every time it was read.
+    const strip = page.locator('[data-widget="rStrip"]');
+    await expect(strip.getByText(/Last 30 days/)).toBeVisible();
+    await expect(strip.getByText(/trading days?$/)).toBeVisible();
+    await expect(page.locator('[data-widget="equity"]').getByText('Equity curve')).toBeVisible();
+    await expect(page.locator('[data-widget="recent"]').getByText('Recent trades')).toBeVisible();
   });
 
   test('lets the user rearrange the grid, and remembers it', async ({ page }) => {
@@ -158,6 +172,67 @@ test.describe('dashboard', () => {
     await edit.click();
     await resetToDefault.click();
     await expect(page.getByText('Layout saved')).toBeAttached();
+  });
+
+  test('gives every day in the strip its own detail on hover', async ({ page }) => {
+    // The strip is thirty columns of bar and a date; the day's actual numbers live in a hover
+    // card. It replaced the browser's `title`, which took a second to appear and — being one
+    // flat string — reordered its own parts inside the Hebrew layout.
+    test.skip((page.viewportSize()?.width ?? 0) < 768, 'the strip is a list on a phone');
+
+    await page.goto('/dashboard');
+    const strip = page.locator('[data-widget="rStrip"]');
+    const columns = strip.locator('[role="tooltip"]');
+    await expect(columns).toHaveCount(30);
+
+    // Hidden until asked for.
+    await expect(columns.first()).toBeHidden();
+
+    const column = columns.nth(15).locator('..');
+    await column.hover();
+    const card = columns.nth(15);
+    await expect(card).toBeVisible();
+    // A weekday, the date in the product's order, and the day's figures.
+    await expect(card).toContainText(/\d{2}\/\d{2}\/\d{4}/);
+
+    // Reachable without a mouse — a hover-only affordance would not be.
+    await page.keyboard.press('Escape');
+    await column.focus();
+    await expect(card).toBeVisible();
+  });
+
+  test('keeps every hover card inside the viewport, at both ends', async ({ page }) => {
+    // A card centred on its column hangs off the strip at the ends. The first attempt at
+    // clamping used physical `left`/`right`, which is inverted in Hebrew — it pinned the
+    // outer cards to the wrong edge and pushed them further off screen than before.
+    test.skip((page.viewportSize()?.width ?? 0) < 768, 'the strip is a list on a phone');
+
+    // Two conditions, both required to see the bug this guards against.
+    //
+    // Hebrew: the rest of the suite runs in English, and the first clamp used physical
+    // `left`/`right`, which is *correct* in a left-to-right layout. The card only flew off
+    // the wrong edge in RTL, so an English-only test passed while the Hebrew product — the
+    // default locale — was broken.
+    //
+    // 768px: the narrowest width the strip renders at. At 1280 the page margins absorb an
+    // overhanging card, so it looked fine there while being 34px off screen in a split window.
+    await page.setViewportSize({ width: 768, height: 900 });
+    await page.goto('/dashboard');
+    await page.context().addCookies([{ name: 'tri_locale', value: 'he', url: page.url() }]);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    const columns = page.locator('[data-widget="rStrip"] [role="tooltip"]');
+    const total = await columns.count();
+
+    for (const index of [0, 1, Math.floor(total / 2), total - 2, total - 1]) {
+      await columns.nth(index).locator('..').focus();
+      const card = columns.nth(index);
+      await expect(card).toBeVisible();
+      const box = (await card.boundingBox())!;
+      const width = page.viewportSize()!.width;
+      expect(box.x, `column ${index} runs off the start`).toBeGreaterThanOrEqual(-1);
+      expect(box.x + box.width, `column ${index} runs off the end`).toBeLessThanOrEqual(width + 1);
+    }
   });
 
   test('reports RR coverage next to the RR figure', async ({ page }) => {

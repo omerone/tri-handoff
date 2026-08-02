@@ -79,6 +79,12 @@ export function isoToDisplay(iso: string): string {
   return parts ? formatDate(parts) : '';
 }
 
+/** `yyyy-mm-dd` → `dd/mm`, or '' when the value is not a date. */
+export function isoToDayMonth(iso: string): string {
+  const parts = parseIsoDate(iso);
+  return parts ? formatDayMonth(parts) : '';
+}
+
 /** `dd/mm/yyyy` → `yyyy-mm-dd`, or '' when the value is not a date. */
 export function displayToIso(display: string): string {
   const parts = parseDisplayDate(display);
@@ -116,6 +122,28 @@ export function formatMonthName(parts: { year: number; month: number }, locale: 
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(Date.UTC(parts.year, parts.month - 1, 15)));
+}
+
+/**
+ * `יום חמישי, 23/07/2026` — the weekday named in the reader's language, the date in the
+ * product's order.
+ *
+ * The split is deliberate and is the same one `formatMonthName` makes: a weekday *name* is
+ * language, so it follows the locale; the order of the numbers is a product decision, so it
+ * does not.
+ */
+export function formatWeekdayDate(parts: DateParts, locale: Locale): string {
+  const weekday = new Intl.DateTimeFormat(locale === 'he' ? 'he-IL' : 'en-GB', {
+    weekday: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(parts.year, parts.month - 1, parts.day)));
+  return `${weekday}, ${formatDate(parts)}`;
+}
+
+/** `yyyy-mm-dd` → `יום חמישי, 23/07/2026`, or '' when the value is not a date. */
+export function isoToWeekdayDate(iso: string, locale: Locale): string {
+  const parts = parseIsoDate(iso);
+  return parts ? formatWeekdayDate(parts, locale) : '';
 }
 
 /*
