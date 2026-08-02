@@ -14,6 +14,7 @@ export default async function SettingsPage() {
   const t = await getTranslations('settings');
   const tSync = await getTranslations('sync');
   const locale = (await getLocale()) as Locale;
+  const tWizard = await getTranslations('settings.wizard');
 
   const account = await getMt5Account(session.ctx);
 
@@ -60,6 +61,53 @@ export default async function SettingsPage() {
             balance: t('balance'),
             equity: t('equity'),
             never: tSync('never'),
+            wizard: {
+              title: tWizard('title'),
+              step: tWizard('step'),
+              of: tWizard('of'),
+              welcome: {
+                title: tWizard('welcome.title'),
+                subtitle: tWizard('welcome.subtitle'),
+                hint: tWizard('welcome.hint'),
+                action: tWizard('welcome.action'),
+              },
+              login: {
+                title: tWizard('login.title'),
+                label: tWizard('login.label'),
+                hint: tWizard('login.hint'),
+                help: tWizard('login.help'),
+              },
+              server: {
+                title: tWizard('server.title'),
+                label: tWizard('server.label'),
+                hint: tWizard('server.hint'),
+                live: tWizard('server.live'),
+                demo: tWizard('server.demo'),
+              },
+              password: {
+                title: tWizard('password.title'),
+                label: tWizard('password.label'),
+                warning: tWizard('password.warning'),
+                hint: tWizard('password.hint'),
+                help: tWizard('password.help'),
+              },
+              processing: {
+                validating: tWizard('processing.validating'),
+                syncing: tWizard('processing.syncing'),
+              },
+              success: {
+                title: tWizard('success.title'),
+                subtitle: tWizard('success.subtitle'),
+                status: tWizard('success.status'),
+                action: tWizard('success.action'),
+              },
+            },
+            connectInvalid: t('connectInvalid'),
+            connectRejected: t('connectRejected'),
+            connectUnreachable: t('connectUnreachable'),
+            connectSyncFailed: t('connectSyncFailed'),
+            connected: t('connected'),
+            tooSoon: t('tooSoon'),
           }}
         />
       </Card>

@@ -69,7 +69,11 @@
     "tradesCount": "{count, plural, one {# trade} other {# trades}}"
   },
   "dash": {
-    "rStrip": "Last 60 trades (R)",
+    "rStrip": "Last {days} days (R)",
+    "rStripTradingDays": "{count, plural, one {one trading day} other {# trading days}}",
+    "noTrades": "No trades",
+    "dayNetR": "Net R",
+    "dayRrCoverage": "R from {counted} of {total} trades (the rest had no stop loss)",
     "equity": "Equity curve",
     "recent": "Recent trades",
     "empty": "No trades yet. Connect your MT5 account to get started."
@@ -263,6 +267,47 @@
     "theme": "Theme",
     "themeDark": "Dark",
     "themeLight": "Light",
+    "wizard": {
+      "title": "Connect your MT5 account",
+      "step": "Step",
+      "of": "of",
+      "welcome": {
+        "title": "Let's connect your MT5 account",
+        "subtitle": "Complete 4 simple steps to get started",
+        "hint": "This should take about two minutes",
+        "action": "Next"
+      },
+      "login": {
+        "title": "Step 1: Account number",
+        "label": "MT5 account number",
+        "hint": "Your account number with your broker (like 50214437)",
+        "help": "Where to find it? Open MT5, look at the window title or terminal. Your account number is displayed right there."
+      },
+      "server": {
+        "title": "Step 2: Choose your broker's server",
+        "label": "Server name",
+        "hint": "Usually 'Live' unless you're using a Demo account",
+        "live": "Live servers",
+        "demo": "Demo servers"
+      },
+      "password": {
+        "title": "Step 3: Investor password",
+        "label": "Investor password",
+        "warning": "Not your regular password — this is a special read-only password you create yourself",
+        "hint": "This password allows read-only access (no ability to trade)",
+        "help": "Where to find it? In MT5 Terminal → Tools → Options → Account tab → Investment Password. If you haven't created one yet, you can create it now."
+      },
+      "processing": {
+        "validating": "Validating your details...",
+        "syncing": "This may take a few seconds as we connect to the MT5 server"
+      },
+      "success": {
+        "title": "Done! Your account is connected",
+        "subtitle": "Your data is syncing now",
+        "status": "In a moment you'll see all your data on the dashboard",
+        "action": "Back to dashboard"
+      }
+    },
     "themeSystem": "System"
   },
   "calendar": {

@@ -1,12 +1,12 @@
 'use client';
 
-import { useActionState, useTransition } from 'react';
-import { Landmark, Shield, TriangleAlert } from 'lucide-react';
-import { Field, FormMessage, SubmitButton } from '@/components/ui/form';
+import { useTransition } from 'react';
+import { Landmark, Shield } from 'lucide-react';
 import { Num } from '@/components/ui/kpi';
-import { connectMt5Action, disconnectMt5Action, type Mt5FormState } from './mt5-actions';
+import { Mt5ConnectWizard, type WizardLabels } from './mt5-wizard';
+import { disconnectMt5Action } from './mt5-actions';
 
-export type Mt5CardLabels = {
+export type Mt5CardLabels = WizardLabels & {
   login: string;
   server: string;
   investorPassword: string;
@@ -14,7 +14,6 @@ export type Mt5CardLabels = {
   disconnect: string;
   disconnectConfirm: string;
   investor: string;
-  investorWarning: string;
   notConnected: string;
   notConnectedHint: string;
   backfillNote: string;
@@ -40,64 +39,7 @@ export function Mt5Card({
   account: ConnectedAccount | null;
   labels: Mt5CardLabels;
 }) {
-  return account ? <Connected account={account} labels={labels} /> : <ConnectForm labels={labels} />;
-}
-
-/**
- * The investor-password warning is not fine print.
- *
- * A trader handing over their master password would be giving a third-party service the
- * ability to trade their account — the exact risk SPEC §5 avoids by making TRi read-only. So
- * the warning sits above the field rather than below the form, and it says what TRi cannot
- * do rather than what the user should not do.
- */
-function InvestorWarning({ text }: { text: string }) {
-  return (
-    <div className="border-warn/30 bg-warn/10 flex gap-2 rounded-[10px] border px-3 py-2.5">
-      <TriangleAlert size={15} className="text-warn mt-px shrink-0" aria-hidden />
-      <p className="text-text/90 text-xs leading-relaxed">{text}</p>
-    </div>
-  );
-}
-
-function ConnectForm({ labels }: { labels: Mt5CardLabels }) {
-  const [state, action] = useActionState<Mt5FormState, FormData>(connectMt5Action, {});
-
-  return (
-    <form action={action} className="flex flex-col gap-3">
-      <div>
-        <div className="text-sm font-bold">{labels.notConnected}</div>
-        <p className="text-dim mt-1 text-xs">{labels.notConnectedHint}</p>
-      </div>
-
-      <InvestorWarning text={labels.investorWarning} />
-      <FormMessage error={state.error} notice={state.notice} />
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={labels.login} name="login" required dir="ltr" placeholder="50214437" />
-        <Field
-          label={labels.server}
-          name="server"
-          required
-          dir="ltr"
-          placeholder="MetaQuotes-Live01"
-        />
-      </div>
-      <Field
-        label={labels.investorPassword}
-        name="investorPassword"
-        type="password"
-        autoComplete="off"
-        required
-        dir="ltr"
-      />
-
-      <p className="text-dim text-xs">{labels.backfillNote}</p>
-      <div>
-        <SubmitButton>{labels.connect}</SubmitButton>
-      </div>
-    </form>
-  );
+  return account ? <Connected account={account} labels={labels} /> : <Mt5ConnectWizard labels={labels} />;
 }
 
 function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5CardLabels }) {
@@ -145,8 +87,6 @@ function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5
           </dd>
         </div>
       </dl>
-
-      <InvestorWarning text={labels.investorWarning} />
 
       <div>
         <button
