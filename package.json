@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:rate-limiting": "vitest run tests/rate-limiting/",
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run test",
     "db:generate": "prisma generate",
@@ -52,6 +53,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",
+    "redis": "^4.7.0",
     "server-only": "^0.0.1",
     "zod": "^3.24.1",
     "zxcvbn": "^4.4.2"
