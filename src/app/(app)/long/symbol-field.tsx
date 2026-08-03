@@ -156,9 +156,15 @@ export function SymbolField({
             aria-controls={listId}
             aria-autocomplete="list"
             placeholder={labels.searchHint}
-            className="border-line bg-raised text-text placeholder:text-dim/60 w-52 rounded-[10px] border px-3 py-2 pe-7 text-sm"
+            // Physical `pr`, not logical `pe` — the same trap `DateField` documents, and the
+            // same fix. This input is `dir="ltr"` so a ticker reads correctly, which puts its
+            // logical end on the *right*; the icon beside it sat at the wrapper's logical end,
+            // which inside the Hebrew layout is the *left*. Space reserved on one side and the
+            // icon drawn on the other is what put the magnifier on top of the "T" in "TSLA".
+            // Both are physical now, so they cannot disagree.
+            className="border-line bg-raised text-text placeholder:text-dim/60 w-52 rounded-[10px] border px-3 py-2 pr-7 text-sm"
           />
-          <span className="text-dim pointer-events-none absolute end-2">
+          <span className="text-dim pointer-events-none absolute right-2">
             {searching ? (
               <Loader2 size={13} className="tri-spin" aria-label={labels.searching} />
             ) : (

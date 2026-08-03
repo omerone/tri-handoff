@@ -97,7 +97,13 @@ test('finds a listing by company name and prices the position from it', async ({
   await page.goto('/long');
   await page.fill('input[name="symbol"]', 'Microsoft');
 
-  const option = page.getByRole('option').filter({ hasText: 'MSFT' }).first();
+  // The listing whose *symbol* is MSFT, not the first row that merely mentions it. The
+  // search returns up to a hundred listings now, and the world has tickers like "MSFT34" and
+  // "4MSFT" — a substring match picked one of those and asserted its way to "4MSFT".
+  const option = page
+    .getByRole('option')
+    .filter({ has: page.getByText('MSFT', { exact: true }) })
+    .first();
   await expect(option).toBeVisible();
   await option.click();
 
@@ -137,4 +143,32 @@ test('closing a position banks the gain and moves it out of the open book', asyn
   page.once('dialog', (dialog) => dialog.accept());
   await row.getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByRole('cell', { name: symbol, exact: true })).toHaveCount(0);
+});
+
+test('keeps the search icon out of the ticker', async ({ page }) => {
+  // The icon is positioned physically and the input reserves physical padding. A logical pair
+  // drifts apart in Hebrew — the input is `dir="ltr"` so its logical end is the right, while
+  // the icon's wrapper inherits RTL and puts its logical end on the left — which is how the
+  // magnifier came to sit on top of the "T" in "TSLA". Hebrew is the default locale, so this
+  // is the layout most users see, and nothing else in the suite would notice.
+  await page.goto('/long');
+  await page.context().addCookies([{ name: 'tri_locale', value: 'he', url: page.url() }]);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+
+  const input = page.locator('input[name="symbol"]');
+  await input.fill('TSLA');
+
+  const field = (await input.boundingBox())!;
+  const icon = (await page.locator('input[name="symbol"] + span').boundingBox())!;
+  const reserved = await input.evaluate((el) => parseFloat(getComputedStyle(el).paddingRight));
+
+  // The icon has to live entirely inside the padding the input set aside for it. Anywhere
+  // else and it is drawn over whatever the user typed.
+  expect(icon.x, 'the icon is outside the space reserved for it').toBeGreaterThanOrEqual(
+    field.x + field.width - reserved - 1,
+  );
+  expect(icon.x + icon.width, 'the icon overflows the field').toBeLessThanOrEqual(
+    field.x + field.width + 1,
+  );
 });
