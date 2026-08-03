@@ -219,6 +219,7 @@ export async function listClosedTrades(
   const rows = await prisma.trade.findMany({
     where: whereClause(ctx, filter, { closedOnly: true }),
     orderBy: [{ closeAt: 'asc' }, { ticket: 'asc' }],
+    take: 10000,
   });
   return rows.map(toRecord);
 }
@@ -276,6 +277,7 @@ export async function listCashFlow(ctx: TenantContext): Promise<TradeRecord[]> {
   const rows = await prisma.trade.findMany({
     where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, kind: { not: 'trade' } },
     orderBy: { openAt: 'asc' },
+    take: 10000,
   });
   return rows.map(toRecord);
 }

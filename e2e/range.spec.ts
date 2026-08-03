@@ -188,6 +188,38 @@ test.describe('the custom panel', () => {
     await expect(page.getByPlaceholder('dd/mm/yyyy').first()).toHaveValue('01/06/2026');
   });
 
+  test('floats over the page instead of pushing it down', async ({ page }) => {
+    // The bar lives in the sticky header. A panel that expands it moves every screen down by a
+    // row and takes the row back on the next click — the page shifting under the reader as a
+    // side effect of opening a menu.
+    await page.goto('/dashboard');
+    const before = (await page.locator('main').boundingBox())!;
+
+    await open(page);
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    const after = (await page.locator('main').boundingBox())!;
+    expect(after.y).toBe(before.y);
+  });
+
+  test('dismisses on Escape and hands focus back to its button', async ({ page }) => {
+    await page.goto('/dashboard');
+    await open(page);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    // Otherwise the way out of the popover is hunting for the button again.
+    await expect(page.getByRole('button', { name: 'Custom range' })).toBeFocused();
+  });
+
+  test('dismisses on a click elsewhere', async ({ page }) => {
+    await page.goto('/dashboard');
+    await open(page);
+
+    await page.locator('main').click({ position: { x: 5, y: 5 } });
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
   test('closes when a preset answers the question instead', async ({ page }) => {
     // The panel used to stay open across the navigation, leaving a form full of month fields
     // standing under a picker that says the range is everything.

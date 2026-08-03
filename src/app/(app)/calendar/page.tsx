@@ -25,6 +25,8 @@ import { DayCell } from './day-cell';
  */
 const MAX_MONTHS = 12;
 
+export const revalidate = 60;
+
 /**
  * The month calendar: daily P&L, trade count and win rate per square (SPEC §1.1).
  *

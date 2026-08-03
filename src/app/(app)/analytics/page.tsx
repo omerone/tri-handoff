@@ -23,6 +23,8 @@ import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { SESSIONS, WEEKDAYS } from '@/lib/analytics/dimensions';
 
+export const revalidate = 60;
+
 /**
  * "Where am I most profitable" — SPEC §3.5, and the reason the product exists beyond a
  * balance sheet.

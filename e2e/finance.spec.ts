@@ -85,7 +85,7 @@ test.describe('the finance screen', () => {
     const wealth = tile(page, 'Total wealth');
 
     await expect(wealth).toContainText('Trading account');
-    await expect(wealth).toContainText('Recorded cash');
+    await expect(wealth).toContainText('Recorded cash flow');
   });
 });
 
