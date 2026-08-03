@@ -1,5 +1,5 @@
 import 'server-only';
-import { unstable_cache } from 'next/cache';
+import { cache } from 'react';
 import type { Mt5Status } from '@prisma/client';
 import type { TenantContext } from '@/lib/tenant/context';
 import { assertContext } from './context';
@@ -62,7 +62,21 @@ function toView(row: {
   };
 }
 
-export const getMt5Account = unstable_cache(
+/*
+ * Deduplicated per request, not cached across them.
+ *
+ * This was `unstable_cache` with a revalidate window, which is a different thing: that is a
+ * shared data cache that survives the request, and nothing in the product invalidates it —
+ * there is not a single `revalidateTag` call. Disconnecting a broker left the settings page
+ * showing the account for another five minutes; a sync wrote a new balance and the dashboard
+ * kept the old one under a pill claiming it had just synced; a rearranged dashboard could come
+ * back in its previous arrangement for an hour. It also took the whole suite down with it,
+ * because `unstable_cache` needs a request context that a test does not have.
+ *
+ * React's `cache` gets the part that was actually worth having — one query per request no
+ * matter how many components ask — and cannot go stale, because it dies with the request.
+ */
+export const getMt5Account = cache(
   async (ctx: TenantContext): Promise<Mt5AccountView | null> => {
     assertContext(ctx);
     const row = await prisma.mt5Account.findFirst({
@@ -71,8 +85,6 @@ export const getMt5Account = unstable_cache(
     });
     return row ? toView(row) : null;
   },
-  ['mt5-account'],
-  { revalidate: 300, tags: ['mt5-account'] },
 );
 
 export async function connectMt5Account(

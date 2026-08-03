@@ -1,6 +1,33 @@
 import { expect, test } from '@playwright/test';
 
 /**
+ * The calendar's month heading, and the month before it.
+ *
+ * Read from the page rather than written down. The demo book is generated as a window ending
+ * "now", so a spec that names a month is a spec that passes until the seed is next run — which
+ * is exactly how "July 2026" came to be asserted in three places and wrong in all of them the
+ * morning someone added trades dated today.
+ */
+const MONTHS = Array.from({ length: 12 }, (_, index) =>
+  new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(2026, index, 15)),
+  ),
+);
+
+async function shownMonth(page: import('@playwright/test').Page): Promise<string> {
+  const text = await page.locator('main').innerText();
+  const found = text.match(new RegExp(`(${MONTHS.join('|')})\\s+(\\d{4})`));
+  if (!found) throw new Error(`no month heading on the page: ${text.slice(0, 120)}`);
+  return `${found[1]} ${found[2]}`;
+}
+
+function monthBefore(label: string): string {
+  const [name, year] = label.split(' ');
+  const previous = new Date(Date.UTC(Number(year), MONTHS.indexOf(name as string) - 1, 15));
+  return `${MONTHS[previous.getUTCMonth()]} ${previous.getUTCFullYear()}`;
+}
+
+/**
  * The P1 screens, against the seeded demo book (92 trades from the mock provider).
  *
  * The assertions are mostly about *consistency between screens* rather than exact figures:
@@ -316,10 +343,10 @@ test.describe('analytics', () => {
 test.describe('calendar', () => {
   test('opens on the month of the most recent trade and navigates', async ({ page }) => {
     await page.goto('/calendar');
-    await expect(page.getByText(/July 2026/)).toBeVisible();
+    const opened = await shownMonth(page);
 
     await page.getByRole('link', { name: 'Previous month' }).click();
-    await expect(page.getByText(/June 2026/)).toBeVisible();
+    await expect(page.locator('main').getByText(monthBefore(opened))).toBeVisible();
   });
 });
 

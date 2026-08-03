@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { CalendarRange, ChevronDown } from 'lucide-react';
 import { applyRangeAction } from '@/app/actions/range';

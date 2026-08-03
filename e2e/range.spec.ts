@@ -89,9 +89,10 @@ test.describe('what the range does to a screen', () => {
   });
 
   test('says the window is empty rather than offering to connect a broker', async ({ page }) => {
-    // August 2026 is past the end of the seeded book. The all-time empty state invites the
-    // user to connect an account they already have, which reads as the sync having failed.
-    await page.goto('/dashboard?range=this-month');
+    // A window years before the demo book, rather than a preset that is only empty until
+    // someone seeds a trade dated today. The all-time empty state invites the user to connect
+    // an account they already have, which reads as the sync having failed.
+    await page.goto('/dashboard?range=2021-03..2021-03');
     await expect(page.getByText('No data in the selected range')).toBeVisible();
     await expect(page.getByText(/Connect your MT5 account/)).toHaveCount(0);
   });
@@ -111,9 +112,10 @@ test.describe('what the range does to a screen', () => {
 
   test('leaves the calendar browsable when nothing is pinned down', async ({ page }) => {
     await page.goto('/calendar?range=max');
-    await expect(page.getByText(/July 2026/)).toBeVisible();
+    const opened = await shownMonth(page);
+
     await page.getByRole('link', { name: 'Previous month' }).click();
-    await expect(page.getByText(/June 2026/)).toBeVisible();
+    await expect(page.locator('main').getByText(monthBefore(opened))).toBeVisible();
   });
 
   test('reports finance over the window rather than a month', async ({ page }) => {

@@ -75,6 +75,18 @@ const nextConfig: NextConfig = {
           // script-src carries a fresh nonce on every response.
         ],
       },
+      {
+        source: '/static/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      {
+        source: '/_next/static/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      {
+        source: '/api/:path*',
+        headers: [{ key: 'Cache-Control', value: 'private, no-cache, no-store, must-revalidate' }],
+      },
     ];
   },
 };

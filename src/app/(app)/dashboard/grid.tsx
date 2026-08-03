@@ -265,8 +265,6 @@ export function DashboardGrid({
                   index={index}
                   names={names}
                   layout={layout}
-                  dragging={dragging}
-                  rtl={rtl}
                   onResize={(direction) => apply(resizeWidget(layout, item.id, direction))}
                   onDragStart={(event) => startDrag(event, item.id)}
                   onDragMove={onDragMove}
@@ -315,8 +313,6 @@ interface EditScrimProps {
   index: number;
   names: Readonly<Record<WidgetId, string>>;
   layout: readonly LayoutItem[];
-  dragging: WidgetId | null;
-  rtl: boolean;
   onResize: (direction: -1 | 1) => void;
   onDragStart: (event: PointerEvent<HTMLElement>) => void;
   onDragMove: (event: PointerEvent<HTMLElement>) => void;
@@ -329,8 +325,6 @@ const EditScrim = memo(function EditScrim({
   index,
   names,
   layout,
-  dragging,
-  rtl,
   onResize,
   onDragStart,
   onDragMove,
