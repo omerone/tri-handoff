@@ -1,20 +1,5 @@
 {
-  "env": {
-    "DATABASE_URL": {
-      "description": "PostgreSQL database URL with connection pooling for Vercel serverless. Use Neon pooler endpoint.",
-      "example": "postgresql://user:password@xxxxx-pooler.us-east-1.postgres.vercel-storage.com/dbname?sslmode=require",
-      "required": true
-    },
-    "SESSION_SECRET": {
-      "description": "Secret key for session encryption (min 32 chars)",
-      "required": true
-    },
-    "ENCRYPTION_KEY": {
-      "description": "Secret key for data encryption (min 32 chars)",
-      "required": true
-    }
-  },
-  "buildCommand": "npm run build && prisma migrate deploy",
+  "buildCommand": "npm run build",
   "installCommand": "npm install",
   "outputDirectory": ".next"
 }
