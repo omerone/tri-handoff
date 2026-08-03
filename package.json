@@ -11,6 +11,7 @@
     "_comment:dev": "--turbopack is dev-only and does not touch what `build` produces. Measured on this app: ready in 1.1s rather than 2.1s, and a route compiles in 0.17-0.84s rather than 0.4-2.9s, which is the wait between saving a file and seeing the tab you clicked. Drop the flag if a loader ever misbehaves under it.",
     "dev": "next dev --turbopack",
     "build": "next build",
+    "postbuild": "prisma migrate deploy",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
