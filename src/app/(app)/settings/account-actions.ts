@@ -10,8 +10,7 @@ import { requireSession } from '@/lib/auth/session';
 import { consumeRateLimit } from '@/lib/db';
 import { deleteUserDataGDPR, validateDeletionRequest } from '@/lib/db/gdpr';
 import { SecurityLogger } from '@/lib/security/logger';
-// eslint-disable-next-line no-restricted-imports
-import { prisma } from '@/lib/db/prisma';
+import { findPasswordHash } from '@/lib/db/security-events';
 
 export type AccountFormState = { error?: string; notice?: string };
 
@@ -63,20 +62,17 @@ export async function deleteUserAccount(
       password: formData.get('password'),
     });
 
-    // Fetch user to get password hash (not included in session for security)
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { passwordHash: true },
-    });
+    // Fetch the password hash (deliberately not on the session) to re-authenticate.
+    const passwordHash = await findPasswordHash(session.user.id);
 
-    if (!user) {
+    if (!passwordHash) {
       return { error: t('deleteFailedUserNotFound') };
     }
 
     // Verify password matches
     const validationResult = await validateDeletionRequest(
       session.user.id,
-      user.passwordHash,
+      passwordHash,
       parsed.password
     );
 

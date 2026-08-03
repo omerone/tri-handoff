@@ -1,5 +1,11 @@
 # TRi Web Application Firewall (WAF) Deployment Guide
 
+> **Status: procedure, not implementation.**
+> This document describes what TRi intends to do, and parts of it name files that do not
+> exist in the repository (the in-app WAF tests, which were removed — see docs/WAF_README.md). Read it as the policy to follow, and check the code
+> before relying on any control it describes as built. `docs/RATE_LIMITING.md`,
+> `docs/AUDIT_LOGGING.md` and `docs/SECURITY_HEADERS.md` describe subsystems that are.
+
 ## Overview
 
 This guide covers the deployment and management of production-grade WAF protection for the TRi application using either CloudFlare or AWS WAF.

@@ -1,5 +1,11 @@
 # Compliance Checklist
 
+> **Status: procedure, not implementation.**
+> This document describes what TRi intends to do, and parts of it name files that do not
+> exist in the repository (a cookie-consent banner and a compliance event logger). Read it as the policy to follow, and check the code
+> before relying on any control it describes as built. `docs/RATE_LIMITING.md`,
+> `docs/AUDIT_LOGGING.md` and `docs/SECURITY_HEADERS.md` describe subsystems that are.
+
 **Document Version**: 1.0  
 **Last Updated**: August 3, 2026  
 **Next Review**: November 3, 2026 (Quarterly)  

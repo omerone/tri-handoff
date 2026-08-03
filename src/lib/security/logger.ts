@@ -1,6 +1,10 @@
 import 'server-only';
-// eslint-disable-next-line no-restricted-imports
-import { prisma } from '@/lib/db/prisma';
+import {
+  countRecentAuthEvents,
+  recordAdminAction,
+  recordAuthEvent,
+  recordDataAccess,
+} from '@/lib/db/security-events';
 import { headers } from 'next/headers';
 
 /**
@@ -53,18 +57,13 @@ class SecurityLogger {
     try {
       const context = await getContext();
 
-      await prisma.authEvent.create({
-        data: {
-          userId: opts.userId,
-          eventType: opts.eventType,
-          description: opts.description,
-          result: opts.result ?? 'success',
-          ipAddress: context.ipAddress,
-          userAgent: context.userAgent,
-          details: opts.failureReason
-            ? { failureReason: opts.failureReason }
-            : undefined,
-        },
+      await recordAuthEvent({
+        userId: opts.userId,
+        eventType: opts.eventType,
+        description: opts.description,
+        result: opts.result ?? 'success',
+        details: opts.failureReason ? { failureReason: opts.failureReason } : undefined,
+        context,
       });
 
       // Alert on suspicious activity: too many failed logins
@@ -91,15 +90,13 @@ class SecurityLogger {
     try {
       const context = await getContext();
 
-      await prisma.dataAccessLog.create({
-        data: {
-          userId: opts.userId,
-          action: opts.action,
-          resource: opts.resource,
-          recordCount: opts.recordCount,
-          dataSizeBytes: opts.dataSizeBytes,
-          ipAddress: context.ipAddress,
-        },
+      await recordDataAccess({
+        userId: opts.userId,
+        action: opts.action,
+        resource: opts.resource,
+        recordCount: opts.recordCount,
+        dataSizeBytes: opts.dataSizeBytes,
+        ipAddress: context.ipAddress,
       });
 
       // Alert on large exports (data exfiltration detection)
@@ -134,20 +131,14 @@ class SecurityLogger {
     try {
       const context = await getContext();
 
-      await prisma.adminAuditLog.create({
-        data: {
-          adminId: opts.adminId,
-          tenantId: opts.tenantId,
-          userId: opts.userId,
-          actionType: opts.actionType,
-          description: opts.description,
-          // `changes` is a Json column, so the object goes in as-is. Stringifying it first
-          // stored a quoted blob that no query could reach into, and `null` is not a value
-          // Prisma accepts for a Json field — omitting it leaves the column null.
-          changes: opts.changes ?? undefined,
-          ipAddress: context.ipAddress,
-          userAgent: context.userAgent,
-        },
+      await recordAdminAction({
+        adminId: opts.adminId,
+        tenantId: opts.tenantId,
+        userId: opts.userId,
+        actionType: opts.actionType,
+        description: opts.description,
+        changes: opts.changes,
+        context,
       });
     } catch (err) {
       console.error('Failed to log admin action:', err);
@@ -164,12 +155,10 @@ class SecurityLogger {
     try {
       const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
 
-      const failedCount = await prisma.authEvent.count({
-        where: {
-          userId,
-          eventType: 'login_failed',
-          createdAt: { gte: thirtyMinutesAgo },
-        },
+      const failedCount = await countRecentAuthEvents({
+        userId,
+        eventType: 'login_failed',
+        since: thirtyMinutesAgo,
       });
 
       if (failedCount >= 5) {

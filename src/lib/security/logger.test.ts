@@ -22,6 +22,16 @@ vi.mock('next/headers', () => ({
   headers: vi.fn(),
 }));
 
+/*
+ * The logger reaches the database through `@/lib/db/security-events`, not through Prisma
+ * directly — but the assertions below deliberately go one layer deeper and check what
+ * actually reaches the client. That is where the column mapping lives, and where the bug
+ * that stored `changes` as a quoted JSON string hid. Mocking the repository instead would
+ * assert that this file calls a function, which is not a fact worth a test.
+ *
+ * The tenant-isolation guard is suppressed for that reason and no other: this is a mock in a
+ * test file, so there is no query here that could escape a tenant scope.
+ */
 // eslint-disable-next-line no-restricted-imports
 import { prisma } from '@/lib/db/prisma';
 import { headers } from 'next/headers';

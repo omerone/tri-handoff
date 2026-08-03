@@ -1,5 +1,11 @@
 # GDPR Compliance Procedures
 
+> **Status: procedure, not implementation.**
+> This document describes what TRi intends to do, and parts of it name files that do not
+> exist in the repository (privacy server actions, an export test and a cleanup script). Read it as the policy to follow, and check the code
+> before relying on any control it describes as built. `docs/RATE_LIMITING.md`,
+> `docs/AUDIT_LOGGING.md` and `docs/SECURITY_HEADERS.md` describe subsystems that are.
+
 **Version**: 1.0  
 **Last Updated**: 2026-08-03  
 **Scope**: TRi Trading Journal  

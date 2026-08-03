@@ -1,6 +1,10 @@
 import 'server-only';
-// eslint-disable-next-line no-restricted-imports
-import { prisma } from '@/lib/db/prisma';
+import {
+  countAdminActionsByAdmin,
+  countAuthEventsByUser,
+  findUserEmails,
+  listLargeExports,
+} from '@/lib/db/security-events';
 
 /**
  * Security Monitoring & Alerting System
@@ -61,40 +65,35 @@ export async function checkFailedLogins(): Promise<SecurityAlert[]> {
   const windowStart = new Date(Date.now() - ALERT_CONFIG.failedLogins.windowMinutes * 60 * 1000);
 
   // Group failed login attempts by user
-  const failedLogins = await prisma.authEvent.groupBy({
-    by: ['userId'],
-    where: {
-      eventType: 'login_failed',
-      result: 'failure',
-      createdAt: { gte: windowStart },
-    },
-    _count: {
-      id: true,
-    },
+  const failedLogins = await countAuthEventsByUser({
+    eventType: 'login_failed',
+    result: 'failure',
+    since: windowStart,
   });
 
-  for (const record of failedLogins) {
-    if (record._count.id >= ALERT_CONFIG.failedLogins.threshold) {
-      const user = await prisma.user.findUnique({
-        where: { id: record.userId },
-        select: { email: true },
-      });
+  const breaching = failedLogins.filter(
+    (record) => record.count >= ALERT_CONFIG.failedLogins.threshold,
+  );
+  // One lookup for the whole batch rather than one per alert — see `findUserEmails`.
+  const emails = await findUserEmails(breaching.map((record) => record.userId));
 
-      alerts.push({
-        id: `failed-logins-${record.userId}`,
-        type: 'failed_logins',
-        severity: ALERT_CONFIG.failedLogins.severity,
-        title: `Multiple Failed Login Attempts`,
-        description: `User ${user?.email || record.userId} had ${record._count.id} failed login attempts in the last 30 minutes`,
-        affectedUsers: [record.userId],
-        metadata: {
-          failedAttempts: record._count.id,
-          userId: record.userId,
-          email: user?.email,
-        },
-        timestamp: new Date(),
-      });
-    }
+  for (const record of breaching) {
+    const email = emails.get(record.userId);
+
+    alerts.push({
+      id: `failed-logins-${record.userId}`,
+      type: 'failed_logins',
+      severity: ALERT_CONFIG.failedLogins.severity,
+      title: `Multiple Failed Login Attempts`,
+      description: `User ${email || record.userId} had ${record.count} failed login attempts in the last 30 minutes`,
+      affectedUsers: [record.userId],
+      metadata: {
+        failedAttempts: record.count,
+        userId: record.userId,
+        email,
+      },
+      timestamp: new Date(),
+    });
   }
 
   return alerts;
@@ -108,39 +107,28 @@ export async function checkMassDataExport(): Promise<SecurityAlert[]> {
   const alerts: SecurityAlert[] = [];
   const windowStart = new Date(Date.now() - ALERT_CONFIG.dataExport.windowMinutes * 60 * 1000);
 
-  const exports = await prisma.dataAccessLog.findMany({
-    where: {
-      action: 'export',
-      createdAt: { gte: windowStart },
-      recordCount: { gte: ALERT_CONFIG.dataExport.threshold },
-    },
-    select: {
-      id: true,
-      userId: true,
-      recordCount: true,
-      resource: true,
-      createdAt: true,
-    },
+  const exports = await listLargeExports({
+    since: windowStart,
+    minRecords: ALERT_CONFIG.dataExport.threshold,
   });
 
+  const emails = await findUserEmails(exports.map((exp) => exp.userId));
+
   for (const exp of exports) {
-    const user = await prisma.user.findUnique({
-      where: { id: exp.userId },
-      select: { email: true },
-    });
+    const email = emails.get(exp.userId);
 
     alerts.push({
       id: `mass-export-${exp.id}`,
       type: 'mass_data_export',
       severity: ALERT_CONFIG.dataExport.severity,
       title: `Large Data Export Detected`,
-      description: `User ${user?.email || exp.userId} exported ${exp.recordCount} ${exp.resource} records at ${exp.createdAt.toISOString()}`,
+      description: `User ${email || exp.userId} exported ${exp.recordCount} ${exp.resource} records at ${exp.createdAt.toISOString()}`,
       affectedUsers: [exp.userId],
       metadata: {
         recordCount: exp.recordCount,
         resource: exp.resource,
         userId: exp.userId,
-        email: user?.email,
+        email,
       },
       timestamp: exp.createdAt,
     });
@@ -157,28 +145,20 @@ export async function checkAdminActivity(): Promise<SecurityAlert[]> {
   const alerts: SecurityAlert[] = [];
   const windowStart = new Date(Date.now() - ALERT_CONFIG.adminActions.windowMinutes * 60 * 1000);
 
-  const adminActions = await prisma.adminAuditLog.groupBy({
-    by: ['adminId'],
-    where: {
-      createdAt: { gte: windowStart },
-    },
-    _count: {
-      id: true,
-    },
-  });
+  const adminActions = await countAdminActionsByAdmin({ since: windowStart });
 
   for (const record of adminActions) {
-    if (record._count.id >= ALERT_CONFIG.adminActions.threshold && record.adminId) {
+    if (record.count >= ALERT_CONFIG.adminActions.threshold && record.adminId) {
       alerts.push({
         id: `admin-activity-${record.adminId}`,
         type: 'high_admin_activity',
         severity: ALERT_CONFIG.adminActions.severity,
         title: `High Admin Activity Detected`,
-        description: `Admin ${record.adminId} performed ${record._count.id} actions in the last 60 minutes`,
+        description: `Admin ${record.adminId} performed ${record.count} actions in the last 60 minutes`,
         affectedUsers: [],
         metadata: {
           adminId: record.adminId,
-          actionCount: record._count.id,
+          actionCount: record.count,
         },
         timestamp: new Date(),
       });
@@ -196,39 +176,33 @@ export async function checkPasswordResetAttempts(): Promise<SecurityAlert[]> {
   const alerts: SecurityAlert[] = [];
   const windowStart = new Date(Date.now() - ALERT_CONFIG.passwordReset.windowMinutes * 60 * 1000);
 
-  const resetAttempts = await prisma.authEvent.groupBy({
-    by: ['userId'],
-    where: {
-      eventType: 'password_reset_requested',
-      createdAt: { gte: windowStart },
-    },
-    _count: {
-      id: true,
-    },
+  const resetAttempts = await countAuthEventsByUser({
+    eventType: 'password_reset_requested',
+    since: windowStart,
   });
 
-  for (const record of resetAttempts) {
-    if (record._count.id >= ALERT_CONFIG.passwordReset.threshold) {
-      const user = await prisma.user.findUnique({
-        where: { id: record.userId },
-        select: { email: true },
-      });
+  const breaching = resetAttempts.filter(
+    (record) => record.count >= ALERT_CONFIG.passwordReset.threshold,
+  );
+  const emails = await findUserEmails(breaching.map((record) => record.userId));
 
-      alerts.push({
-        id: `password-reset-${record.userId}`,
-        type: 'password_reset_attempts',
-        severity: ALERT_CONFIG.passwordReset.severity,
-        title: `Multiple Password Reset Attempts`,
-        description: `User ${user?.email || record.userId} requested ${record._count.id} password resets in the last 30 minutes`,
-        affectedUsers: [record.userId],
-        metadata: {
-          attempts: record._count.id,
-          userId: record.userId,
-          email: user?.email,
-        },
-        timestamp: new Date(),
-      });
-    }
+  for (const record of breaching) {
+    const email = emails.get(record.userId);
+
+    alerts.push({
+      id: `password-reset-${record.userId}`,
+      type: 'password_reset_attempts',
+      severity: ALERT_CONFIG.passwordReset.severity,
+      title: `Multiple Password Reset Attempts`,
+      description: `User ${email || record.userId} requested ${record.count} password resets in the last 30 minutes`,
+      affectedUsers: [record.userId],
+      metadata: {
+        attempts: record.count,
+        userId: record.userId,
+        email,
+      },
+      timestamp: new Date(),
+    });
   }
 
   return alerts;

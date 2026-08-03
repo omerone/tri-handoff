@@ -39,36 +39,22 @@ This document provides a quick reference for the WAF implementation. For detaile
    - Custom app-specific rules
    - Performance considerations
 
-### Rate Limiting
+### What is *not* in the application
 
-5. **src/middleware/waf-rate-limit.ts** (2h)
-   - Enhanced rate limiting middleware
-   - Per-IP: 100 req/min global
-   - Per-route: auth (5/15min), API (50/min), upload (10/min)
-   - Per-user (authenticated): 1000 req/min
-   - Exponential backoff
-   - Graceful degradation
+An in-app WAF was written — request filtering, CloudWatch monitoring and a second rate
+limiter under `src/middleware/` and `src/lib/waf/` — and has been removed. Two reasons, and
+both are worth keeping in mind before anything like it is written again:
 
-### Monitoring
+- **Nothing imported it.** `src/middleware.ts` is the only middleware Next runs, and it sets
+  headers. The filtering modules were reachable from their own tests and from nothing else,
+  so the suite was green for code that never saw a request.
+- **It could not have run where a WAF belongs.** Next middleware executes on the Edge
+  runtime; those modules read Postgres and Redis. A WAF that inspects traffic has to sit in
+  front of the application, which is exactly what the CloudFlare and AWS scripts above
+  configure.
 
-6. **src/lib/waf/monitoring.ts** (2h)
-   - CloudWatch integration
-   - Real-time metric tracking
-   - Slack/email alerting
-   - Dashboard generation
-   - Event logging
-
-### Testing
-
-7. **tests/waf/waf-rules.test.ts** (2h)
-   - SQL injection payload tests
-   - XSS payload tests
-   - Path traversal tests
-   - RFI/LFI tests
-   - Command injection tests
-   - Rate limiting tests
-   - False positive checks
-   - Performance tests
+Application-level rate limiting still exists and is applied at the actions that matter — see
+`docs/RATE_LIMITING.md`.
 
 ### Documentation
 
@@ -330,9 +316,7 @@ PAGERDUTY_SERVICE_KEY     - PagerDuty integration
 - **WAF Rules**: docs/WAF_RULES.yaml
 - **Deployment Guide**: docs/WAF_DEPLOYMENT.md
 - **DDoS Guide**: docs/DDOS_MITIGATION.md
-- **Rate Limiting**: src/middleware/waf-rate-limit.ts
-- **Monitoring**: src/lib/waf/monitoring.ts
-- **Tests**: tests/waf/waf-rules.test.ts
+- **Application rate limiting**: docs/RATE_LIMITING.md
 
 ## Support
 

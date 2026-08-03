@@ -8,10 +8,9 @@ import { parseYearMonth, stepMonth } from '@/lib/finance/bounds';
 import { dailyTotals } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
-import { formatCompactSigned, formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { wallClock } from '@/lib/time/zone';
-import { formatMonthName } from '@/lib/time/format';
+import { formatMonthName, formatWeekdayDate } from '@/lib/time/format';
 import { DayCell } from './day-cell';
 
 /**
@@ -48,6 +47,16 @@ export default async function CalendarPage({
   const { year, month } = parseYearMonth(params.m) ?? { year: fallback.year, month: fallback.month };
 
   const weekdayNames = (await getTranslations('calendar')).raw('weekdays') as string[];
+
+  // The hover card's words, resolved once. The square itself is a server component, so it
+  // reads no translations of its own — the same arrangement every other card on the product
+  // uses, and what keeps a Hebrew string from being typed straight into the markup.
+  const dayLabels = {
+    netPnl: t('kpi.netPnl'),
+    trades: t('kpi.trades'),
+    winRate: t('kpi.winRate'),
+    noTrades: t('calendar.noTrades'),
+  };
   const monthName = formatMonthName({ year, month }, locale);
 
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -106,16 +115,20 @@ export default async function CalendarPage({
           const key = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           const total = totals.get(key);
 
+          // Which end of the row this square sits on, so its card can anchor rather than
+          // hang off the grid. Seven columns, and the padding cells count.
+          const column = index % 7;
+
           return (
             <DayCell
               key={key}
               day={day}
               total={total}
-              year={year}
-              month={month}
               locale={locale}
-              money={money}
               display={display}
+              labels={dayLabels}
+              dateLabel={formatWeekdayDate({ year, month, day }, locale)}
+              align={column === 0 ? 'start' : column === 6 ? 'end' : 'centre'}
             />
           );
         })}

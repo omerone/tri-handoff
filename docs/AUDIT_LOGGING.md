@@ -22,16 +22,16 @@ The audit logging system captures all INSERT, UPDATE, and DELETE operations on s
    - Configurable logging on sensitive tables
    - Syslog integration for centralized logging
 
-2. **Prisma Middleware** — Application-level audit logging
-   - Logs all ORM operations
+2. **Prisma client extension** — application-level audit logging (`src/lib/db/audit-middleware.ts`)
+   - Logs every ORM mutation; reads are not logged, they would bury the trail in noise
    - Redacts sensitive fields (passwords, tokens, keys)
    - Captures user context (userId, tenantId, IP, userAgent)
    - Flags suspicious queries (slow, bulk operations)
 
-3. **Database Triggers** — Automatic change tracking
-   - Captures old and new values for UPDATE operations
-   - Records full row for DELETE operations
-   - Independent of application logic
+3. **Database triggers** — *not installed.* `prisma/migrations/audit_triggers.sql` exists but
+   is not part of any migration, and `pg_trigger` holds no `audit_*` rows. Everything the
+   trail records today comes from the extension above, which means a write made outside the
+   application — psql, a migration, a restore — leaves no entry.
 
 4. **Retention & Archival** — Long-term storage
    - Active logs: 90 days (hot storage)
@@ -81,28 +81,41 @@ ALTER SYSTEM SET log_min_duration_statement = 5000;
 SELECT pg_reload_conf();
 ```
 
-### 3. Setup Database Triggers
+### 3. Setup Database Triggers (not done)
 
-Triggers are created automatically via Prisma migrations.
+`prisma/migrations/audit_triggers.sql` is a loose file, not a migration — nothing applies it.
+Applying it by hand is a deliberate decision, not a step in a setup guide: triggers double
+every audited write and record rows the application never saw.
 
-To verify:
+To check what is actually installed:
 
 ```sql
-SELECT * FROM pg_trigger WHERE tgname LIKE 'audit_%';
+SELECT tgname FROM pg_trigger WHERE tgname LIKE 'audit_%';   -- currently: none
 ```
 
 ### 4. Initialize Audit Middleware
 
-In your Prisma client initialization:
+The trail is a Prisma **client extension**, applied where the client is built —
+`src/lib/db/prisma.ts`:
 
 ```typescript
-import { setupAuditMiddleware } from '@/lib/db/audit-middleware';
+import { auditExtension } from '@/lib/db/audit-middleware';
 
-// Call once during app startup
-setupAuditMiddleware();
+const base = new PrismaClient({ /* … */ });
+export const prisma = base.$extends(auditExtension);
 ```
 
-This is typically done in `src/lib/db/prisma.ts` or `src/app/layout.tsx`.
+There is no `setupAuditMiddleware()` to call, and this is the one detail worth getting right:
+`$extends` **returns a new client** rather than modifying the one it is handed. A setup
+function called for its side effect would leave the app using the unextended client and audit
+nothing at all, while looking initialised — the worst way for an audit trail to fail.
+
+`prisma.ts` also exports `prismaBase`, the unextended client. The trail's own writes go
+through it, so an audit row cannot be audited: recursion is prevented by construction rather
+than by a string comparison on the model name.
+
+(Prisma removed `$use` middleware in v5; this project is on v6, where extensions are the
+only mechanism.)
 
 ### 5. Add npm Scripts
 
@@ -113,7 +126,6 @@ Update `package.json`:
   "scripts": {
     "audit-logs:archive": "NODE_OPTIONS=--conditions=react-server tsx scripts/archive-audit-logs.ts",
     "audit-logs:archive:dry": "NODE_OPTIONS=--conditions=react-server tsx scripts/archive-audit-logs.ts --dry-run",
-    "audit-logs:export": "NODE_OPTIONS=--conditions=react-server tsx scripts/export-audit-logs.ts",
     "pgaudit:setup": "bash scripts/setup-pgaudit.sh"
   }
 }
@@ -200,9 +212,13 @@ const logs = await exportAuditLog({
 
 #### Get Audit Logs via API
 
+The endpoint requires an **operator session** and is served only on the platform's base
+domain — a client's domain answers 404, so the operator API does not announce its existence
+there. Sign in at `/admin/login` first; the examples below assume the session cookie.
+
 ```bash
 # Get user's audit log
-curl "http://localhost:3000/api/admin/audit-logs?user=user123&limit=50"
+curl -b "$COOKIE" "http://localhost:3000/api/admin/audit-logs?user=user123&limit=50"
 
 # Get suspicious activity
 curl "http://localhost:3000/api/admin/audit-logs?suspicious=true"
@@ -533,10 +549,12 @@ Query performance via indexes on:
 
 ### Audit Logs Not Appearing
 
-1. Check middleware is initialized:
-   ```typescript
-   setupAuditMiddleware();
-   ```
+1. Check the client is the extended one — `src/lib/db/prisma.ts` must export the result of
+   `.$extends(auditExtension)`, not the client it was applied to. A repository importing the
+   base client writes nothing to the trail.
+
+   Note that the fixtures in `tests/helpers/fixtures.ts` use an unextended client on purpose,
+   so a write made with `testDb` is *expected* to leave no audit row.
 
 2. Verify tables exist:
    ```sql
