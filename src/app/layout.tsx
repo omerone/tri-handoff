@@ -3,7 +3,6 @@ import { Heebo, IBM_Plex_Mono } from 'next/font/google';
 import { cookies } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
-import { Analytics } from '@vercel/analytics/react';
 import { LOCALE_DIR } from '@/i18n/config';
 import { resolveLocale } from '@/i18n/request';
 import { resolveTheme, THEME_COOKIE } from '@/lib/theme';
@@ -58,7 +57,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
         </NextIntlClientProvider>
-        <Analytics />
       </body>
     </html>
   );
