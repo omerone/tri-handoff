@@ -21,7 +21,7 @@ export const runtime = 'nodejs';
  * blocked for everyone.
  */
 
-const MAX_RESULTS = 50;  // Increased from 8 to show all matching stocks
+const MAX_RESULTS = 100;  // Show all matching stocks (increased from initial 8)
 const SEARCHES = { limit: 60, windowMs: 60 * 1000 };
 
 export async function GET(request: NextRequest) {
@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
   }
 
   // Asked for extra, because the filter below throws some away (unsupported currencies).
-  const found = await quotesProvider().search(query, Math.max(200, MAX_RESULTS * 3));
+  // Request 300+ to ensure we have enough after filtering.
+  const found = await quotesProvider().search(query, Math.max(300, MAX_RESULTS * 3));
 
   // Only listings in a currency the app can actually hold a position in. `AAPL` alone comes
   // back on exchanges quoting Colombian pesos and South African cents; offering one would

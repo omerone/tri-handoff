@@ -177,7 +177,7 @@ export function SymbolField({
         <ul
           id={listId}
           role="listbox"
-          className="border-line bg-raised absolute z-30 mt-1 max-h-64 w-72 overflow-auto rounded-[10px] border py-1 shadow-lg"
+          className="border-line bg-raised absolute z-30 mt-1 max-h-96 w-72 overflow-auto rounded-[10px] border py-1 shadow-lg"
         >
           {results.length === 0 ? (
             <li className="text-dim px-3 py-2 text-xs">
