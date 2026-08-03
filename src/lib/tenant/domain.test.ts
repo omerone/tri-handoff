@@ -16,6 +16,16 @@ describe('normalizeDomain', () => {
     expect(normalizeDomain('[::1]:3000')).toBe('[::1]');
   });
 
+  it('maps no host onto another, however convenient', () => {
+    // A `localhost` → `demo.localhost` alias has been added here twice as a development
+    // shortcut. Both times it silently handed every request with `Host: localhost` a client's
+    // tenant, and made `APP_BASE_DOMAIN=localhost:3000` normalise to the client's domain —
+    // which put the operator login on it. The e2e smoke suite catches it; this catches it in
+    // a second, next to the code. See the comment in `normalizeDomain`.
+    expect(normalizeDomain('localhost')).toBe('localhost');
+    expect(normalizeDomain('localhost:3000')).toBe('localhost');
+  });
+
   it('is idempotent', () => {
     const once = normalizeDomain('HTTPS://Demo.TRi.App:443/');
     expect(normalizeDomain(once)).toBe(once);

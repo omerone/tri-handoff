@@ -14,6 +14,20 @@
     "settings": "Settings",
     "signOut": "Sign out"
   },
+  "range": {
+    "title": "Time range",
+    "max": "Maximum",
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "custom": "Custom range",
+    "byMonths": "Months",
+    "byDates": "Dates",
+    "from": "From",
+    "to": "To",
+    "apply": "Apply",
+    "empty": "No data in the selected range",
+    "monthsCapped": "Showing the last {shown} of the {total} months in range"
+  },
   "sync": {
     "syncing": "Syncing from MT5…",
     "synced": "Synced from MT5",
@@ -150,6 +164,7 @@
     "income": "Income",
     "expenses": "Expenses",
     "monthNet": "Monthly net",
+    "periodNet": "Range net",
     "totalWealth": "Total wealth",
     "title": "Personal finance",
     "add": "Add",

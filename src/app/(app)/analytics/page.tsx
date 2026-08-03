@@ -16,6 +16,8 @@ import {
   type Metrics,
 } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
+import { currentResolvedRange } from '@/lib/preferences/range';
+import { toTradeFilter } from '@/lib/time/range';
 import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
@@ -25,13 +27,20 @@ import { SESSIONS, WEEKDAYS } from '@/lib/analytics/dimensions';
  * "Where am I most profitable" — SPEC §3.5, and the reason the product exists beyond a
  * balance sheet.
  */
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
   const session = await requireSession();
   const t = await getTranslations();
   const locale = (await getLocale()) as Locale;
   const rtl = LOCALE_DIR[locale] === 'rtl';
 
-  const book = await loadBook(session.ctx);
+  // Every breakdown, insight and heatmap cell below is computed from this one list, so the
+  // range is applied once, here, and the "buckets sum to the total" guarantee survives it.
+  const range = await currentResolvedRange((await searchParams).range);
+  const book = await loadBook(session.ctx, toTradeFilter(range));
   const { money, display } = await displayMoney({
     source: book.accountCurrency,
     display: session.user.displayCurrency,
@@ -41,7 +50,7 @@ export default async function AnalyticsPage() {
   if (book.trades.length === 0) {
     return (
       <Card title={t('nav.analytics')}>
-        <EmptyState>{t('dash.empty')}</EmptyState>
+        <EmptyState>{range.bounded ? t('range.empty') : t('dash.empty')}</EmptyState>
       </Card>
     );
   }

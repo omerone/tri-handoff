@@ -12,6 +12,8 @@ import { getMt5Account, listJournalVocabulary } from '@/lib/db';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { formatDateAt, formatTimeAt } from '@/lib/time/format';
+import { currentResolvedRange } from '@/lib/preferences/range';
+import { toTradeFilter } from '@/lib/time/range';
 import { displayMoney } from '@/lib/money/display';
 import { TradeFilters } from './filters';
 import { Pager } from './pager';
@@ -24,6 +26,7 @@ type SearchParams = {
   style?: string;
   strategy?: string;
   page?: string;
+  range?: string;
 };
 
 /**
@@ -45,7 +48,11 @@ export default async function TradesPage({
   const rtl = LOCALE_DIR[locale] === 'rtl';
   const params = await searchParams;
 
+  // The range narrows by close date and the dropdowns narrow by everything else; they compose
+  // into one `where`, so the table, the pager and the summary bar all see the same population.
+  const range = await currentResolvedRange(params.range);
   const filter: TradeFilter = {
+    ...toTradeFilter(range),
     ...(isAssetClass(params.class) ? { assetClass: params.class } : {}),
     ...(isDirection(params.dir) ? { direction: params.dir } : {}),
     ...(isStyle(params.style) ? { style: params.style } : {}),

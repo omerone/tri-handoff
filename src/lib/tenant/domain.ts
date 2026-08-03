@@ -17,14 +17,31 @@ export function normalizeDomain(raw: string): string {
   }
   const colon = host.lastIndexOf(':');
   if (colon !== -1) host = host.slice(0, colon);
-  host = host.replace(/\.$/, '');
-
-  // In development: localhost maps to demo.localhost for convenience
-  if (host === 'localhost') {
-    return 'demo.localhost';
-  }
-
-  return host;
+  /*
+   * No host aliases here, and `localhost` least of all.
+   *
+   * A `localhost` → `demo.localhost` mapping was added twice for local convenience and
+   * removed twice. This function is pure host parsing, and three security decisions read its
+   * output, so aliasing one host to another breaks all three at once:
+   *
+   *   - `resolveTenant` treats every request carrying `Host: localhost` as a signed-in
+   *     client's domain — in production as much as in development — so "only a provisioned
+   *     domain reaches a tenant" stops being true;
+   *   - `assertAdminHost` compares this function's output for `APP_BASE_DOMAIN` against the
+   *     request's. With `APP_BASE_DOMAIN=localhost:3000` both sides become `demo.localhost`,
+   *     which serves the *operator login* on a customer's own domain — the one thing that
+   *     module exists to prevent;
+   *   - the 404 that tells an unknown host it is not a TRi client stops firing for it.
+   *
+   * The convenience was not needed either: browsers and curl resolve `*.localhost` to the
+   * loopback address with no `/etc/hosts` entry, which is why the demo tenant is provisioned
+   * at `demo.localhost` in the first place.
+   *
+   * A development-only alias, if one is ever wanted, belongs in `resolveTenant` behind an
+   * explicit `NODE_ENV` check — never in the function every boundary check parses hosts with.
+   * `domain.test.ts` guards this.
+   */
+  return host.replace(/\.$/, '');
 }
 
 const DOMAIN_PATTERN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;

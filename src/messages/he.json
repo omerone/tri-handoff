@@ -14,6 +14,20 @@
     "settings": "הגדרות",
     "signOut": "התנתקות"
   },
+  "range": {
+    "title": "טווח זמן",
+    "max": "מקסימום",
+    "thisMonth": "החודש",
+    "lastMonth": "חודש קודם",
+    "custom": "טווח מותאם",
+    "byMonths": "חודשים",
+    "byDates": "תאריכים",
+    "from": "מ",
+    "to": "עד",
+    "apply": "החל",
+    "empty": "אין נתונים בטווח שנבחר",
+    "monthsCapped": "מוצגים {shown} החודשים האחרונים מתוך {total} בטווח"
+  },
   "sync": {
     "syncing": "מסנכרן מ-MT5…",
     "synced": "סונכרן מ-MT5",
@@ -150,6 +164,7 @@
     "income": "הכנסות",
     "expenses": "הוצאות",
     "monthNet": "מאזן חודשי",
+    "periodNet": "נטו בטווח",
     "totalWealth": "שווי כולל",
     "title": "מאזן פיננסי",
     "add": "הוספה",

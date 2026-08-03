@@ -9,6 +9,8 @@ import { RStrip } from '@/components/charts/r-strip';
 import { requireSession } from '@/lib/auth/session';
 import { computeMetrics, equityCurve, maxDrawdown, recentDailyR } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
+import { currentResolvedRange } from '@/lib/preferences/range';
+import { toTradeFilter } from '@/lib/time/range';
 import { getDashboardLayout } from '@/lib/db';
 import { normalizeLayout, type WidgetId } from '@/lib/dashboard/layout';
 import { DashboardGrid } from './grid';
@@ -16,8 +18,20 @@ import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { displayMoney } from '@/lib/money/display';
 import { formatNumber, formatPercent } from '@/lib/money/currency';
 
-/** SPEC §1.1's strip, in days. Thirty is a month a trader can hold in their head. */
+/**
+ * SPEC §1.1's strip, in days. Thirty is a month a trader can hold in their head, and it is
+ * what the strip shows whenever the range is unbounded.
+ */
 const R_STRIP_DAYS = 30;
+
+/**
+ * How many days the strip will stretch to for a chosen range.
+ *
+ * A quarter still reads as a strip; a two-year range would be seven hundred bars two pixels
+ * wide, which is a texture rather than a chart. Past this the strip goes back to its own
+ * thirty-day window — the header says which, so the number under it is never ambiguous.
+ */
+const R_STRIP_MAX_DAYS = 92;
 import { formatDayMonthAt, formatTimeAt, isoToDayMonth, isoToWeekdayDate } from '@/lib/time/format';
 
 /**
@@ -28,13 +42,18 @@ import { formatDayMonthAt, formatTimeAt, isoToDayMonth, isoToWeekdayDate } from 
  * component decides where each one sits and nothing else, so the trades, the FX rate and the
  * money formatting never reach the browser as data.
  */
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
   const session = await requireSession();
   const t = await getTranslations();
   const locale = (await getLocale()) as Locale;
   const rtl = LOCALE_DIR[locale] === 'rtl';
 
-  const book = await loadBook(session.ctx);
+  const range = await currentResolvedRange((await searchParams).range);
+  const book = await loadBook(session.ctx, toTradeFilter(range));
   const { money, display, converted } = await displayMoney({
     source: book.accountCurrency,
     display: session.user.displayCurrency,
@@ -44,7 +63,10 @@ export default async function DashboardPage() {
   if (book.trades.length === 0) {
     return (
       <Card title={t('nav.dash')}>
-        <EmptyState>{t('dash.empty')}</EmptyState>
+        {/* Two different statements, and telling them apart matters: an empty *window* is not
+            an empty account, and offering to connect a broker to someone who already has one
+            reads as the sync having failed. */}
+        <EmptyState>{range.bounded ? t('range.empty') : t('dash.empty')}</EmptyState>
       </Card>
     );
   }
@@ -52,15 +74,19 @@ export default async function DashboardPage() {
   const layout = normalizeLayout(await getDashboardLayout(session.ctx));
 
   const metrics = computeMetrics(book.trades);
-  const curve = equityCurve(book.trades, book.startBalance);
-  const drawdown = maxDrawdown(curve, book.startBalance);
-  const balance = book.startBalance + metrics.net;
+  const curve = equityCurve(book.trades, book.openingBalance);
+  const drawdown = maxDrawdown(curve, book.openingBalance);
+  const balance = book.openingBalance + metrics.net;
 
   const recent = [...book.trades].slice(-6).reverse();
 
   // Thirty calendar days rather than the last sixty trades: "the last sixty" is a different
-  // span every time it is read, and six bars could be six days or one busy afternoon.
-  const days = recentDailyR(book.trades, R_STRIP_DAYS);
+  // span every time it is read, and six bars could be six days or one busy afternoon. A chosen
+  // range replaces that window with itself, so the strip is the period the rest of the screen
+  // is about rather than a second, unrelated one.
+  const stripDays =
+    range.days !== null && range.days <= R_STRIP_MAX_DAYS ? range.days : R_STRIP_DAYS;
+  const days = recentDailyR(book.trades, stripDays);
   const tradingDays = days.filter((day) => day.count > 0).length;
 
   const widgets: Record<WidgetId, ReactNode> = {
@@ -124,7 +150,7 @@ export default async function DashboardPage() {
       // the same panel is a strip two rows tall.
       <CollapsibleCard
         defaultOpen={false}
-        title={t('dash.rStrip', { days: R_STRIP_DAYS })}
+        title={t('dash.rStrip', { days: stripDays })}
         action={
           <span className="text-dim text-[11px]">
             {t('dash.rStripTradingDays', { count: tradingDays })}
@@ -157,7 +183,7 @@ export default async function DashboardPage() {
             balance: point.balance,
             label: `${formatDayMonthAt(point.closeAt)} ${formatTimeAt(point.closeAt)}`,
           }))}
-          startBalance={book.startBalance}
+          startBalance={book.openingBalance}
           rtl={rtl}
           display={display}
         />
@@ -210,7 +236,7 @@ export default async function DashboardPage() {
     avgRr: t('kpi.avgRR'),
     profitFactor: t('kpi.profitFactor'),
     maxDd: t('kpi.maxDD'),
-    rStrip: t('dash.rStrip', { days: R_STRIP_DAYS }),
+    rStrip: t('dash.rStrip', { days: stripDays }),
     equity: t('dash.equity'),
     recent: t('dash.recent'),
   };

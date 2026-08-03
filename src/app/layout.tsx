@@ -5,7 +5,8 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { LOCALE_DIR } from '@/i18n/config';
 import { resolveLocale } from '@/i18n/request';
-import { asTheme, THEME_COOKIE } from '@/lib/theme';
+import { resolveTheme, THEME_COOKIE } from '@/lib/theme';
+import { getSession } from '@/lib/auth/session';
 import './globals.css';
 
 // Heebo carries both Hebrew and Latin, so the UI keeps one voice across both locales.
@@ -43,9 +44,12 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await resolveLocale();
   const messages = await getMessages();
-  // From the cookie, not the session: the sign-in screen has no session and should still
-  // honour the theme, and every page would otherwise pay for a query it does not need.
-  const theme = asTheme((await cookies()).get(THEME_COOKIE)?.value);
+  // The saved preference decides, and the cookie covers the visitor who has no session yet.
+  // `getSession` is request-cached and both route-group layouts already call it, so reading it
+  // here costs nothing beyond the lookup the page was going to make anyway — and it is the
+  // only way Settings and the painted page cannot disagree.
+  const session = await getSession();
+  const theme = resolveTheme(session?.user.theme, (await cookies()).get(THEME_COOKIE)?.value);
 
   return (
     <html lang={locale} dir={LOCALE_DIR[locale]} data-theme={theme}>

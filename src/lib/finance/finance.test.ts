@@ -3,6 +3,7 @@ import {
   cumulativeCash,
   expensesByCategory,
   monthBalance,
+  rangeBalance,
   totalWealth,
   yearBalance,
   type FinanceEntry,
@@ -439,5 +440,125 @@ describe('cumulativeCash over a long history', () => {
     ];
     expect(cumulativeCash(entries, { year: 2026, month: 5 })).toBe(0);
     expect(cumulativeCash(entries, { year: 2025, month: 12 })).toBe(0);
+  });
+});
+
+/**
+ * A window that is not a calendar month.
+ *
+ * The month view is the special case of this, and the two have to agree — a range covering
+ * exactly March must report what March reports, or the same money reads differently depending
+ * on which control the user reached for.
+ */
+describe('an arbitrary window', () => {
+  const salary = entry({
+    type: 'income',
+    category: 'salary',
+    amountIls: 10_000,
+    entryDate: day(2026, 1, 1),
+    isRecurring: true,
+  });
+  const rent = entry({
+    type: 'expense',
+    category: 'housing',
+    amountIls: 4_000,
+    entryDate: day(2026, 1, 20),
+    isRecurring: true,
+  });
+
+  it('agrees with the month view over exactly one month', () => {
+    const entries = [salary, rent, entry({ entryDate: day(2026, 3, 7), amountIls: 300 })];
+
+    const asRange = rangeBalance(
+      entries,
+      { year: 2026, month: 3, day: 1 },
+      { year: 2026, month: 3, day: 31 },
+    );
+    const asMonth = monthBalance(entries, 2026, 3);
+
+    expect(asRange.income).toBe(asMonth.income);
+    expect(asRange.expenses).toBe(asMonth.expenses);
+    expect(asRange.net).toBe(asMonth.net);
+    expect(asRange.entries).toHaveLength(asMonth.entries.length);
+  });
+
+  it('sums a multi-month window', () => {
+    const quarter = rangeBalance(
+      [salary, rent],
+      { year: 2026, month: 1, day: 1 },
+      { year: 2026, month: 3, day: 31 },
+    );
+
+    expect(quarter.income).toBe(30_000);
+    expect(quarter.expenses).toBe(12_000);
+    expect(quarter.net).toBe(18_000);
+    expect(quarter.entries).toHaveLength(6);
+  });
+
+  it('excludes an occurrence that falls outside the days asked for', () => {
+    // The second half of February only: the rent on the 20th is in, the salary on the 1st is
+    // not. A month-at-a-time expansion that forgot to filter would include both.
+    const window = rangeBalance(
+      [salary, rent],
+      { year: 2026, month: 2, day: 15 },
+      { year: 2026, month: 2, day: 28 },
+    );
+
+    expect(window.income).toBe(0);
+    expect(window.expenses).toBe(4_000);
+    expect(window.entries).toHaveLength(1);
+  });
+
+  it("picks up the next month's occurrences when the window runs into it", () => {
+    // Mid-February to the 5th of March: February's rent and March's salary, and neither of
+    // the two that sit outside those days.
+    const window = rangeBalance(
+      [salary, rent],
+      { year: 2026, month: 2, day: 15 },
+      { year: 2026, month: 3, day: 5 },
+    );
+
+    expect(window.income).toBe(10_000);
+    expect(window.expenses).toBe(4_000);
+    expect(window.entries).toHaveLength(2);
+  });
+
+  it('includes both boundary days', () => {
+    const window = rangeBalance(
+      [rent],
+      { year: 2026, month: 2, day: 20 },
+      { year: 2026, month: 3, day: 20 },
+    );
+    expect(window.entries).toHaveLength(2);
+  });
+
+  it('returns the entries in date order across months', () => {
+    const window = rangeBalance(
+      [rent, salary],
+      { year: 2026, month: 1, day: 1 },
+      { year: 2026, month: 2, day: 28 },
+    );
+
+    const dates = window.entries.map((occurrence) => occurrence.occurrenceDate.getTime());
+    expect(dates).toEqual([...dates].sort((a, b) => a - b));
+  });
+
+  it('is empty for a window with nothing in it', () => {
+    const window = rangeBalance(
+      [entry({ entryDate: day(2026, 5, 5) })],
+      { year: 2026, month: 6, day: 1 },
+      { year: 2026, month: 6, day: 30 },
+    );
+    expect(window).toMatchObject({ income: 0, expenses: 0, net: 0, entries: [] });
+  });
+
+  it('breaks a window down by category, largest first', () => {
+    const window = rangeBalance(
+      [salary, rent, entry({ category: 'food', amountIls: 900, entryDate: day(2026, 1, 9) })],
+      { year: 2026, month: 1, day: 1 },
+      { year: 2026, month: 1, day: 31 },
+    );
+
+    expect(expensesByCategory(window).map((row) => row.category)).toEqual(['housing', 'food']);
   });
 });

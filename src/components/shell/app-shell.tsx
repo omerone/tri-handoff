@@ -1,9 +1,15 @@
 import { getLocale, getTranslations } from 'next-intl/server';
+import { cookies } from 'next/headers';
 import type { Locale } from '@/i18n/config';
+import { resolveTheme, THEME_COOKIE } from '@/lib/theme';
 import { enabledNav } from '@/lib/nav';
+import { currentRange } from '@/lib/preferences/range';
+import { monthNames, selectableYears } from '@/lib/time/range-options';
 import type { TenantSession } from '@/lib/tenant/context';
 import { LanguageToggle } from './language-toggle';
+import { ThemeToggle } from './theme-toggle';
 import { MainNav, type NavItem } from './main-nav';
+import { RangePicker } from './range-picker';
 import { SignOutButton } from './sign-out-button';
 import { SyncStatus } from './sync-status';
 
@@ -20,12 +26,20 @@ export async function AppShell({
 }) {
   const t = await getTranslations();
   const locale = (await getLocale()) as Locale;
+  // Same resolution the root layout paints with, so the sun/moon never offers to switch to
+  // the theme already on screen.
+  const theme = resolveTheme(session.user.theme, (await cookies()).get(THEME_COOKIE)?.value);
 
   const items: NavItem[] = enabledNav().map((item) => ({
     key: item.key,
     href: item.href,
     label: t(`nav.${item.label}`),
   }));
+
+  // One instant, handed to the picker rather than read again on the client: `thisMonth`
+  // resolved against two different clocks is two different months, and a hydration mismatch.
+  const now = new Date();
+  const range = await currentRange();
 
   return (
     <div className="min-h-screen">
@@ -44,18 +58,48 @@ export async function AppShell({
               <div className="text-base leading-none font-extrabold">{t('app.name')}</div>
               {/* Decoration, and at 320px it wraps to two lines and grows the sticky header
                   that every screen then scrolls under. */}
-              <div className="text-dim hidden text-[11px] min-[360px]:block">{t('app.tagline')}</div>
+              <div className="text-dim hidden text-[11px] min-[360px]:block">
+                {t('app.tagline')}
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <SyncStatus session={session} lastLoginAt={session.user.lastLoginAt} />
+            <ThemeToggle current={theme} />
             <LanguageToggle current={locale} />
             <SignOutButton label={t('nav.signOut')} />
           </div>
         </div>
 
         <MainNav items={items} />
+
+        {/*
+          Inside the sticky header, under the nav: the range is the frame everything below is
+          read in, and a filter that scrolls away is a filter the reader stops accounting for.
+          It hides itself on the screens where a period means nothing — see `isRangedPath`.
+        */}
+        <RangePicker
+          fallback={range}
+          now={now}
+          locale={locale}
+          years={selectableYears(now)}
+          labels={{
+            title: t('range.title'),
+            presets: {
+              max: t('range.max'),
+              thisMonth: t('range.thisMonth'),
+              lastMonth: t('range.lastMonth'),
+            },
+            custom: t('range.custom'),
+            byMonths: t('range.byMonths'),
+            byDates: t('range.byDates'),
+            from: t('range.from'),
+            to: t('range.to'),
+            apply: t('range.apply'),
+            monthNames: monthNames(locale),
+          }}
+        />
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-5">{children}</main>

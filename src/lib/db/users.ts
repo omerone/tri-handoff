@@ -12,7 +12,10 @@ import { prisma } from './prisma';
 export async function findUserForLogin(tenantId: string, email: string) {
   return prisma.user.findUnique({
     where: { tenantId_email: { tenantId, email: email.trim().toLowerCase() } },
-    select: { id: true, tenantId: true, email: true, passwordHash: true },
+    // `locale` and `theme` ride along so sign-in can refresh their cookie copies: a browser
+    // that has never seen this account carries no cookies, and the first paint after login
+    // would otherwise be the default theme rather than the user's.
+    select: { id: true, tenantId: true, email: true, passwordHash: true, locale: true, theme: true },
   });
 }
 

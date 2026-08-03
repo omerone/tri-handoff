@@ -1,0 +1,329 @@
+'use client';
+
+import { useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { CalendarRange, ChevronDown } from 'lucide-react';
+import { applyRangeAction } from '@/app/actions/range';
+import { DateField } from '@/components/ui/date-field';
+import type { Locale } from '@/i18n/config';
+import { isRangedPath } from '@/lib/nav';
+import { toIsoDate } from '@/lib/time/format';
+import {
+  describeRange,
+  formatRange,
+  parseRange,
+  presetToken,
+  RANGE_PARAM,
+  RANGE_PRESETS,
+  resolveRange,
+  type RangePreset,
+  type TimeRange,
+} from '@/lib/time/range';
+
+export type RangeLabels = {
+  title: string;
+  presets: Record<RangePreset, string>;
+  custom: string;
+  byMonths: string;
+  byDates: string;
+  from: string;
+  to: string;
+  apply: string;
+  /** Twelve month names in the reader's language, January first. */
+  monthNames: readonly string[];
+};
+
+/** The two shapes a custom range can take. Also the `intent` the action reads. */
+type Mode = 'months' | 'dates';
+
+const modeOf = (range: TimeRange): Mode => (range.kind === 'dates' ? 'dates' : 'months');
+
+/**
+ * The one time control in the product, sitting under the nav on every screen that reads its
+ * data through a period.
+ *
+ * The presets are submit buttons in a plain form posting to a server action, so choosing one
+ * is a single request with no client state involved. The custom panel needs a client
+ * component, and so does the picker as a whole, for the three facts the shell around it cannot
+ * see — which path it is on, what is in the query string, and therefore which range is
+ * actually in force. The shell is a layout, and layouts are not handed `searchParams`; a
+ * picker fed only the cookie would sit there reading "Maximum" above a page rendering a shared
+ * link's March.
+ *
+ * So the URL is read here and resolved with the same `parseRange` the server used, which is
+ * what keeps the two answers identical rather than merely similar. `now` arrives as a prop for
+ * the same reason: `thisMonth` resolved against two different clocks is two different months.
+ */
+export function RangePicker({
+  fallback,
+  now,
+  locale,
+  years,
+  labels,
+}: {
+  /** The cookie's range, used when the URL asks for nothing. */
+  fallback: TimeRange;
+  /** One instant for both renders of this component, so hydration cannot disagree. */
+  now: Date;
+  locale: Locale;
+  years: readonly number[];
+  labels: RangeLabels;
+}) {
+  const pathname = usePathname();
+  const params = useSearchParams();
+
+  const current = parseRange(params.get(RANGE_PARAM), now) ?? fallback;
+  const custom = current.kind === 'months' || current.kind === 'dates';
+  const key = formatRange(current);
+
+  /*
+   * What the panel is doing, remembered against the range it was opened for.
+   *
+   * This was a `<details open={custom}>`, which has a hole in it: once the user has toggled a
+   * native disclosure, the DOM state is theirs and React will not touch it again unless the
+   * attribute it renders actually changes. Open the panel, then click "Maximum", and the panel
+   * stayed open — a form full of month and date fields standing under a picker that says the
+   * range is everything. Resetting on the range key is the documented way to derive state from
+   * props, and it closes the panel exactly when the answer above it changed.
+   */
+  const [panel, setPanel] = useState(() => ({ key, open: custom, mode: modeOf(current) }));
+  if (panel.key !== key) setPanel({ key, open: custom, mode: modeOf(current) });
+
+  // Long positions are what is open right now and Settings is not data; a control that changes
+  // nothing is worse than no control.
+  if (!isRangedPath(pathname)) return null;
+
+  const resolved = resolveRange(current, now);
+  const summary = describeRange(resolved, locale);
+
+  // The custom fields open on what is already showing. With nothing to show — `max` — they
+  // open on the current month, which is the shortest path to the range most people want next.
+  const thisMonth = resolveRange({ kind: 'thisMonth' }, now);
+  const defaults = {
+    from: resolved.fromDate ?? thisMonth.fromDate!,
+    to: resolved.toDate ?? thisMonth.toDate!,
+  };
+
+  const query = params.toString();
+  const group = 'border-line bg-raised inline-flex gap-1 rounded-[10px] border p-[3px]';
+  const segment = (active: boolean) =>
+    `tri-tap rounded-lg px-3 py-1.5 text-[13px] ${
+      active ? 'bg-brand font-bold text-white' : 'text-dim font-medium'
+    }`;
+  const field =
+    'border-line bg-raised text-text min-h-9 rounded-[10px] border px-2.5 py-1.5 text-xs';
+
+  return (
+    <div className="border-line bg-header border-b">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2">
+        {/* The sticky header already carries the mark, the sync pill and the nav strip; on a
+            320px screen the words here would push all of it into a third row. The icon stays,
+            and the group's `aria-label` says the same thing to a screen reader either way. */}
+        <span className="text-dim flex items-center gap-1.5 text-[11px] font-semibold">
+          <CalendarRange size={13} aria-hidden />
+          <span className="hidden sm:inline">{labels.title}</span>
+        </span>
+
+        <form action={applyRangeAction}>
+          <Where path={pathname} query={query} />
+          <div role="group" aria-label={labels.title} className={group}>
+            {RANGE_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="submit"
+                name="intent"
+                value={presetToken(preset)}
+                aria-pressed={current.kind === preset}
+                className={segment(current.kind === preset)}
+              >
+                {labels.presets[preset]}
+              </button>
+            ))}
+          </div>
+        </form>
+
+        <button
+          type="button"
+          aria-expanded={panel.open}
+          aria-controls="tri-range-custom"
+          onClick={() => setPanel((state) => ({ ...state, open: !state.open }))}
+          className={`tri-tap border-line inline-flex min-h-9 items-center gap-1.5 rounded-[10px] border px-3 py-1.5 text-[13px] ${
+            custom ? 'bg-brand font-bold text-white' : 'bg-raised text-dim font-medium'
+          }`}
+        >
+          {labels.custom}
+          <ChevronDown size={13} aria-hidden className={panel.open ? 'rotate-180' : undefined} />
+        </button>
+
+        {/* What is actually on screen, in the same words the picker offered — so a range
+            picked three screens ago is still legible without opening the panel. */}
+        {summary ? (
+          // `dir="ltr"` for the same reason `Num` sets it: `01/01/2026 – 31/03/2026` is a
+          // left-to-right run, and inside the Hebrew layout the neutral slashes and dash let
+          // the endpoints swap places.
+          <span dir="ltr" className="text-dim hidden text-[11px] md:inline">
+            {summary}
+          </span>
+        ) : null}
+      </div>
+
+      {panel.open ? (
+        /*
+         * One form, one Apply.
+         *
+         * It was two forms side by side — months and dates, each with its own button — which
+         * put six controls and two Apply buttons on screen for a choice that is one or the
+         * other. Switching the mode leaves only the two fields that mode needs, which also
+         * keeps `required` honest: a hidden-but-present date field is one the browser refuses
+         * to report a validation error on, because it cannot focus it to show the message.
+         */
+        <div id="tri-range-custom" className="border-line bg-raised/40 border-t">
+          <form
+            action={applyRangeAction}
+            className="mx-auto flex max-w-6xl flex-wrap items-end gap-x-3 gap-y-2 px-4 py-2.5"
+          >
+            <Where path={pathname} query={query} />
+            <input type="hidden" name="intent" value={panel.mode} />
+
+            <div role="group" aria-label={labels.custom} className={`${group} self-center`}>
+              {(
+                [
+                  ['months', labels.byMonths],
+                  ['dates', labels.byDates],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={panel.mode === mode}
+                  onClick={() => setPanel((state) => ({ ...state, mode }))}
+                  className={segment(panel.mode === mode)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {panel.mode === 'months' ? (
+              <>
+                <MonthSelect
+                  name="fromMonth"
+                  legend={labels.from}
+                  value={defaults.from}
+                  years={years}
+                  monthNames={labels.monthNames}
+                  className={field}
+                />
+                <MonthSelect
+                  name="toMonth"
+                  legend={labels.to}
+                  value={defaults.to}
+                  years={years}
+                  monthNames={labels.monthNames}
+                  className={field}
+                />
+              </>
+            ) : (
+              <>
+                {/* `DateField` rather than a bare `<input type="date">`, for the reason written
+                    on that component: the native control renders in the *browser's* locale, so
+                    the 2nd of August reads as 08/02 for half the people who open it. */}
+                <DateField
+                  name="fromDate"
+                  label={labels.from}
+                  defaultValue={toIsoDate(defaults.from)}
+                  required
+                  className={`${field} w-36`}
+                />
+                <DateField
+                  name="toDate"
+                  label={labels.to}
+                  defaultValue={toIsoDate(defaults.to)}
+                  required
+                  className={`${field} w-36`}
+                />
+              </>
+            )}
+
+            <button
+              type="submit"
+              className="tri-tap bg-brand min-h-9 self-end rounded-[10px] px-4 py-1.5 text-xs font-bold text-white"
+            >
+              {labels.apply}
+            </button>
+          </form>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Where to come back to, carried on both forms.
+ *
+ * The action needs both: the path so it can redirect, and the existing query so that changing
+ * the range on a table narrowed to "short crypto" does not also clear the filter.
+ */
+function Where({ path, query }: { path: string; query: string }) {
+  return (
+    <>
+      <input type="hidden" name="path" value={path} />
+      <input type="hidden" name="query" value={query} />
+    </>
+  );
+}
+
+/**
+ * A month, as a named month and a four-digit year.
+ *
+ * Not `<input type="month">`: it is the same trap as `<input type="date">`, rendering in the
+ * browser's locale with no way for the page to say otherwise. A month *name* cannot be
+ * misread for a year, in either language.
+ */
+function MonthSelect({
+  name,
+  legend,
+  value,
+  years,
+  monthNames,
+  className,
+}: {
+  name: string;
+  legend: string;
+  value: { year: number; month: number };
+  years: readonly number[];
+  monthNames: readonly string[];
+  className: string;
+}) {
+  return (
+    <span className="flex flex-col gap-1">
+      <span className="text-dim text-[11px] font-semibold">{legend}</span>
+      <span className="flex gap-1">
+        <select
+          name={`${name}Month`}
+          defaultValue={value.month}
+          aria-label={legend}
+          className={className}
+        >
+          {monthNames.map((label, index) => (
+            <option key={label} value={index + 1}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          name={`${name}Year`}
+          defaultValue={value.year}
+          aria-label={legend}
+          className={className}
+        >
+          {years.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
+      </span>
+    </span>
+  );
+}

@@ -5,9 +5,11 @@ import { Card } from '@/components/ui/card';
 import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { isAtOrBefore, parseYearMonth, stepMonth } from '@/lib/finance/bounds';
+import { currentResolvedRange } from '@/lib/preferences/range';
+import { describeRange } from '@/lib/time/range';
 import { getMt5Account, listFinanceEntries, listLongPositions } from '@/lib/db';
 import { portfolioTotals } from '@/lib/positions/valuation';
-import { cumulativeCash, expensesByCategory, monthBalance, totalWealth, yearBalance } from '@/lib/finance/balance';
+import { cumulativeCash, expensesByCategory, rangeBalance, totalWealth, yearBalance } from '@/lib/finance/balance';
 import { isKnownCategory, suggestedCategories } from '@/lib/finance/categories';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
@@ -16,7 +18,7 @@ import { getFxRate, hasRate } from '@/lib/money/fx';
 import { wallClock } from '@/lib/time/zone';
 import { EntryForm } from './entry-form';
 import { EntryRow } from './entry-row';
-import { formatDayMonthAt, formatMonthName } from '@/lib/time/format';
+import { formatDayMonthAt, formatMonthName, type DateParts } from '@/lib/time/format';
 
 /**
  * The personal-finance screen (SPEC §3.1) — the module that makes TRi more than a trading
@@ -30,7 +32,7 @@ import { formatDayMonthAt, formatMonthName } from '@/lib/time/format';
 export default async function FinancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ m?: string }>;
+  searchParams: Promise<{ m?: string; range?: string }>;
 }) {
   const session = await requireSession();
   const t = await getTranslations('finance');
@@ -45,21 +47,33 @@ export default async function FinancePage({
   ]);
 
   const today = wallClock(new Date());
+  const range = await currentResolvedRange(params.range);
   const { year, month } = parseYearMonth(params.m) ?? { year: today.year, month: today.month };
 
-  const balance = monthBalance(entries, year, month);
+  /*
+   * The window this screen is about.
+   *
+   * A chosen range is the window. Without one the screen keeps the month-at-a-time browsing it
+   * has always had, with `?m=` as the position — the arrows are navigation, and navigation only
+   * makes sense while nothing has been pinned down.
+   */
+  const period = range.bounded
+    ? { from: range.fromDate!, to: range.toDate! }
+    : { from: firstOf(year, month), to: lastOf(year, month) };
+
+  const balance = rangeBalance(entries, period.from, period.to);
 
   /*
-   * The month view and the running totals answer different questions, and only one of them
-   * is allowed to look forward.
+   * The window and the running totals answer different questions, and only one of them is
+   * allowed to look forward.
    *
    * Browsing to next month is legitimate — recurring entries are exactly the thing a user
    * wants to see coming. But "year to date" and "recorded cash" are statements about money
    * that has actually moved, and expanding a salary into November to compute them turns a
-   * projection into a fact. So the aggregates run through the viewed month *or today*,
-   * whichever is earlier, while the list below shows whatever month was asked for.
+   * projection into a fact. So the aggregates run through the window's last month *or today*,
+   * whichever is earlier, while the list below shows whatever was asked for.
    */
-  const viewed = { year, month };
+  const viewed = { year: period.to.year, month: period.to.month };
   const thisMonth = { year: today.year, month: today.month };
   const asOf = isAtOrBefore(viewed, thisMonth) ? viewed : thisMonth;
   const lookingAhead = !isAtOrBefore(viewed, thisMonth);
@@ -129,7 +143,8 @@ export default async function FinancePage({
   const categoryLabel = (category: string): string =>
     isKnownCategory(category) ? t(`categories.${category}`) : category;
 
-  const monthName = formatMonthName({ year, month }, locale);
+  // The period, named the way it was chosen: a month by its name, a range by its bounds.
+  const periodName = describeRange(range, locale) ?? formatMonthName({ year, month }, locale);
 
   const step = (delta: number) => {
     const next = stepMonth({ year, month }, delta);
@@ -151,7 +166,7 @@ export default async function FinancePage({
         <KPI label={t('income')} value={money(fromIls(balance.income))} tone="pos" />
         <KPI label={t('expenses')} value={money(fromIls(balance.expenses))} tone="neg" />
         <KPI
-          label={t('monthNet')}
+          label={range.bounded ? t('periodNet') : t('monthNet')}
           value={money(fromIls(balance.net), { signed: true })}
           tone={balance.net >= 0 ? 'pos' : 'neg'}
           sub={`${lookingAhead ? t('yearToDateAsOfToday') : t('yearToDate')}: ${money(fromIls(ytd.net), { signed: true })}`}
@@ -181,18 +196,22 @@ export default async function FinancePage({
       <Card
         title={
           <span className="flex items-center gap-2">
-            {t('title')} · {monthName}
+            {t('title')} · {periodName}
           </span>
         }
         action={
-          <div className="flex gap-1.5">
-            <Link href={step(-1)} aria-label={t('prevMonth')} className={navButton}>
-              <Prev size={14} aria-hidden />
-            </Link>
-            <Link href={step(1)} aria-label={t('nextMonth')} className={navButton}>
-              <Next size={14} aria-hidden />
-            </Link>
-          </div>
+          // Stepping out of a chosen range would show a month the picker above says is not
+          // selected. With no range the arrows *are* the navigation.
+          range.bounded ? null : (
+            <div className="flex gap-1.5">
+              <Link href={step(-1)} aria-label={t('prevMonth')} className={navButton}>
+                <Prev size={14} aria-hidden />
+              </Link>
+              <Link href={step(1)} aria-label={t('nextMonth')} className={navButton}>
+                <Next size={14} aria-hidden />
+              </Link>
+            </div>
+          )
         }
       >
         <div className="border-line border-b pb-3">
@@ -209,7 +228,7 @@ export default async function FinancePage({
               add: t('add'),
             }}
             categories={{ income: suggestions('income'), expense: suggestions('expense') }}
-            defaultDate={defaultDateFor(year, month, today)}
+            defaultDate={defaultDateFor(period, today)}
           />
         </div>
 
@@ -220,7 +239,13 @@ export default async function FinancePage({
             {balance.entries.map((occurrence) => (
               <EntryRow
                 key={`${occurrence.id}:${occurrence.occurrenceDate.toISOString()}`}
-                month={{ year, month }}
+                // The occurrence's own month, not the window's. "End series" ends it *here*,
+                // and a range spanning a quarter would otherwise end a December salary in
+                // October.
+                month={{
+                  year: occurrence.occurrenceDate.getUTCFullYear(),
+                  month: occurrence.occurrenceDate.getUTCMonth() + 1,
+                }}
                 entry={{
                   id: occurrence.id,
                   type: occurrence.type,
@@ -274,15 +299,25 @@ export default async function FinancePage({
   );
 }
 
+const iso = (parts: DateParts) =>
+  `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+
+const firstOf = (year: number, month: number): DateParts => ({ year, month, day: 1 });
+const lastOf = (year: number, month: number): DateParts => ({
+  year,
+  month,
+  day: new Date(Date.UTC(year, month, 0)).getUTCDate(),
+});
+
 /**
- * Today when looking at the current month, otherwise the first of the month being viewed —
- * so adding an entry while browsing March does not silently date it today.
+ * Today when today is inside the window, otherwise where the window starts — so adding an
+ * entry while looking at March does not silently date it today, and an entry added to a range
+ * lands somewhere the user can still see it.
  */
 function defaultDateFor(
-  year: number,
-  month: number,
+  period: { from: DateParts; to: DateParts },
   today: { year: number; month: number; day: number },
 ): string {
-  const day = year === today.year && month === today.month ? today.day : 1;
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const now = iso({ year: today.year, month: today.month, day: today.day });
+  return now >= iso(period.from) && now <= iso(period.to) ? now : iso(period.from);
 }

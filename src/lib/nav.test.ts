@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import en from '@/messages/en.json';
 import he from '@/messages/he.json';
-import { enabledNav, NAV } from './nav';
+import { enabledNav, HOME_PATH, isRangedPath, NAV, safeAppPath } from './nav';
 
 /**
  * The nav is the one place where a route can be advertised before it exists: `enabled` is
@@ -69,5 +69,68 @@ describe('enabledNav', () => {
     const keys = enabledNav().map((i) => i.key);
     expect(keys).toContain('dash');
     expect(keys).toContain('settings');
+  });
+});
+
+/**
+ * Which screens the time range applies to.
+ *
+ * The picker renders itself from these flags, so a route added without one silently gains — or
+ * silently loses — a control the rest of the product has.
+ */
+describe('ranged routes', () => {
+  it('covers every screen that reads a period, and no others', () => {
+    const ranged = NAV.filter((item) => item.ranged)
+      .map((item) => item.href)
+      .sort();
+    expect(ranged).toEqual(['/analytics', '/calendar', '/dashboard', '/finance', '/trades']);
+  });
+
+  it('leaves out the screens that are statements about now', () => {
+    // Open positions and Settings have no period to narrow; a picker over either would be a
+    // control that changes nothing on screen.
+    expect(isRangedPath('/long')).toBe(false);
+    expect(isRangedPath('/settings')).toBe(false);
+  });
+
+  it('matches the list route but not a single trade', () => {
+    expect(isRangedPath('/trades')).toBe(true);
+    // One trade has one close date. Narrowing it by a window can only hide it.
+    expect(isRangedPath('/trades/abc123')).toBe(false);
+  });
+
+  it('says no to anything it does not recognise', () => {
+    expect(isRangedPath('/')).toBe(false);
+    expect(isRangedPath('/dashboard/')).toBe(false);
+  });
+});
+
+/**
+ * The range picker posts the page it was used on, and a hidden field is client-controlled.
+ * These are the shapes that turn a "come back here" into somebody else's site.
+ */
+describe('safeAppPath', () => {
+  it('keeps an ordinary in-app path', () => {
+    for (const path of ['/dashboard', '/trades', '/trades/abc-123', '/']) {
+      expect(safeAppPath(path)).toBe(path);
+    }
+  });
+
+  it('refuses anything that could leave the app', () => {
+    for (const hostile of [
+      'https://evil.example/steal',
+      '//evil.example',
+      '/\\evil.example',
+      'javascript:alert(1)',
+      '/dashboard?next=https://evil.example',
+      '/dashboard#/../../x',
+      'dashboard',
+      '',
+      undefined,
+      null,
+      42,
+    ]) {
+      expect(safeAppPath(hostile), String(hostile)).toBe(HOME_PATH);
+    }
   });
 });

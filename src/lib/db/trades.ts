@@ -223,6 +223,32 @@ export async function listClosedTrades(
   return rows.map(toRecord);
 }
 
+/**
+ * Realised P&L on everything closed before an instant.
+ *
+ * What the equity curve of a *window* has to start from. Without it, "this month" drew a curve
+ * beginning at the account's deposit total — as though the previous two years of trading had
+ * not happened — and the drawdown percentage underneath it was measured against that same
+ * fiction.
+ *
+ * Deliberately not filtered by anything but the date: this is the account's balance, not the
+ * selected subset's. Narrowing to short crypto does not mean the account started the month
+ * with only the short crypto.
+ */
+export async function realisedProfitBefore(ctx: TenantContext, instant: Date): Promise<number> {
+  assertContext(ctx);
+  const result = await prisma.trade.aggregate({
+    where: {
+      userId: ctx.userId,
+      user: { tenantId: ctx.tenantId },
+      kind: 'trade',
+      closeAt: { not: null, lt: instant },
+    },
+    _sum: { profit: true },
+  });
+  return Number(result._sum.profit ?? 0);
+}
+
 export async function countTrades(ctx: TenantContext, filter: TradeFilter = {}): Promise<number> {
   assertContext(ctx);
   return prisma.trade.count({ where: whereClause(ctx, filter) });

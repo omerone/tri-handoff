@@ -39,10 +39,71 @@ export function monthBalance(
   return { year, month, income, expenses, net: income - expenses, entries: occurrences };
 }
 
+/** What a month and a range have in common: the flow, and the entries behind it. */
+export type PeriodBalance = {
+  income: number;
+  expenses: number;
+  /** Income minus expenses — a *flow*, not a balance sheet. */
+  net: number;
+  entries: (FinanceEntry & { occurrenceDate: Date; generated: boolean })[];
+};
+
+/** Calendar day, in UTC — the way finance dates are stored (`@db.Date`). */
+type CalendarDay = { year: number; month: number; day: number };
+
+const utcDay = (day: CalendarDay): number => Date.UTC(day.year, day.month - 1, day.day);
+
+/**
+ * The same arithmetic over an arbitrary window rather than a calendar month.
+ *
+ * Recurring entries are still expanded a month at a time, because that is the unit a series is
+ * defined in — a salary is monthly, and clamping the 31st to the 30th in April only makes
+ * sense against a month. So the window is covered month by month and the resulting occurrences
+ * are then filtered to it, which is what makes a range starting on the 15th exclude the
+ * salary paid on the 1st while a range starting on the 1st includes it.
+ */
+export function rangeBalance(
+  entries: readonly FinanceEntry[],
+  from: CalendarDay,
+  to: CalendarDay,
+): PeriodBalance {
+  const first = utcDay(from);
+  const last = utcDay(to);
+
+  const occurrences: PeriodBalance['entries'] = [];
+  for (const { year, month } of monthsBetween(from, to)) {
+    for (const occurrence of occurrencesInMonth(entries, year, month)) {
+      const at = occurrence.occurrenceDate.getTime();
+      if (at >= first && at <= last) occurrences.push(occurrence);
+    }
+  }
+  occurrences.sort((a, b) => a.occurrenceDate.getTime() - b.occurrenceDate.getTime());
+
+  let income = 0;
+  let expenses = 0;
+  for (const entry of occurrences) {
+    if (entry.type === 'income') income += entry.amountIls;
+    else expenses += entry.amountIls;
+  }
+
+  return { income, expenses, net: income - expenses, entries: occurrences };
+}
+
+/** The months a window touches, oldest first. Both ends inclusive. */
+function monthsBetween(from: CalendarDay, to: CalendarDay): { year: number; month: number }[] {
+  const start = monthIndex(from.year, from.month);
+  const end = monthIndex(to.year, to.month);
+  const count = Math.max(0, end - start + 1);
+  return Array.from({ length: count }, (_, offset) => {
+    const index = start + offset;
+    return { year: Math.floor(index / 12), month: (index % 12) + 1 };
+  });
+}
+
 export type CategoryTotal = { category: string; total: number; count: number };
 
-/** Expense breakdown for a month, largest first — "where did it go". */
-export function expensesByCategory(balance: MonthBalance): CategoryTotal[] {
+/** Expense breakdown for a period, largest first — "where did it go". */
+export function expensesByCategory(balance: PeriodBalance): CategoryTotal[] {
   const totals = new Map<string, CategoryTotal>();
 
   for (const entry of balance.entries) {

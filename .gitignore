@@ -25,3 +25,4 @@ pgdata/
 
 # Playwright's saved sign-in state
 e2e/.auth/
+.vercel

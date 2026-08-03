@@ -23,6 +23,7 @@ import {
   redeemResetToken,
 } from '@/lib/db/unscoped';
 import { sendPasswordResetEmail } from '@/lib/mail/password-reset';
+import { setLocaleCookie, setThemeCookie } from '@/lib/preferences/cookies';
 import { resolveTenant } from '@/lib/tenant/resolve';
 
 export type FormState = { error?: string; notice?: string };
@@ -98,6 +99,11 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
   await resetRateLimit(limitKey('login', tenant.id, email));
   await startSession(user.id);
   await touchLastLogin(makeTenantContext(user.tenantId, user.id));
+
+  // Bring the cookie copies back in line with the account being signed in to. Without this a
+  // fresh browser paints the default theme and language until something happens to write them.
+  await setThemeCookie(user.theme);
+  await setLocaleCookie(user.locale);
 
   // Outside the guarded section: redirect() signals by throwing.
   redirect('/dashboard');

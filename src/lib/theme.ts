@@ -31,6 +31,21 @@ export function asTheme(value: unknown): Theme {
  */
 export const THEME_COOKIE = 'tri_theme';
 
+/**
+ * The theme to paint, given the saved preference on the user row and the cookie.
+ *
+ * The row wins whenever there is one. The cookie is a cache of it, and a cache can be missing
+ * or stale — cleared cookies, a new browser, a year-old cookie that expired, or the theme
+ * changed on another device. When that happened the page painted the cookie's answer (dark, by
+ * default) while Settings read the row and showed "light" selected: the whole interface dark
+ * with the light button lit. Same question, two sources, one of them wrong.
+ *
+ * Only a signed-out visitor has no row, and that is exactly the case the cookie exists for.
+ */
+export function resolveTheme(saved: unknown, cookieValue: unknown): Theme {
+  return isTheme(saved) ? saved : asTheme(cookieValue);
+}
+
 export const TOKEN = {
   bg: 'var(--tri-bg)',
   surface: 'var(--tri-surface)',

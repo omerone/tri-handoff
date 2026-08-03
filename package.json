@@ -2,8 +2,9 @@
   "name": "tri",
   "version": "0.1.0",
   "private": true,
+  "_comment:engines": "One version, everywhere: .nvmrc, the Dockerfile base image and CI all say 22. The floor was >=20.9.0, which admitted Node versions the test setup cannot run on — `tests/setup-env.ts` calls process.loadEnvFile, added in 20.12 — so `npm test` failed with a TypeError about a missing function rather than a word about the version. engine-strict in .npmrc turns that into a refusal at install time.",
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.0.0 <23"
   },
   "scripts": {
     "prepare": "husky install",

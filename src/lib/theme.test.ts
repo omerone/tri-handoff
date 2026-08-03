@@ -1,6 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { asTheme, DEFAULT_THEME, isTheme, THEMES, toneColor, signTone, TOKEN } from './theme';
+import {
+  asTheme,
+  DEFAULT_THEME,
+  isTheme,
+  resolveTheme,
+  THEMES,
+  toneColor,
+  signTone,
+  TOKEN,
+} from './theme';
 
 describe('theme selection', () => {
   it('defaults to dark, as SPEC §1.1 specifies', () => {
@@ -14,6 +23,29 @@ describe('theme selection', () => {
     expect(THEMES).toEqual(['dark', 'light', 'system']);
     for (const theme of THEMES) expect(asTheme(theme)).toBe(theme);
     expect(isTheme('sepia')).toBe(false);
+  });
+});
+
+describe('resolving the saved preference against the cookie', () => {
+  it('paints the saved preference, whatever the cookie says', () => {
+    // The bug this exists for: row says light, cookie missing or stale, so the page painted
+    // dark while Settings — which reads the row — showed "light" selected.
+    expect(resolveTheme('light', undefined)).toBe('light');
+    expect(resolveTheme('light', 'dark')).toBe('light');
+    expect(resolveTheme('dark', 'light')).toBe('dark');
+    expect(resolveTheme('system', 'dark')).toBe('system');
+  });
+
+  it('falls back to the cookie when there is no session to read a preference from', () => {
+    expect(resolveTheme(undefined, 'light')).toBe('light');
+    expect(resolveTheme(null, 'system')).toBe('system');
+  });
+
+  it('defaults when neither source has an answer', () => {
+    expect(resolveTheme(undefined, undefined)).toBe(DEFAULT_THEME);
+    expect(resolveTheme('sepia', 'sepia')).toBe(DEFAULT_THEME);
+    // A row value that is not a theme must not shadow a cookie that is one.
+    expect(resolveTheme('sepia', 'light')).toBe('light');
   });
 });
 
