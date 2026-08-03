@@ -17,8 +17,8 @@ import { Num } from '@/components/ui/kpi';
  *
  * Two layouts, because thirty labelled columns do not fit a phone:
  *
- *  - **Wide:** the strip itself, one column per day, the date under each, and a hover card
- *    with the day's detail.
+ *  - **Wide:** the strip itself, one column per day, a hover card with the day's detail, and
+ *    the date under each column for as long as the dates fit — see `LABELS_FIT_ANYWHERE`.
  *  - **Narrow:** the same days as rows — the day's R, a bar growing left or right from a
  *    centre line, and the date. Every row carries its own date, which is the thing that
  *    cannot survive being squeezed into ten pixels, and the detail is on the row rather than
@@ -36,6 +36,35 @@ const MAX_BAR = 30;
 const MIN_BAR = 3;
 /** How many columns at each end anchor their hover card to the strip edge. See `DayCard`. */
 const EDGE_COLUMNS = 5;
+
+/*
+ * When the date under each column stops fitting.
+ *
+ * A `dd/MM` at 9px is about 26px wide and the columns are separated by 3px, so a label needs
+ * roughly 29px of column to itself. The strip is 704px across at the narrowest width it
+ * renders at (768px, where the phone layout hands over) and about 960px from `lg` up — which
+ * is 24 and 33 columns.
+ *
+ * Past that the labels do not wrap or ellipsis; they overprint each other into a grey smear
+ * that is not a date, is not a scale, and is not legible at any range. So they come off, and
+ * the day is read the way the rest of the day's numbers already are: by pointing at it. The
+ * hover card carries the full weekday and date, and it is reachable by keyboard too.
+ *
+ * The span does not disappear with them — the first and last date move to a caption under the
+ * strip, so the axis still says what period it covers.
+ */
+const LABELS_FIT_ANYWHERE = 24;
+const LABELS_FIT_WIDE = 33;
+
+/**
+ * Columns at each end that anchor their card, scaled to how thin the columns are.
+ *
+ * `EDGE_COLUMNS` was measured against a thirty-day strip, where a column is 20px and five of
+ * them clear the card's 160px. At ninety-two days a column is 8px, and the same five columns
+ * are 40px — a card centred on the sixth still hangs off the edge. Roughly an eighth of the
+ * strip is what half a card costs at the narrowest width, whatever the column count.
+ */
+const edgeColumns = (count: number) => Math.max(EDGE_COLUMNS, Math.ceil(count * 0.12));
 
 export type DailyREntry = {
   date: string;
@@ -165,6 +194,20 @@ export function RStrip({ days, labels }: { days: DailyREntry[]; labels: RStripLa
   // they just had.
   const traded = days.filter((day) => day.count > 0).reverse();
 
+  /*
+   * Three densities, decided from the column count and then expressed in CSS.
+   *
+   * The bucket is fixed on the server but the *width* is not, so the middle case — a strip
+   * that fits its labels on a laptop and not on a split window — is a media query rather than
+   * a guess. That keeps the whole thing a server component: no measuring, no JavaScript, and
+   * no reflow after hydration.
+   */
+  const dense = days.length > LABELS_FIT_WIDE;
+  const tight = !dense && days.length > LABELS_FIT_ANYWHERE;
+  const edge = edgeColumns(days.length);
+  const first = days.at(0);
+  const last = days.at(-1);
+
   return (
     <>
       {/* ---------- Wide: the strip ---------- */}
@@ -173,15 +216,8 @@ export function RStrip({ days, labels }: { days: DailyREntry[]; labels: RStripLa
           {days.map((day, index) => {
             const up = day.netR >= 0;
             const height = barHeight(day.netR);
-            // Five is enough at every width the strip renders at: the card is about 160px and
-            // a column is 20px at the narrowest, so four columns of clearance are needed and
-            // the fifth is free insurance.
             const align =
-              index < EDGE_COLUMNS
-                ? 'start'
-                : index >= days.length - EDGE_COLUMNS
-                  ? 'end'
-                  : 'centre';
+              index < edge ? 'start' : index >= days.length - edge ? 'end' : 'centre';
             return (
               <div
                 key={day.date}
@@ -206,15 +242,31 @@ export function RStrip({ days, labels }: { days: DailyREntry[]; labels: RStripLa
                   </div>
                 </div>
 
-                <span
-                  className={`text-[9px] ${day.count > 0 ? 'text-dim' : 'text-dim/40'} group-hover:text-text`}
-                >
-                  <Num>{labels.formatDayMonth(day.date)}</Num>
-                </span>
+                {dense ? null : (
+                  <span
+                    className={`text-[9px] ${tight ? 'hidden lg:inline' : ''} ${
+                      day.count > 0 ? 'text-dim' : 'text-dim/40'
+                    } group-hover:text-text`}
+                  >
+                    <Num>{labels.formatDayMonth(day.date)}</Num>
+                  </span>
+                )}
               </div>
             );
           })}
         </div>
+
+        {/* The ends of the span, for the widths where the per-day labels came off. Two dates
+            rather than none: without them the strip is a shape with no place on the calendar,
+            and the reader has to hover to find out which months they are looking at. */}
+        {(dense || tight) && first && last ? (
+          <div
+            className={`text-dim/70 mt-1 flex justify-between text-[9px] ${dense ? '' : 'lg:hidden'}`}
+          >
+            <Num>{labels.formatDayMonth(first.date)}</Num>
+            <Num>{labels.formatDayMonth(last.date)}</Num>
+          </div>
+        ) : null}
       </div>
 
       {/* ---------- Narrow: the same days, one per row, each labelled ---------- */}

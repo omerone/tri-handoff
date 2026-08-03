@@ -266,3 +266,69 @@ test.describe('the custom panel', () => {
     );
   });
 });
+
+test.describe('the R-strip under a wide range', () => {
+  // June through August is 92 days, which is the widest strip the dashboard will draw.
+  const WIDE = '/dashboard?range=2026-06..2026-08';
+
+  test('drops the per-day dates once they would overprint each other', async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 0) < 768, 'the strip is a list on a phone');
+
+    await page.goto(WIDE);
+    const strip = page.locator('[data-widget="rStrip"]');
+    await expect(strip.getByText(/Last 92 days/).filter({ visible: true })).toBeVisible();
+
+    // Ninety-two `dd/MM` labels in the width of a card is a grey smear, not a scale. What is
+    // left is the span: the first and last date, and nothing between them.
+    const figures = strip.locator('span.tri-num:visible');
+    await expect(figures).toHaveCount(2);
+  });
+
+  test('still gives every day its date, on hover', async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 0) < 768, 'the strip is a list on a phone');
+
+    await page.goto(WIDE);
+    const strip = page.locator('[data-widget="rStrip"]');
+    const cards = strip.locator('[role="tooltip"]');
+    await expect(cards).toHaveCount(92);
+
+    const card = cards.nth(45);
+    await expect(card).toBeHidden();
+    await cards.nth(45).locator('..').hover();
+    // The weekday and the full date — more than the column ever carried.
+    await expect(card).toContainText(/\d{2}\/\d{2}\/\d{4}/);
+  });
+
+  test('keeps the hover cards on screen even when the columns are 8px wide', async ({ page }) => {
+    // The clearance at each end is measured in columns, so it has to grow as the columns
+    // shrink: five columns clear a card at thirty days and 40px at ninety-two.
+    test.skip((page.viewportSize()?.width ?? 0) < 768, 'the strip is a list on a phone');
+
+    await page.setViewportSize({ width: 768, height: 900 });
+    await page.goto(WIDE);
+    const columns = page.locator('[data-widget="rStrip"] [role="tooltip"]');
+    const total = await columns.count();
+
+    // Every column in the anchoring region, not five samples of it. The card is `w-max`, so
+    // its width depends on the day — a quiet day's card is half the size of a busy one's, and
+    // sampling happened to land on the narrow ones and pass against a clearance that was too
+    // small. The boundary is where the bug lives, so the test walks all of it.
+    const window = 16;
+    const indices = [
+      ...Array.from({ length: window }, (_, i) => i),
+      Math.floor(total / 2),
+      ...Array.from({ length: window }, (_, i) => total - 1 - i),
+    ];
+
+    for (const index of indices) {
+      await columns.nth(index).locator('..').focus();
+      const card = columns.nth(index);
+      await expect(card).toBeVisible();
+      const box = (await card.boundingBox())!;
+      expect(box.x, `column ${index} runs off the start`).toBeGreaterThanOrEqual(-1);
+      expect(box.x + box.width, `column ${index} runs off the end`).toBeLessThanOrEqual(
+        page.viewportSize()!.width + 1,
+      );
+    }
+  });
+});
