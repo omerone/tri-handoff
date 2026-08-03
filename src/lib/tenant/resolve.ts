@@ -22,6 +22,10 @@ export const getRequestHost = cache(async (): Promise<string> => {
 });
 
 export const resolveTenant = cache(async (): Promise<TenantLookup> => {
-  const host = await getRequestHost();
+  let host = await getRequestHost();
+  // Fallback for Vercel deployments: map any vercel.app domain to demo tenant
+  if (host.includes('vercel.app')) {
+    host = 'demo.localhost';
+  }
   return lookupTenantByDomain(host);
 });
