@@ -34,8 +34,6 @@ const R_STRIP_DAYS = 30;
 const R_STRIP_MAX_DAYS = 92;
 import { formatDayMonthAt, formatTimeAt, isoToDayMonth, isoToWeekdayDate } from '@/lib/time/format';
 
-export const revalidate = 60;
-
 /**
  * The dashboard from the prototype: six KPI tiles, the R-strip, the equity curve and the
  * recent-trades panel — laid out the way the user arranged them (SPEC §1.1).

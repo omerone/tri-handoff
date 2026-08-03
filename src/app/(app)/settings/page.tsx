@@ -9,8 +9,6 @@ import type { Locale } from '@/i18n/config';
 import { asCurrency, formatMoney } from '@/lib/money/currency';
 import { formatDateTimeAt } from '@/lib/time/format';
 
-export const revalidate = 60;
-
 export default async function SettingsPage() {
   const session = await requireSession();
   const t = await getTranslations('settings');

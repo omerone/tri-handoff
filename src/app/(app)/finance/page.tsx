@@ -20,8 +20,6 @@ import { EntryForm } from './entry-form';
 import { EntryRow } from './entry-row';
 import { formatDayMonthAt, formatMonthName, type DateParts } from '@/lib/time/format';
 
-export const revalidate = 60;
-
 /**
  * The personal-finance screen (SPEC §3.1) — the module that makes TRi more than a trading
  * journal.

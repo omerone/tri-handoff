@@ -18,8 +18,6 @@ import { displayMoney } from '@/lib/money/display';
 import { TradeFilters } from './filters';
 import { Pager } from './pager';
 
-export const revalidate = 60;
-
 const PAGE_SIZE = 40;
 
 type SearchParams = {
