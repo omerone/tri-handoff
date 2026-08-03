@@ -1,4 +1,5 @@
 import 'server-only';
+import { unstable_cache } from 'next/cache';
 import { Prisma } from '@prisma/client';
 import type { Locale } from '@/i18n/config';
 import type { TenantContext, TenantUser } from '@/lib/tenant/context';
@@ -72,14 +73,18 @@ export async function updateUserPreferences(
  * The value is returned raw. Interpreting it is `normalizeLayout`'s job, which the caller
  * runs — that keeps the tolerance for stale shapes in one place, tested without a database.
  */
-export async function getDashboardLayout(ctx: TenantContext): Promise<unknown> {
-  assertContext(ctx);
-  const row = await prisma.user.findFirst({
-    where: { id: ctx.userId, tenantId: ctx.tenantId },
-    select: { dashboardLayout: true },
-  });
-  return row?.dashboardLayout ?? null;
-}
+export const getDashboardLayout = unstable_cache(
+  async (ctx: TenantContext): Promise<unknown> => {
+    assertContext(ctx);
+    const row = await prisma.user.findFirst({
+      where: { id: ctx.userId, tenantId: ctx.tenantId },
+      select: { dashboardLayout: true },
+    });
+    return row?.dashboardLayout ?? null;
+  },
+  ['dashboard-layout'],
+  { revalidate: 3600, tags: ['dashboard-layout'] },
+);
 
 /** Saves an arrangement, or clears it (`null`) to fall back to the default. */
 export async function saveDashboardLayout(

@@ -1,4 +1,5 @@
 import 'server-only';
+import { unstable_cache } from 'next/cache';
 import type { Mt5Status } from '@prisma/client';
 import type { TenantContext } from '@/lib/tenant/context';
 import { assertContext } from './context';
@@ -61,14 +62,18 @@ function toView(row: {
   };
 }
 
-export async function getMt5Account(ctx: TenantContext): Promise<Mt5AccountView | null> {
-  assertContext(ctx);
-  const row = await prisma.mt5Account.findFirst({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
-    select: VIEW_FIELDS,
-  });
-  return row ? toView(row) : null;
-}
+export const getMt5Account = unstable_cache(
+  async (ctx: TenantContext): Promise<Mt5AccountView | null> => {
+    assertContext(ctx);
+    const row = await prisma.mt5Account.findFirst({
+      where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+      select: VIEW_FIELDS,
+    });
+    return row ? toView(row) : null;
+  },
+  ['mt5-account'],
+  { revalidate: 300, tags: ['mt5-account'] },
+);
 
 export async function connectMt5Account(
   ctx: TenantContext,

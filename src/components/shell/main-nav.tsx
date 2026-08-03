@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -26,7 +26,7 @@ const ICONS: Record<string, LucideIcon> = {
   settings: Settings,
 };
 
-export function MainNav({ items }: { items: NavItem[] }) {
+export const MainNav = memo(function MainNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
   const strip = useRef<HTMLElement>(null);
 
@@ -65,4 +65,4 @@ export function MainNav({ items }: { items: NavItem[] }) {
       })}
     </nav>
   );
-}
+});

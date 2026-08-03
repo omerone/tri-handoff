@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { CalendarRange, ChevronDown } from 'lucide-react';
 import { applyRangeAction } from '@/app/actions/range';
@@ -90,7 +90,15 @@ export function RangePicker({
    * props, and it closes the popover exactly when the answer above it changed.
    */
   const [panel, setPanel] = useState(() => ({ key, open: custom, mode: modeOf(current) }));
-  if (panel.key !== key) setPanel({ key, open: custom, mode: modeOf(current) });
+
+  useEffect(() => {
+    setPanel((prev) => {
+      if (prev.key !== key) {
+        return { key, open: custom, mode: modeOf(current) };
+      }
+      return prev;
+    });
+  }, [key, custom, current]);
 
   const anchor = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
