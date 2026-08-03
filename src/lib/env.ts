@@ -83,9 +83,21 @@ async function load(): Promise<Env> {
   // This populates process.env with values from the secrets manager
   const secrets = await loadSecrets();
 
-  // Merge loaded secrets into process.env for validation
+  /*
+   * Merge into `process.env` for validation — and in production the secret store wins.
+   *
+   * The other way round looks safer and is not: the deployment target is `docker compose up`,
+   * which sets `DATABASE_URL`, `SESSION_SECRET` and `ENCRYPTION_KEY` from the compose file on
+   * every container. `if (!process.env[key])` therefore never fires for exactly the keys the
+   * secrets manager exists to hold, so rotating a secret in AWS would change nothing, in
+   * silence, until someone noticed the old one still worked.
+   *
+   * Outside production the local environment stays authoritative: a developer who exports a
+   * variable to point at a scratch database means it.
+   */
+  const secretStoreWins = process.env.NODE_ENV === 'production';
   Object.entries(secrets).forEach(([key, value]) => {
-    if (!process.env[key]) {
+    if (secretStoreWins || !process.env[key]) {
       process.env[key] = value;
     }
   });

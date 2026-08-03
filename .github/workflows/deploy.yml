@@ -145,12 +145,15 @@ jobs:
           # aws logs put-retention-policy --log-group-name /tri/audit-logs --retention-in-days 365
           echo "[Deploy] CloudWatch logs configured"
 
-      - name: Schedule daily audit log archival
+      - name: Warn that audit archival is not scheduled
         run: |
-          echo "[Deploy] Scheduling daily audit log archival..."
-          # TODO: Set up cron job to run: npm run audit-logs:archive
-          # This can be done via GitHub Actions scheduler or a cloud cron service
-          echo "[Deploy] Audit archival scheduled"
+          # This step used to print "Audit archival scheduled" and schedule nothing, which is
+          # the most expensive kind of green tick: the audit table grows without bound and the
+          # deploy log says the opposite. It stays loud until something actually runs
+          # `npm run audit-logs:archive` — a cron on the host, or a scheduled workflow with
+          # database access and an S3 target.
+          echo "::warning title=Audit archival::Nothing schedules 'npm run audit-logs:archive'."
+          echo "  database_audit_log grows without bound until a cron or scheduled workflow runs it."
 
   audit:
     name: Security Checks

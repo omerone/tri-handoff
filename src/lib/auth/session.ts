@@ -3,6 +3,7 @@ import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateToken, hashToken } from '@/lib/crypto/tokens';
+import { registerAuditIdentity } from './audit-identity';
 import {
   createSession,
   deleteSession,
@@ -56,6 +57,19 @@ export const getSession = cache(async (): Promise<TenantSession | null> => {
     },
     ctx: makeTenantContext(record.tenantId, record.userId),
   };
+});
+
+/*
+ * Hand the audit trail its "who".
+ *
+ * At module scope, so it is in place before the first query of any request that reaches this
+ * file — and only in the Node bundle, which is the point: the trail cannot import sessions
+ * itself without pulling `node:crypto` into the Edge build. `getSession` is request-cached,
+ * so this costs the audit hook nothing beyond the lookup the page already made.
+ */
+registerAuditIdentity(async () => {
+  const session = await getSession();
+  return session ? { userId: session.ctx.userId, tenantId: session.ctx.tenantId } : null;
 });
 
 /** For pages behind the login wall. Redirects rather than throwing. */

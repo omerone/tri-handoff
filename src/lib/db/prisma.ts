@@ -13,16 +13,41 @@ import { auditExtension } from '@/lib/db/audit-middleware';
  * nothing at all, which is the worst way for an audit trail to fail.
  */
 
-const createClient = () =>
+const createBase = () =>
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-  }).$extends(auditExtension);
+  });
 
+type BasePrismaClient = ReturnType<typeof createBase>;
 /** Extending changes the client's type, so it is inferred rather than spelled out. */
-type ExtendedPrismaClient = ReturnType<typeof createClient>;
+type ExtendedPrismaClient = ReturnType<typeof createBase> extends infer T
+  ? T extends BasePrismaClient
+    ? ReturnType<typeof extend>
+    : never
+  : never;
 
-const globalForPrisma = globalThis as unknown as { prisma?: ExtendedPrismaClient };
+const extend = (client: BasePrismaClient) => client.$extends(auditExtension);
 
-export const prisma: ExtendedPrismaClient = globalForPrisma.prisma ?? createClient();
+const globalForPrisma = globalThis as unknown as {
+  prisma?: ExtendedPrismaClient;
+  prismaBase?: BasePrismaClient;
+};
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+const base: BasePrismaClient = globalForPrisma.prismaBase ?? createBase();
+
+/**
+ * The unextended client, for the audit writer and nothing else.
+ *
+ * Writing the trail through the extended client means the write is itself audited, and the
+ * only thing standing between that and unbounded recursion is a string comparison on the
+ * model name. One connection, two views of it: the audit row goes in through a client that
+ * has no extension to re-enter.
+ */
+export const prismaBase: BasePrismaClient = base;
+
+export const prisma: ExtendedPrismaClient = globalForPrisma.prisma ?? extend(base);
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prismaBase = base;
+  globalForPrisma.prisma = prisma;
+}

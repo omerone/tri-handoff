@@ -12,6 +12,7 @@ import { formatCompactSigned, formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { wallClock } from '@/lib/time/zone';
 import { formatMonthName } from '@/lib/time/format';
+import { DayCell } from './day-cell';
 
 /**
  * The month calendar: daily P&L, trade count and win rate per square (SPEC §1.1).
@@ -105,61 +106,17 @@ export default async function CalendarPage({
           const key = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           const total = totals.get(key);
 
-          const background = !total
-            ? 'var(--tri-raised)'
-            : total.net >= 0
-              ? 'var(--tri-pos-soft)'
-              : 'var(--tri-neg-soft)';
-          const border = !total
-            ? 'var(--tri-line)'
-            : total.net >= 0
-              ? 'var(--tri-pos-edge)'
-              : 'var(--tri-neg-edge)';
-
           return (
-            <div
+            <DayCell
               key={key}
-              className="rounded-xl border px-1 py-1.5 md:px-2"
-              style={{ background, borderColor: border }}
-              title={
-                total
-                  ? `${money(total.net, { signed: true })} · ${t('kpi.tradesCount', { count: total.count })}`
-                  : undefined
-              }
-            >
-              <div className="text-dim text-[11px]">{day}</div>
-              {total ? (
-                <>
-                  {/*
-                   * Two renderings of the same number. A phone gives each square about forty
-                   * pixels of text, which `+₪1,165` does not fit into — it wrapped mid-figure
-                   * and collided with the next day. The compact form fits; the full one comes
-                   * back as soon as there is room for it.
-                   */}
-                  <div className={`font-bold ${total.net >= 0 ? 'text-pos' : 'text-neg'}`}>
-                    {/* The visibility class goes on the wrapper: `Num` sets its own
-                        `inline-block`, which would win over `hidden` on the same element. */}
-                    <span className="text-[13px] md:hidden">
-                      <Num>{formatCompactSigned(total.net * display.rate, locale)}</Num>
-                    </span>
-                    <span className="hidden text-xs md:inline">
-                      <Num>{money(total.net, { signed: true })}</Num>
-                    </span>
-                  </div>
-                  <div className="text-dim text-[10px]">
-                    <Num>
-                      {total.count}
-                      <span className="hidden md:inline">
-                        {' · '}
-                        {formatNumber((total.wins / total.count) * 100, locale, 0)}%
-                      </span>
-                    </Num>
-                  </div>
-                </>
-              ) : (
-                <div className="text-dim/50 text-[11px]">{t('calendar.noTrades')}</div>
-              )}
-            </div>
+              day={day}
+              total={total}
+              year={year}
+              month={month}
+              locale={locale}
+              money={money}
+              display={display}
+            />
           );
         })}
       </div>

@@ -7,6 +7,7 @@ import {
   trackAllOpenPositions,
   updateCurrentPrice,
 } from '@/lib/db';
+import { listTrackedSymbols } from '@/lib/db/quotes';
 import { CHUNK, dueSymbols, refreshDueQuotes } from '@/lib/quotes/refresh';
 import { cleanup, createTenantFixture, testDb, type Fixture } from '../helpers/fixtures';
 
@@ -46,11 +47,32 @@ beforeAll(async () => {
   bob = await createTenantFixture();
 });
 
-// The quote cache and the credit counter are shared, not tenant data, so each test starts
-// from an empty one rather than inheriting the last test's spending.
+/**
+ * The refresh is global on purpose — one quote serves every tenant holding that listing — so
+ * these tests share a mechanism with whatever else is in the development database. Two
+ * consequences, and both were learned the hard way when the demo tenant's own positions were
+ * switched onto the feed and half this file started failing:
+ *
+ *  1. counting what the refresh *did* only works if nothing else is due, so the assertions
+ *     below are about the fixtures' own listings, not about totals;
+ *  2. a test run must not spend the fixtures' credits marking somebody's real book to a mock
+ *     price, so anything already tracked is stamped as just-fetched and drops out of the
+ *     due list for the duration.
+ */
+const TEST_SYMBOLS = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'QQQ', 'SPY', 'VOO', 'BTC/USD', 'ETH/USD', 'NOTREAL'];
+
 beforeEach(async () => {
-  await testDb.quote.deleteMany({});
+  await testDb.quote.deleteMany({ where: { symbol: { in: TEST_SYMBOLS } } });
   await testDb.rateLimit.deleteMany({ where: { key: 'quotes:daily' } });
+
+  const now = new Date();
+  for (const key of await listTrackedSymbols()) {
+    await testDb.quote.upsert({
+      where: { symbol_micCode: { symbol: key.symbol, micCode: key.micCode } },
+      create: { symbol: key.symbol, micCode: key.micCode, asOf: now, fetchedAt: now },
+      update: { fetchedAt: now, asOf: now },
+    });
+  }
 });
 
 afterEach(async () => {
@@ -221,7 +243,9 @@ describe('switching an existing book onto the feed', () => {
   });
 
   it('prices a position that carries no MIC, which is every position that predates the feed', async () => {
-    const position = await addPosition(alice, { micCode: '', priceSource: 'manual' });
+    // `MSFT`, not `AAPL`: a bare ticker is one shared cache key, and the demo tenant's own
+    // book holds a bare `AAPL` — the fixture would be reading somebody else's quote row.
+    const position = await addPosition(alice, { symbol: 'MSFT', micCode: '', priceSource: 'manual' });
     await setPriceSource(alice.ctx, position.id, 'auto');
 
     const outcome = await refreshDueQuotes();

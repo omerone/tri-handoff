@@ -1,8 +1,9 @@
 import 'server-only';
  
-import { prisma } from '@/lib/db/prisma';
 import { Prisma } from '@prisma/client';
 import { headers } from 'next/headers';
+import { currentAuditIdentity } from '@/lib/auth/audit-identity';
+import { clientIp } from '@/lib/auth/limits';
 
 /**
  * Database Audit Middleware
@@ -59,13 +60,26 @@ interface AuditContext {
 }
 
 /**
- * Extract audit context from request headers
+ * Extract audit context from the request, when there is one.
+ *
+ * The address comes from `clientIp()` rather than being read here, and that is the whole
+ * point: `X-Forwarded-For` is a list the caller may prepend to, so taking its first entry —
+ * which this did — records whatever address the attacker chose to type. An audit trail that
+ * can be told what to say about who did something is worse than one with no address at all,
+ * because it will be believed. `clientIp()` prefers `X-Real-Ip`, which Caddy sets from the
+ * socket peer and the caller cannot influence.
+ *
+ * There is often no request at all: the maintenance timer, the quote refresh and the CLI
+ * scripts all write through the same client. `headers()` throws there, and a trail entry with
+ * no address is the correct record of a background job.
  */
 async function getAuditContext(): Promise<AuditContext> {
   try {
     const headerStore = await headers();
+    const ip = await clientIp();
     return {
-      ipAddress: headerStore.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+      // `clientIp` says "unknown" when it cannot tell; a trail column reads better as null.
+      ipAddress: ip === 'unknown' ? null : ip,
       userAgent: headerStore.get('user-agent')?.slice(0, 300) ?? null,
     };
   } catch {
@@ -86,6 +100,22 @@ function redactSensitiveFields(obj: unknown): unknown {
 
   if (Array.isArray(obj)) {
     return obj.map(redactSensitiveFields);
+  }
+
+  /*
+   * Anything that is not a plain object keeps its own string form.
+   *
+   * Walking one with `Object.entries` rebuilds it as a plain object, and for the two types
+   * this schema is full of that is fatal: a `Decimal` becomes `{s, e, d}` and a `Date` becomes
+   * `{}`. Prisma then refuses to serialize the result into the JSON column and the whole audit
+   * write throws — swallowed by the `catch` around it, so the row is simply never written.
+   * Every mutation carrying a price or a timestamp — which is to say every trade, position,
+   * finance entry and quote in the product — was missing from the trail, and the trail looked
+   * healthy because the rows that *did* land were the ones with nothing but strings in them.
+   */
+  const prototype = Object.getPrototypeOf(obj) as object | null;
+  if (prototype !== Object.prototype && prototype !== null) {
+    return obj instanceof Date ? obj.toISOString() : String(obj);
   }
 
   const result: Record<string, unknown> = {};
@@ -141,13 +171,25 @@ function checkSuspicious(
 }
 
 /**
- * Extract user context from operation params
+ * Who did this.
+ *
+ * The session first, and that is the fix rather than a refinement: reading `userId` out of
+ * the arguments only works for a `create` that happens to carry one. Every `updateMany` and
+ * every `delete` in this codebase is keyed by id — `where: { id, userId }` sometimes, `where:
+ * { id }` often — so the column was empty on most rows, and an audit trail that records what
+ * changed but not who changed it answers the wrong half of the question it exists for.
+ *
+ * `getSession()` is request-cached and reads no more rows than the page already did. Outside
+ * a request — the maintenance timer, the quote refresh, the CLI scripts — it returns null and
+ * the arguments are the only thing left to go on.
  */
-function extractUserContext(params: AuditParams): {
+async function extractUserContext(params: AuditParams): Promise<{
   userId?: string;
   tenantId?: string;
-} {
-  // Try to extract from the data being operated on
+}> {
+  const identity = await currentAuditIdentity();
+  if (identity) return identity;
+
   const data = params.args.data || params.args.where;
   if (typeof data === 'object' && data !== null) {
     return {
@@ -217,7 +259,7 @@ export const auditExtension = Prisma.defineExtension({
           void (async () => {
             try {
               const context = await getAuditContext();
-              const userContext = extractUserContext(params);
+              const userContext = await extractUserContext(params);
               const { suspicious, reason } = checkSuspicious(params, executionTimeMs);
 
               let logged = 'INSERT';
@@ -271,10 +313,23 @@ async function logAuditOperation(opts: {
     }
 
     if (opts.operation === 'INSERT' || opts.operation === 'UPDATE') {
-      // For inserts/updates, the new values are in params.args.data
-      if (opts.params.args.data) {
-        newValues = redactSensitiveFields(opts.params.args.data);
-      }
+      /*
+       * `create` and `update` as well as `data`, because an upsert has no `data`.
+       *
+       * It is in the audited-operations list, so the row was written — with `newValues` empty.
+       * That is how the MT5 connection, which is an upsert, produced an audit entry saying
+       * that something had changed on the account and nothing about what.
+       *
+       * Which branch of an upsert ran is not knowable from here, so both are recorded under
+       * their own names rather than guessed at.
+       */
+      const { data, create, update } = opts.params.args as {
+        data?: unknown;
+        create?: unknown;
+        update?: unknown;
+      };
+      const payload = data ?? (create || update ? { create, update } : undefined);
+      if (payload) newValues = redactSensitiveFields(payload);
     }
 
     // Extract record ID
@@ -286,8 +341,14 @@ async function logAuditOperation(opts: {
       recordId = String((opts.result as Record<string, unknown>).id || '');
     }
 
+    // Imported here, not at the top of the file: `prisma.ts` imports this module to build the
+    // client, so a static import back would be a cycle — one of the two modules would see
+    // `undefined` at evaluation time. Loading it inside the write, which already runs after
+    // both modules exist, breaks the cycle without a trick.
+    const { prismaBase } = await import('@/lib/db/prisma');
+
     // Create audit log entry
-    await prisma.databaseAuditLog.create({
+    await prismaBase.databaseAuditLog.create({
       data: {
         tableName: opts.tableName,
         operation: opts.operation,
@@ -334,7 +395,8 @@ export async function getSuspiciousActivity(
 > {
   const since = new Date(Date.now() - timeWindowHours * 60 * 60 * 1000);
 
-  return prisma.databaseAuditLog.findMany({
+  const { prismaBase } = await import('@/lib/db/prisma');
+  return prismaBase.databaseAuditLog.findMany({
     where: {
       suspicious: true,
       createdAt: { gte: since },
@@ -369,7 +431,8 @@ export async function getUserAuditTrail(
     ipAddress: string | null;
   }>
 > {
-  return prisma.databaseAuditLog.findMany({
+  const { prismaBase } = await import('@/lib/db/prisma');
+  return prismaBase.databaseAuditLog.findMany({
     where: { userId },
     select: {
       id: true,
