@@ -219,7 +219,7 @@ export async function listClosedTrades(
   const rows = await prisma.trade.findMany({
     where: whereClause(ctx, filter, { closedOnly: true }),
     orderBy: [{ closeAt: 'asc' }, { ticket: 'asc' }],
-    take: 10000,
+    take: 5000,
   });
   return rows.map(toRecord);
 }
@@ -277,7 +277,7 @@ export async function listCashFlow(ctx: TenantContext): Promise<TradeRecord[]> {
   const rows = await prisma.trade.findMany({
     where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, kind: { not: 'trade' } },
     orderBy: { openAt: 'asc' },
-    take: 10000,
+    take: 1000,
   });
   return rows.map(toRecord);
 }
@@ -342,6 +342,8 @@ export async function listJournalVocabulary(
   const rows = await prisma.trade.findMany({
     where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, kind: 'trade' },
     select: { strategy: true, tags: true, mood: true },
+    orderBy: { closeAt: 'desc' },
+    take: 1000,
   });
 
   const strategies = new Set<string>();

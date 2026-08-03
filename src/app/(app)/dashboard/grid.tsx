@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  memo,
   useEffect,
   useRef,
   useState,
@@ -258,62 +259,21 @@ export function DashboardGrid({
             >
               {widgets[item.id]}
 
-              {editing ? (
-                /*
-                 * A scrim rather than a corner toolbar. Floating the controls over the card
-                 * covered whatever was in that corner — on a KPI tile that is the label, so
-                 * "Account balance" read as "Account balan". It also leaves the card's own
-                 * links live, and a mis-aimed click while arranging navigates away and loses
-                 * the arrangement. Covering the card says what mode this is and answers both.
-                 */
-                <div className="bg-surface/50 ring-brand/40 absolute inset-0 z-20 flex items-center justify-center rounded-[18px] ring-2">
-                  <div className="border-line bg-raised flex items-center gap-0.5 rounded-lg border p-0.5 shadow-sm">
-                    {/*
-                     * Width is only read at the desktop breakpoint, so below it these
-                     * controls changed the readout, marked the layout dirty and saved —
-                     * while the card in front of the user did not move a pixel. An enabled
-                     * control that does nothing is worse than no control.
-                     */}
-                    <div className="hidden items-center gap-0.5 lg:flex">
-                      <ResizeButton
-                        label={t('narrower', { name: names[item.id] })}
-                        disabled={!canResize(item.span, -1)}
-                        onClick={() => apply(resizeWidget(layout, item.id, -1))}
-                      >
-                        <Minus size={14} aria-hidden />
-                      </ResizeButton>
-                      <span dir="ltr" className="text-dim w-8 text-center text-[11px] tabular-nums">
-                        {item.span}/{COLUMNS}
-                      </span>
-                      <ResizeButton
-                        label={t('wider', { name: names[item.id] })}
-                        disabled={!canResize(item.span, 1)}
-                        onClick={() => apply(resizeWidget(layout, item.id, 1))}
-                      >
-                        <Plus size={14} aria-hidden />
-                      </ResizeButton>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label={t('move', {
-                        name: names[item.id],
-                        position: index + 1,
-                        total: layout.length,
-                      })}
-                      onPointerDown={(event) => startDrag(event, item.id)}
-                      onPointerMove={onDragMove}
-                      onPointerUp={endDrag}
-                      onPointerCancel={endDrag}
-                      onLostPointerCapture={endDrag}
-                      onKeyDown={(event) => onHandleKey(event, item.id)}
-                      // `touch-none`, or a touch drag scrolls the page instead of moving the card.
-                      className="text-dim hover:text-text cursor-grab touch-none rounded-md p-1.5 active:cursor-grabbing"
-                    >
-                      <GripVertical size={15} aria-hidden />
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+              {editing && (
+                <EditScrim
+                  item={item}
+                  index={index}
+                  names={names}
+                  layout={layout}
+                  dragging={dragging}
+                  rtl={rtl}
+                  onResize={(direction) => apply(resizeWidget(layout, item.id, direction))}
+                  onDragStart={(event) => startDrag(event, item.id)}
+                  onDragMove={onDragMove}
+                  onDragEnd={endDrag}
+                  onKey={(event) => onHandleKey(event, item.id)}
+                />
+              )}
             </div>
           );
         })}
@@ -349,3 +309,75 @@ function ResizeButton({
     </button>
   );
 }
+
+interface EditScrimProps {
+  item: LayoutItem;
+  index: number;
+  names: Readonly<Record<WidgetId, string>>;
+  layout: readonly LayoutItem[];
+  dragging: WidgetId | null;
+  rtl: boolean;
+  onResize: (direction: -1 | 1) => void;
+  onDragStart: (event: PointerEvent<HTMLElement>) => void;
+  onDragMove: (event: PointerEvent<HTMLElement>) => void;
+  onDragEnd: (event: PointerEvent<HTMLElement>) => void;
+  onKey: (event: KeyboardEvent<HTMLElement>) => void;
+}
+
+const EditScrim = memo(function EditScrim({
+  item,
+  index,
+  names,
+  layout,
+  dragging,
+  rtl,
+  onResize,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onKey,
+}: EditScrimProps) {
+  const t = useTranslations('layout');
+  return (
+    <div className="bg-surface/50 ring-brand/40 absolute inset-0 z-20 flex items-center justify-center rounded-[18px] ring-2">
+      <div className="border-line bg-raised flex items-center gap-0.5 rounded-lg border p-0.5 shadow-sm">
+        <div className="hidden items-center gap-0.5 lg:flex">
+          <ResizeButton
+            label={t('narrower', { name: names[item.id] })}
+            disabled={!canResize(item.span, -1)}
+            onClick={() => onResize(-1)}
+          >
+            <Minus size={14} aria-hidden />
+          </ResizeButton>
+          <span dir="ltr" className="text-dim w-8 text-center text-[11px] tabular-nums">
+            {item.span}/{COLUMNS}
+          </span>
+          <ResizeButton
+            label={t('wider', { name: names[item.id] })}
+            disabled={!canResize(item.span, 1)}
+            onClick={() => onResize(1)}
+          >
+            <Plus size={14} aria-hidden />
+          </ResizeButton>
+        </div>
+        <button
+          type="button"
+          aria-label={t('move', {
+            name: names[item.id],
+            position: index + 1,
+            total: layout.length,
+          })}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          onLostPointerCapture={onDragEnd}
+          onKeyDown={onKey}
+          className="text-dim hover:text-text cursor-grab touch-none rounded-md p-1.5 active:cursor-grabbing"
+        >
+          <GripVertical size={15} aria-hidden />
+        </button>
+      </div>
+    </div>
+  );
+});

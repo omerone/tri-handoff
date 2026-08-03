@@ -289,6 +289,7 @@ model Trade {
 
   @@unique([userId, ticket])
   @@index([userId, closeAt])
+  @@index([userId, kind])
   @@index([userId, kind, closeAt])
   @@index([userId, assetClass])
   @@index([userId, direction])
