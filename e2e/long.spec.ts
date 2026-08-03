@@ -32,6 +32,9 @@ function tile(page: Page, label: string) {
 
 async function addPosition(page: Page, symbol: string) {
   await page.fill('input[name="symbol"]', symbol);
+  // The symbol box is a search now. `E2E…` matches no listing, which is the manual path this
+  // file is about — dismissing the menu keeps it from floating over the fields below.
+  await page.keyboard.press('Escape');
   await page.fill('input[name="qty"]', '10');
   await page.fill('input[name="buyPrice"]', '100');
   await page.fill('input[name="fees"]', '0');
@@ -46,7 +49,7 @@ test('the screen renders with its tiles and its form', async ({ page }) => {
   for (const label of ['Cost', 'Value', 'Unrealized P&L', 'Realized P&L']) {
     await expect(tile(page, label)).toBeVisible();
   }
-  await expect(page.getByText(/no automatic price feed/)).toBeVisible();
+  await expect(page.getByText(/marked to the last close automatically/)).toBeVisible();
 
   const text = await page.locator('main').innerText();
   expect(text).not.toMatch(/\b(long|nav)\.[a-zA-Z.]+/);
@@ -86,6 +89,32 @@ test('marking to market moves the value and the return', async ({ page }) => {
   await expect(row).toContainText('+$300.00');
   await expect(row).toContainText('30.0%');
   await expect(row).toContainText('$1,300.00');
+});
+
+test('finds a listing by company name and prices the position from it', async ({ page }) => {
+  // The two halves of the feature in one pass: searching by name rather than ticker, and a
+  // picked listing coming back as a position the refresh owns rather than the user.
+  await page.goto('/long');
+  await page.fill('input[name="symbol"]', 'Microsoft');
+
+  const option = page.getByRole('option').filter({ hasText: 'MSFT' }).first();
+  await expect(option).toBeVisible();
+  await option.click();
+
+  await expect(page.locator('input[name="symbol"]')).toHaveValue('MSFT');
+  // Picking a listing carries its currency across — Apple in London is quoted in pounds, and
+  // a position saved in the wrong one is never marked to market at all.
+  await expect(page.locator('select[name="currency"]')).toHaveValue('USD');
+
+  await page.fill('input[name="qty"]', '3');
+  await page.fill('input[name="buyPrice"]', '100');
+  await page.getByRole('button', { name: 'Add position' }).click();
+
+  const row = page.getByRole('row', { name: /MSFT/ }).first();
+  await expect(row).toContainText('auto');
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await row.getByRole('button', { name: 'Delete' }).click();
 });
 
 test('closing a position banks the gain and moves it out of the open book', async ({ page }) => {

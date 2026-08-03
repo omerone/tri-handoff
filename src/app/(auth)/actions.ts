@@ -201,19 +201,20 @@ export async function completeResetAction(
   }
   if (password !== confirm) return { error: t('passwordsDontMatch') };
 
-  // Validate password strength using zxcvbn (score >= 3 required)
+  const parsed = completeResetSchema.safeParse({ token, password, confirm });
+  if (!parsed.success) return { error: t('resetLinkInvalid') };
+
+  const record = await findValidResetToken(hashToken(token), tenantLookup.tenant.id);
+  if (!record) return { error: t('resetLinkInvalid') };
+
+  // Strength is checked here rather than beside the length check above, because it needs the
+  // account's own email to score against — and that is only known once the token resolves.
   try {
     validatePasswordStrength(password, [record.email]);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Password is not strong enough';
     return { error: message };
   }
-
-  const parsed = completeResetSchema.safeParse({ token, password, confirm });
-  if (!parsed.success) return { error: t('resetLinkInvalid') };
-
-  const record = await findValidResetToken(hashToken(token), tenantLookup.tenant.id);
-  if (!record) return { error: t('resetLinkInvalid') };
 
   // Claims the token, sets the password and revokes every session atomically — see
   // redeemResetToken. Returns false if someone else redeemed the same link first.

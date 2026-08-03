@@ -32,9 +32,7 @@ export default async function SettingsPage() {
         login: account.login,
         server: account.server,
         status: account.status,
-        lastSync: account.lastSyncAt
-          ? formatDateTimeAt(account.lastSyncAt)
-          : null,
+        lastSync: account.lastSyncAt ? formatDateTimeAt(account.lastSyncAt) : null,
         balance: money(account.balance),
         equity: money(account.equity),
       }
@@ -42,29 +40,27 @@ export default async function SettingsPage() {
 
   return (
     <div className="flex max-w-xl flex-col gap-4">
-      <Card title={t('mt5')}>
+      {/* "Connected MT5 account" is a lie while the wizard is still asking for the details. */}
+      <Card title={connected ? t('mt5') : tWizard('title')}>
         <Mt5Card
           account={connected}
           labels={{
             login: t('login'),
             server: t('server'),
-            investorPassword: t('investorPassword'),
             connect: t('connect'),
             disconnect: t('disconnect'),
             disconnectConfirm: t('disconnectConfirm'),
             investor: t('investor'),
             investorWarning: t('investorWarning'),
-            notConnected: t('notConnected'),
-            notConnectedHint: t('notConnectedHint'),
-            backfillNote: t('backfillNote'),
             lastSync: t('lastSync'),
             balance: t('balance'),
             equity: t('equity'),
             never: tSync('never'),
             wizard: {
-              title: tWizard('title'),
               step: tWizard('step'),
               of: tWizard('of'),
+              back: tWizard('back'),
+              help: tWizard('help'),
               welcome: {
                 title: tWizard('welcome.title'),
                 subtitle: tWizard('welcome.subtitle'),
@@ -87,7 +83,6 @@ export default async function SettingsPage() {
               password: {
                 title: tWizard('password.title'),
                 label: tWizard('password.label'),
-                warning: tWizard('password.warning'),
                 hint: tWizard('password.hint'),
                 help: tWizard('password.help'),
               },
@@ -102,12 +97,6 @@ export default async function SettingsPage() {
                 action: tWizard('success.action'),
               },
             },
-            connectInvalid: t('connectInvalid'),
-            connectRejected: t('connectRejected'),
-            connectUnreachable: t('connectUnreachable'),
-            connectSyncFailed: t('connectSyncFailed'),
-            connected: t('connected'),
-            tooSoon: t('tooSoon'),
           }}
         />
       </Card>

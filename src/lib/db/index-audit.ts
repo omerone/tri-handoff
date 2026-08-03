@@ -20,4 +20,4 @@ export {
   deleteArchivedLogs,
 } from '@/lib/db/audit-queries';
 
-export { setupAuditMiddleware, getSuspiciousActivity as getSuspiciousActivityMiddleware } from '@/lib/db/audit-middleware';
+export { auditExtension, getSuspiciousActivity as getSuspiciousActivityMiddleware } from '@/lib/db/audit-middleware';

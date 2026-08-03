@@ -2,6 +2,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { EquityChart } from '@/components/charts/equity-chart';
 import { RStrip } from '@/components/charts/r-strip';
@@ -113,7 +114,16 @@ export default async function DashboardPage() {
       />
     ),
     rStrip: (
-      <Card
+      // Collapsible, because this is the one panel whose narrow layout is a list rather than a
+      // chart: thirty days as rows is most of a phone screen, and everything the trader
+      // arranged under it starts below the fold.
+      //
+      // Closed to start with on a phone — the header still carries the headline ("18 trading
+      // days"), and the day-by-day detail is a thing a trader goes looking for rather than
+      // something they need in the way of the tiles and the curve. Open on a desktop, where
+      // the same panel is a strip two rows tall.
+      <CollapsibleCard
+        defaultOpen={false}
         title={t('dash.rStrip', { days: R_STRIP_DAYS })}
         action={
           <span className="text-dim text-[11px]">
@@ -137,7 +147,7 @@ export default async function DashboardPage() {
             rrCoverage: (counted, total) => t('dash.dayRrCoverage', { counted, total }),
           }}
         />
-      </Card>
+      </CollapsibleCard>
     ),
     equity: (
       <Card title={t('dash.equity')}>

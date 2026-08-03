@@ -1,11 +1,12 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { Check, Clock, Trash2, TriangleAlert, X } from 'lucide-react';
+import { Check, Clock, RefreshCw, Trash2, TriangleAlert, X } from 'lucide-react';
 import { Num } from '@/components/ui/kpi';
 import {
   closePositionAction,
   deletePositionAction,
+  setPriceSourceAction,
   updatePriceAction,
   type PositionFormState,
 } from './actions';
@@ -29,6 +30,10 @@ export type PositionRowLabels = {
   deleteConfirm: string;
   updated: string;
   cancel: string;
+  /** Badge on a position the feed prices, and the control that puts one back on it. */
+  auto: string;
+  autoOn: string;
+  autoOff: string;
 };
 
 export type PositionRowData = {
@@ -46,6 +51,8 @@ export type PositionRowData = {
   updatedAt: string;
   /** Preformatted warning when the price is old, null when it is fresh. */
   staleMessage: string | null;
+  /** True when the quote refresh owns this position's price. */
+  tracked: boolean;
   closed: boolean;
   realized: string | null;
   realizedPositive: boolean;
@@ -88,14 +95,43 @@ export function PositionRow({
         ) : (
           <div className="flex items-center gap-2">
             <Num className="text-xs">{position.currentPrice}</Num>
-            {position.closed ? null : (
-              <button
-                type="button"
-                onClick={() => setMode('price')}
-                className="border-line bg-raised text-brand rounded-lg border px-2 py-1 text-[11px]"
+
+            {position.tracked ? (
+              <span
+                title={labels.autoOn}
+                className="bg-brand/10 text-brand inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
               >
-                {labels.update}
-              </button>
+                <RefreshCw size={9} aria-hidden />
+                {labels.auto}
+              </span>
+            ) : null}
+
+            {position.closed ? null : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setMode('price')}
+                  className="border-line bg-raised text-brand rounded-lg border px-2 py-1 text-[11px]"
+                >
+                  {labels.update}
+                </button>
+                {/* Only the way *back* onto the feed is offered. Leaving it is not a button:
+                    typing a price already does that, and it is the same intent said once. */}
+                {position.tracked ? null : (
+                  <form action={setPriceSourceAction}>
+                    <input type="hidden" name="id" value={position.id} />
+                    <input type="hidden" name="priceSource" value="auto" />
+                    <button
+                      type="submit"
+                      title={labels.autoOff}
+                      aria-label={labels.autoOff}
+                      className="text-dim hover:text-brand p-1"
+                    >
+                      <RefreshCw size={12} aria-hidden />
+                    </button>
+                  </form>
+                )}
+              </>
             )}
           </div>
         )}

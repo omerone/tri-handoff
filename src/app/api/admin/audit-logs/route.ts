@@ -1,12 +1,10 @@
 import 'server-only';
-import { NextRequest, NextResponse } from 'next/server';
-// eslint-disable-next-line no-restricted-imports
-import { prisma } from '@/lib/db/prisma';
+import { type NextRequest, NextResponse } from 'next/server';
+import { adminForApi } from '@/lib/auth/admin-session';
 import {
   getUserAuditLog,
   getTableAuditLog,
   getRecordAuditLog,
-  getSuspiciousActivity,
   exportAuditLog,
   getAuditStatistics,
 } from '@/lib/db/audit-queries';
@@ -36,16 +34,15 @@ import {
  */
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  try {
-    // TODO: Verify super admin authentication
-    // const session = await getSession();
-    // if (!session?.superAdmin) {
-    //   return NextResponse.json(
-    //     { error: 'Unauthorized: super admin access required' },
-    //     { status: 403 }
-    //   );
-    // }
+  // The gate this route documented and did not have. It was shipped with the check commented
+  // out behind a TODO, which made every mutation the product has ever made — user ids, IP
+  // addresses, user agents, and the before/after of every row — readable by anyone who knew
+  // the path, in JSON or as a CSV export. An audit trail that leaks is worse than no audit
+  // trail: it is a second copy of the data with none of the access control of the first.
+  const gate = await adminForApi();
+  if (gate.response) return gate.response as NextResponse;
 
+  try {
     const { searchParams } = new URL(request.url);
 
     // Parse query parameters
@@ -94,7 +91,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Format response
     if (format === 'csv') {
-      return formatAsCSV(logs);
+      return formatAsCSV(logs as unknown as readonly Record<string, unknown>[]);
     }
 
     return NextResponse.json({
@@ -138,7 +135,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 /**
  * Format audit logs as CSV
  */
-function formatAsCSV(logs: any[]): NextResponse {
+function formatAsCSV(logs: readonly Record<string, unknown>[]): NextResponse {
   if (logs.length === 0) {
     return new NextResponse('table,operation,recordId,userId,ipAddress,createdAt\n', {
       headers: {
@@ -148,8 +145,9 @@ function formatAsCSV(logs: any[]): NextResponse {
     });
   }
 
-  // Get headers from first log
-  const headers = Object.keys(logs[0]).filter(
+  // Get headers from first log. Guarded by the empty-list return above; coalesced because the
+  // compiler types an index read as possibly undefined.
+  const headers = Object.keys(logs[0] ?? {}).filter(
     (k) => !['oldValues', 'newValues'].includes(k) // Exclude JSON columns
   );
 

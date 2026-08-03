@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Download, Filter, RefreshCw } from 'lucide-react';
 
 /**
@@ -18,6 +17,26 @@ import { AlertTriangle, Download, Filter, RefreshCw } from 'lucide-react';
  * Usage:
  *   <AuditLogViewer />
  */
+
+/**
+ * `2026-08-03 02:32:19` — UTC, sortable, and byte-identical on the server and the client.
+ *
+ * Deliberately not the project's locale-aware `formatDateTimeAt`, and deliberately not a date
+ * library: an audit trail is read by whoever is reconstructing an incident, and a timestamp
+ * that shifts with the reader's timezone is a timestamp two people cannot compare. Rendering
+ * it from the ISO string also keeps this client component free of a hydration mismatch.
+ */
+function stamp(value: Date | string, { millis = false } = {}): string {
+  const iso = new Date(value).toISOString();
+  return millis ? iso.replace('T', ' ').replace('Z', '') : `${iso.slice(0, 10)} ${iso.slice(11, 19)}`;
+}
+
+/** `audit-logs-2026-08-03-023219.csv` — same instant, safe in a filename. */
+function fileStamp(value: Date): string {
+  const iso = value.toISOString();
+  return `${iso.slice(0, 10)}-${iso.slice(11, 19).replace(/:/g, '')}`;
+}
+
 
 interface AuditLog {
   id: string;
@@ -50,12 +69,10 @@ export function AuditLogViewer() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
-  // Load audit logs
-  useEffect(() => {
-    loadLogs();
-  }, [filters]);
-
-  async function loadLogs() {
+  // Load audit logs. `loadLogs` is a `useCallback` so the effect can depend on it honestly
+  // rather than lying about its dependencies — it closes over `filters`, and a stale closure
+  // here would silently keep showing the previous filter's rows.
+  const loadLogs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -80,7 +97,11 @@ export function AuditLogViewer() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [filters]);
+
+  useEffect(() => {
+    void loadLogs();
+  }, [loadLogs]);
 
   async function exportToCSV() {
     try {
@@ -96,17 +117,17 @@ export function AuditLogViewer() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `audit-logs-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`;
+      a.download = `audit-logs-${fileStamp(new Date())}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (err) {
+    } catch {
       setError('Failed to export logs');
     }
   }
 
-  const handleFilterChange = (key: keyof Filters, value: any) => {
+  const handleFilterChange = (key: keyof Filters, value: Filters[keyof Filters]) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value || undefined,
@@ -218,7 +239,7 @@ export function AuditLogViewer() {
                   className="border-b hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                 >
                   <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
-                    {format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}
+                    {stamp(log.createdAt)}
                   </td>
                   <td className="px-4 py-3 font-mono text-sm">{log.tableName}</td>
                   <td className="px-4 py-3">
@@ -297,7 +318,7 @@ export function AuditLogViewer() {
               </div>
               <div>
                 <dt className="font-semibold text-gray-700 dark:text-gray-300">Timestamp</dt>
-                <dd>{format(new Date(selectedLog.createdAt), 'yyyy-MM-dd HH:mm:ss.SSS')}</dd>
+                <dd>{stamp(selectedLog.createdAt, { millis: true })}</dd>
               </div>
               {selectedLog.executionTimeMs && (
                 <div>

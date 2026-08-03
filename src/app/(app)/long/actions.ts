@@ -9,6 +9,8 @@ import {
   createLongPosition,
   deleteLongPosition,
   getLongPosition,
+  setPriceSource,
+  trackAllOpenPositions,
   updateCurrentPrice,
 } from '@/lib/db';
 import { realizedPnlOnClose } from '@/lib/positions/valuation';
@@ -31,6 +33,13 @@ const createSchema = z.object({
   buyDate: z.coerce.date().refine((date) => isPlausibleDate(date)),
   fees: z.coerce.number().min(0).finite().max(MAX_DECIMAL).default(0),
   currency: z.enum(SUPPORTED_CURRENCIES).default('USD'),
+  /**
+   * Both are set by the search box, and only by it. A symbol typed freehand gets neither, so
+   * it stays a manually priced position — which is exactly right: the feed has no idea what
+   * an arbitrary string is, and a position it cannot price must not claim to be tracked.
+   */
+  micCode: z.string().trim().max(12).default(''),
+  priceSource: z.enum(['auto', 'manual']).default('manual'),
 });
 
 export async function createPositionAction(
@@ -47,12 +56,46 @@ export async function createPositionAction(
     buyDate: formData.get('buyDate'),
     fees: formData.get('fees') || 0,
     currency: formData.get('currency') || 'USD',
+    micCode: formData.get('micCode') || '',
+    priceSource: formData.get('priceSource') || 'manual',
   });
   if (!parsed.success) return { error: t('invalid') };
 
   await createLongPosition(session.ctx, parsed.data);
   revalidatePath('/long');
   return { ok: true };
+}
+
+const priceSourceSchema = z.object({
+  id: z.string().min(1),
+  priceSource: z.enum(['auto', 'manual']),
+});
+
+/**
+ * Puts a position back on the feed after a manual correction, or takes it off deliberately.
+ *
+ * No price is fetched here. The refresh runs on its own timer and picks the position up on
+ * its next tick — making the user wait on a network call to flip a switch would be the one
+ * place in this feature where a vendor being slow is visible as a slow click.
+ */
+export async function setPriceSourceAction(formData: FormData): Promise<void> {
+  const session = await requireSession();
+
+  const parsed = priceSourceSchema.safeParse({
+    id: formData.get('id'),
+    priceSource: formData.get('priceSource'),
+  });
+  if (!parsed.success) return;
+
+  await setPriceSource(session.ctx, parsed.data.id, parsed.data.priceSource);
+  revalidatePath('/long');
+}
+
+/** Switches a whole existing book onto the feed at once — see `trackAllOpenPositions`. */
+export async function trackAllAction(): Promise<void> {
+  const session = await requireSession();
+  await trackAllOpenPositions(session.ctx);
+  revalidatePath('/long');
 }
 
 const priceSchema = z.object({

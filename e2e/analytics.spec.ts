@@ -37,9 +37,12 @@ test.describe('dashboard', () => {
     }
 
     // Days, not trades: "the last sixty trades" was a different span every time it was read.
+    // The strip's card draws its header twice — a plain one for the wide layout and a
+    // disclosure button for the phone, each hidden at the other's width — so the title matches
+    // twice in the DOM and only once on screen. This asserts the one that is actually shown.
     const strip = page.locator('[data-widget="rStrip"]');
-    await expect(strip.getByText(/Last 30 days/)).toBeVisible();
-    await expect(strip.getByText(/trading days?$/)).toBeVisible();
+    await expect(strip.getByText(/Last 30 days/).filter({ visible: true })).toBeVisible();
+    await expect(strip.getByText(/trading days?$/).filter({ visible: true })).toBeVisible();
     await expect(page.locator('[data-widget="equity"]').getByText('Equity curve')).toBeVisible();
     await expect(page.locator('[data-widget="recent"]').getByText('Recent trades')).toBeVisible();
   });

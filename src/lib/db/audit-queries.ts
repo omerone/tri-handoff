@@ -1,5 +1,5 @@
 import 'server-only';
-// eslint-disable-next-line no-restricted-imports
+ 
 import { prisma } from '@/lib/db/prisma';
 
 /**
@@ -32,8 +32,9 @@ interface AuditLogEntry {
  */
 export async function getUserAuditLog(
   userId: string,
-  options = { limit: 1000, offset: 0 }
+  opts: { limit?: number; offset?: number } = {},
 ): Promise<AuditLogEntry[]> {
+  const options = { limit: 1000, offset: 0, ...opts };
   return (await prisma.databaseAuditLog.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
@@ -48,8 +49,9 @@ export async function getUserAuditLog(
  */
 export async function getTableAuditLog(
   tableName: string,
-  options = { limit: 1000, offset: 0 }
+  opts: { limit?: number; offset?: number } = {},
 ): Promise<AuditLogEntry[]> {
+  const options = { limit: 1000, offset: 0, ...opts };
   return (await prisma.databaseAuditLog.findMany({
     where: { tableName },
     orderBy: { createdAt: 'desc' },
@@ -65,8 +67,9 @@ export async function getTableAuditLog(
 export async function getRecordAuditLog(
   tableName: string,
   recordId: string,
-  options = { limit: 1000 }
+  opts: { limit?: number } = {},
 ): Promise<AuditLogEntry[]> {
+  const options = { limit: 1000, ...opts };
   return (await prisma.databaseAuditLog.findMany({
     where: { tableName, recordId },
     orderBy: { createdAt: 'desc' },
@@ -79,8 +82,9 @@ export async function getRecordAuditLog(
  * Used for: security monitoring, breach detection
  */
 export async function getSuspiciousActivity(
-  options = { timeWindowHours: 24, limit: 100 }
+  opts: { timeWindowHours?: number; limit?: number } = {},
 ): Promise<AuditLogEntry[]> {
+  const options = { timeWindowHours: 24, limit: 100, ...opts };
   const since = new Date(Date.now() - options.timeWindowHours * 60 * 60 * 1000);
 
   return (await prisma.databaseAuditLog.findMany({
@@ -98,8 +102,9 @@ export async function getSuspiciousActivity(
  * Used for: performance monitoring, optimization
  */
 export async function getSlowQueries(
-  options = { thresholdMs: 5000, limit: 100, hoursBack: 24 }
+  opts: { thresholdMs?: number; limit?: number; hoursBack?: number } = {},
 ): Promise<AuditLogEntry[]> {
+  const options = { thresholdMs: 5000, limit: 100, hoursBack: 24, ...opts };
   const since = new Date(Date.now() - options.hoursBack * 60 * 60 * 1000);
 
   return (await prisma.databaseAuditLog.findMany({
@@ -117,8 +122,9 @@ export async function getSlowQueries(
  * Used for: GDPR compliance, data governance
  */
 export async function getDataAccessLog(
-  options = { tableName?: string, timeWindowDays: 7, limit: 1000 }
+  opts: { tableName?: string; timeWindowDays?: number; limit?: number } = {},
 ): Promise<AuditLogEntry[]> {
+  const options = { timeWindowDays: 7, limit: 1000, ...opts };
   const since = new Date(Date.now() - options.timeWindowDays * 24 * 60 * 60 * 1000);
 
   return (await prisma.databaseAuditLog.findMany({
@@ -138,8 +144,9 @@ export async function getDataAccessLog(
  */
 export async function getActivityByIP(
   ipAddress: string,
-  options = { limit: 1000 }
+  opts: { limit?: number } = {},
 ): Promise<AuditLogEntry[]> {
+  const options = { limit: 1000, ...opts };
   return (await prisma.databaseAuditLog.findMany({
     where: { ipAddress },
     orderBy: { createdAt: 'desc' },
@@ -152,8 +159,9 @@ export async function getActivityByIP(
  * Used for: real-time monitoring, dashboard
  */
 export async function getRecentActivity(
-  options = { minutesBack: 60, limit: 100 }
+  opts: { minutesBack?: number; limit?: number } = {},
 ): Promise<AuditLogEntry[]> {
+  const options = { minutesBack: 60, limit: 100, ...opts };
   const since = new Date(Date.now() - options.minutesBack * 60 * 1000);
 
   return (await prisma.databaseAuditLog.findMany({
@@ -213,7 +221,7 @@ export async function exportAuditLog(
  * Used for: monitoring, alerting
  */
 export async function getAuditStatistics(
-  options = { hoursBack: 24 }
+  opts: { hoursBack?: number } = {},
 ): Promise<{
   totalOperations: number;
   operationsByType: Record<string, number>;
@@ -222,6 +230,7 @@ export async function getAuditStatistics(
   affectedUsers: number;
   affectedTenants: number;
 }> {
+  const options = { hoursBack: 24, ...opts };
   const since = new Date(Date.now() - options.hoursBack * 60 * 60 * 1000);
 
   const logs = await prisma.databaseAuditLog.findMany({
@@ -281,8 +290,9 @@ export async function getAuditStatistics(
  * Run daily via cron job
  */
 export async function archiveOldAuditLogs(
-  options = { retentionDays: 90 }
+  opts: { retentionDays?: number } = {},
 ): Promise<{ archived: number }> {
+  const options = { retentionDays: 90, ...opts };
   const cutoffDate = new Date(Date.now() - options.retentionDays * 24 * 60 * 60 * 1000);
 
   const result = await prisma.databaseAuditLog.updateMany({
@@ -303,8 +313,9 @@ export async function archiveOldAuditLogs(
  * Keep 12 months total (90 days active, 275 days archived)
  */
 export async function deleteArchivedLogs(
-  options = { retentionMonths: 12 }
+  opts: { retentionMonths?: number } = {},
 ): Promise<{ deleted: number }> {
+  const options = { retentionMonths: 12, ...opts };
   const cutoffDate = new Date();
   cutoffDate.setMonth(cutoffDate.getMonth() - options.retentionMonths);
 

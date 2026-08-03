@@ -101,7 +101,7 @@ class CloudFlareWAFSetup {
       {
         name: 'Command Injection Detection',
         description: 'Block OS command injection attempts',
-        expression: `(http.request.uri.query contains "; ") or (http.request.uri.query contains "| ") or (http.request.uri.query contains "& ") or (http.request.body contains "; ") or (http.request.body contains "| ") or (http.request.body contains "& ") or (http.request.uri.query contains "`") or (http.request.body contains "`")`,
+        expression: `(http.request.uri.query contains "; ") or (http.request.uri.query contains "| ") or (http.request.uri.query contains "& ") or (http.request.body contains "; ") or (http.request.body contains "| ") or (http.request.body contains "& ") or (http.request.uri.query contains "\`") or (http.request.body contains "\`")`,
         action: this.config.environment === 'log-only' ? 'log' : this.config.environment === 'challenge' ? 'challenge' : 'block',
         priority: 4,
       },

@@ -5,7 +5,9 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
+import { limitKey, LIMITS } from '@/lib/auth/limits';
 import { requireSession } from '@/lib/auth/session';
+import { consumeRateLimit } from '@/lib/db';
 import { deleteUserDataGDPR, validateDeletionRequest } from '@/lib/db/gdpr';
 import { SecurityLogger } from '@/lib/security/logger';
 // eslint-disable-next-line no-restricted-imports
@@ -41,6 +43,19 @@ export async function deleteUserAccount(
 ): Promise<AccountFormState> {
   const session = await requireSession();
   const t = await getTranslations('settings.account');
+
+  // The password prompt below is a password prompt, and an unbudgeted one is a guessing
+  // oracle for anyone holding a stolen session. The same limiter the login uses, because a
+  // second rate-limiting mechanism is a second thing to get wrong.
+  const verdict = await consumeRateLimit(
+    limitKey('account-delete', session.ctx.userId),
+    LIMITS.accountDelete.limit,
+    LIMITS.accountDelete.windowMs,
+  );
+  if (!verdict.allowed) {
+    const tAuth = await getTranslations('auth');
+    return { error: tAuth('tooManyAttempts', { minutes: Math.ceil(verdict.retryAfterMs / 60_000) }) };
+  }
 
   try {
     // Parse and validate form input
@@ -106,9 +121,6 @@ export async function deleteUserAccount(
 
     // Clear the cache (user data is gone)
     revalidatePath('/', 'layout');
-
-    // Redirect to login page (user will not be logged in anymore)
-    redirect('/auth/login?deleted=true');
   } catch (error) {
     // Log unexpected errors (but don't expose details)
     console.error('[GDPR] Account deletion error', error);
@@ -125,4 +137,13 @@ export async function deleteUserAccount(
       error: t('deleteFailedSystem'),
     };
   }
+
+  // Outside the `try`, and deliberately. `redirect()` reports itself by throwing a
+  // NEXT_REDIRECT error, so a `redirect` inside the block above was caught by the very
+  // `catch` meant for database failures: the account was deleted, the user was told the
+  // deletion had failed, and they were left sitting on the settings page with a dead session.
+  //
+  // `/login`, not `/auth/login` — `(auth)` is a route group and never appears in the URL,
+  // so the old path was a 404 on the one navigation the user cannot retry.
+  redirect('/login?deleted=true');
 }

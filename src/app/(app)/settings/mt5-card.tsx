@@ -6,17 +6,12 @@ import { Num } from '@/components/ui/kpi';
 import { Mt5ConnectWizard, type WizardLabels } from './mt5-wizard';
 import { disconnectMt5Action } from './mt5-actions';
 
+/** `login`, `server`, `connect` and `investorWarning` come from `WizardLabels` — both halves
+    of this card name the same things, and the wizard needs them too. */
 export type Mt5CardLabels = WizardLabels & {
-  login: string;
-  server: string;
-  investorPassword: string;
-  connect: string;
   disconnect: string;
   disconnectConfirm: string;
   investor: string;
-  notConnected: string;
-  notConnectedHint: string;
-  backfillNote: string;
   lastSync: string;
   balance: string;
   equity: string;

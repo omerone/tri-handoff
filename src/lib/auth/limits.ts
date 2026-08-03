@@ -14,6 +14,13 @@ export const LIMITS = {
   resetPerIp: { limit: 15, windowMs: 60 * 60 * 1000 },
   syncManual: { limit: 6, windowMs: 5 * 60 * 1000 },
   /**
+   * Deleting the account asks for the password again, which makes it a password prompt like
+   * any other — and one behind a session that may already be stolen. Without a budget it is
+   * an unlimited guessing oracle against the very credential that protects everything else.
+   * Five an hour is far above any honest use: nobody deletes their account twice.
+   */
+  accountDelete: { limit: 5, windowMs: 60 * 60 * 1000 },
+  /**
    * Operator login is tighter than a client's: there is no self-service reset behind it,
    * compromising it exposes every client, and legitimate use is a handful of sign-ins a
    * week. Per-account as well as per-IP, so rotating source addresses does not buy an

@@ -15,7 +15,7 @@ export interface AuditLogEntry {
   userId?: string;
   ip?: string;
   userAgent?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   severity?: 'low' | 'medium' | 'high' | 'critical';
   timestamp?: Date;
 }
@@ -37,7 +37,7 @@ export async function auditLog(entry: AuditLogEntry): Promise<void> {
 
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-      console.log('[AUDIT]', JSON.stringify(logEntry, null, 2));
+      console.warn('[AUDIT]', JSON.stringify(logEntry, null, 2));
     }
 
     // In production, send to centralized logging service
@@ -122,7 +122,7 @@ export async function auditLogAuthAttempt(
 export async function auditLogSensitiveOperation(
   operation: string,
   userId: string,
-  details?: Record<string, any>,
+  details?: Record<string, unknown>,
   context?: {
     ip?: string;
     userAgent?: string;
@@ -145,7 +145,7 @@ export async function auditLogAdminAction(
   adminId: string,
   action: string,
   targetId?: string,
-  details?: Record<string, any>,
+  details?: Record<string, unknown>,
   context?: {
     ip?: string;
     userAgent?: string;

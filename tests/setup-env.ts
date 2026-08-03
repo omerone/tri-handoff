@@ -20,6 +20,10 @@ process.env.DATABASE_URL ??= 'postgresql://tri:tri@localhost:5433/tri?schema=pub
 process.env.SESSION_SECRET ??= Buffer.alloc(48, 7).toString('base64');
 process.env.ENCRYPTION_KEY ??= Buffer.alloc(32, 3).toString('base64');
 process.env.MT5_PROVIDER ??= 'mock';
+// Both providers are pinned to the mock even when a developer's .env points at a real vendor:
+// a test that reaches a metered API spends money and stops being deterministic.
+process.env.MT5_PROVIDER = 'mock';
+process.env.QUOTES_PROVIDER = 'mock';
 process.env.FX_API_URL ??= 'https://api.frankfurter.app';
 process.env.APP_BASE_DOMAIN ??= 'localhost:3000';
 process.env.APP_PROTOCOL ??= 'http';

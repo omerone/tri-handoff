@@ -1,13 +1,13 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { DateField } from '@/components/ui/date-field';
 import { FormMessage, SubmitButton } from '@/components/ui/form';
 import { createPositionAction, type PositionFormState } from './actions';
+import { SymbolField, type SymbolFieldLabels, type SymbolMatchView } from './symbol-field';
 
-export type AddFormLabels = {
-  symbol: string;
+export type AddFormLabels = SymbolFieldLabels & {
   qty: string;
   buyPrice: string;
   buyDate: string;
@@ -30,15 +30,21 @@ export function AddPositionForm({
   defaultDate: string;
 }) {
   const [state, action] = useActionState<PositionFormState, FormData>(createPositionAction, {});
+  // Follows the picked listing: Apple on the LSE is quoted in pounds, and a position saved in
+  // dollars because that was the default would never be marked to market — the refresh
+  // refuses to apply a quote in a currency the position is not held in.
+  const [currency, setCurrency] = useState('USD');
+
+  const onPick = (match: SymbolMatchView | null) => {
+    if (match) setCurrency(match.currency);
+  };
 
   return (
     <form action={action} className="flex flex-col gap-3">
       <FormMessage error={state.error} />
 
       <div className="flex flex-wrap items-end gap-2">
-        <Field label={labels.symbol} className="w-28">
-          <input name="symbol" required maxLength={24} dir="ltr" className={`${field} w-28`} />
-        </Field>
+        <SymbolField labels={labels} onPick={onPick} />
 
         <Field label={labels.qty}>
           <input
@@ -77,7 +83,12 @@ export function AddPositionForm({
         </Field>
 
         <Field label={labels.currency}>
-          <select name="currency" defaultValue="USD" className={`${field} w-24`}>
+          <select
+            name="currency"
+            value={currency}
+            onChange={(event) => setCurrency(event.target.value)}
+            className={`${field} w-24`}
+          >
             {currencies.map((code) => (
               <option key={code} value={code}>
                 {code}

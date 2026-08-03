@@ -40,15 +40,23 @@ setup('authenticate and connect MT5', async ({ page }) => {
   if (await toggle.count()) await toggle.click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 
+  // Connecting is a four-step wizard, one field per step — not the single form it used to be.
+  // Driving it here rather than seeding the account directly is deliberate: this is the only
+  // place the connect flow is exercised end to end, and a stale walkthrough is how the whole
+  // suite came to be blocked on a form that no longer exists.
   await page.goto('/settings');
-  const login = page.locator('input[name="login"]');
-  if (await login.count()) {
-    await login.fill('50214437');
-    await page.fill('input[name="server"]', 'MetaQuotes-Live01');
-    await page.fill('input[name="investorPassword"]', 'investor-read-only');
-    await page.getByRole('button', { name: /Connect account/ }).click();
+  const connected = page.getByText('#50214437').first();
+  if (!(await connected.count())) {
+    const next = page.getByRole('button', { name: 'Next' });
+    await next.click();
+    await page.locator('#login-field').fill('50214437');
+    await next.click();
+    await page.locator('#server').selectOption('MetaQuotes-Live01');
+    await next.click();
+    await page.locator('#password-field').fill('investor-read-only');
+    await page.getByRole('button', { name: 'Connect account' }).click();
   }
-  await expect(page.getByText('#50214437')).toBeVisible({ timeout: 60_000 });
+  await expect(connected).toBeVisible({ timeout: 60_000 });
 
   await page.context().storageState({ path: STORAGE_STATE });
 });

@@ -253,7 +253,7 @@ describe('SecurityLogger', () => {
         userId: null,
         actionType: 'update_config',
         description: 'Updated tenant configuration',
-        changes: '{"status":{"from":"active","to":"suspended"}}',
+        changes: { status: { from: 'active', to: 'suspended' } },
         ipAddress: '192.168.1.100',
         userAgent: 'Mozilla/5.0 (Testing)',
         createdAt: new Date(),
@@ -274,10 +274,10 @@ describe('SecurityLogger', () => {
         changes,
       });
 
+      // The object itself, not a JSON string of it. `changes` is a Json column, so a
+      // stringified value would be stored as a quoted blob that no query can reach into.
       expect(createMock).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          changes: JSON.stringify(changes),
-        }),
+        data: expect.objectContaining({ changes }),
       });
     });
   });

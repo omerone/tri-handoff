@@ -14,7 +14,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { gzip } from 'node:zlib';
+import { gunzip, gzip } from 'node:zlib';
 import { promisify } from 'node:util';
 import * as crypto from 'node:crypto';
 
@@ -126,7 +126,7 @@ class AuditLogArchiver {
    * Archive a batch of logs (to S3 or local storage)
    */
   private async archiveBatch(
-    logs: any[],
+    logs: Record<string, unknown>[],
     batchNumber: number
   ): Promise<string> {
     const timestamp = new Date().toISOString().split('T')[0];
@@ -216,10 +216,10 @@ class AuditLogArchiver {
   /**
    * Restore logs from archive (for recovery or analysis)
    */
-  async restoreArchive(archivePath: string): Promise<any[]> {
+  async restoreArchive(archivePath: string): Promise<Record<string, unknown>[]> {
     try {
       const compressed = fs.readFileSync(archivePath);
-      const decompressed = await promisify(require('node:zlib').gunzip)(compressed);
+      const decompressed = await promisify(gunzip)(compressed);
       const logs = JSON.parse(decompressed.toString());
       console.log(`[Audit Archive] ✓ Restored ${logs.length} logs from ${archivePath}`);
       return logs;

@@ -25,7 +25,10 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     let i = 0;
 
     while (i < lines.length) {
-      const line = lines[i];
+      // `?? ''` because `noUncheckedIndexedAccess` types an index read as possibly undefined,
+      // and the loop guard that makes it safe is invisible to the compiler. Coalescing once
+      // here keeps the thirty-odd uses below readable.
+      const line = lines[i] ?? '';
 
       // Headings
       if (line.startsWith('######')) {
@@ -81,8 +84,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       else if (line.startsWith('```')) {
         const codeLines: string[] = [];
         i++;
-        while (i < lines.length && !lines[i].startsWith('```')) {
-          codeLines.push(lines[i]);
+        while (i < lines.length && !(lines[i] ?? '').startsWith('```')) {
+          codeLines.push(lines[i] ?? '');
           i++;
         }
         elements.push(
@@ -102,8 +105,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       // Unordered list
       else if (line.match(/^[-*+]\s/)) {
         const listItems: string[] = [];
-        while (i < lines.length && lines[i].match(/^[-*+]\s/)) {
-          listItems.push(lines[i].replace(/^[-*+]\s/, ''));
+        while (i < lines.length && (lines[i] ?? '').match(/^[-*+]\s/)) {
+          listItems.push((lines[i] ?? '').replace(/^[-*+]\s/, ''));
           i++;
         }
         elements.push(
@@ -118,8 +121,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       // Ordered list
       else if (line.match(/^\d+\.\s/)) {
         const listItems: string[] = [];
-        while (i < lines.length && lines[i].match(/^\d+\.\s/)) {
-          listItems.push(lines[i].replace(/^\d+\.\s/, ''));
+        while (i < lines.length && (lines[i] ?? '').match(/^\d+\.\s/)) {
+          listItems.push((lines[i] ?? '').replace(/^\d+\.\s/, ''));
           i++;
         }
         elements.push(
@@ -135,8 +138,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       else if (line.includes('|')) {
         const tableLines: string[] = [line];
         i++;
-        while (i < lines.length && lines[i].includes('|')) {
-          tableLines.push(lines[i]);
+        while (i < lines.length && (lines[i] ?? '').includes('|')) {
+          tableLines.push(lines[i] ?? '');
           i++;
         }
         elements.push(
@@ -247,7 +250,8 @@ function renderTable(lines: string[]): React.ReactNode {
 
   if (rows.length < 2) return null;
 
-  const headers = rows[0];
+  // Guarded by the `rows.length < 2` check above; coalesced for the compiler's benefit.
+  const headers = rows[0] ?? [];
   const dataRows = rows.slice(2); // Skip header and separator
 
   return (

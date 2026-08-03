@@ -90,6 +90,11 @@ async function load(): Promise<Env> {
     }
   });
 
+  return parseEnv();
+}
+
+/** Validates whatever is on `process.env` right now. No I/O, so `env()` can call it too. */
+function parseEnv(): Env {
   const parsed = schema.safeParse(process.env);
   if (!parsed.success) {
     const issues = parsed.error.issues
@@ -119,20 +124,21 @@ export function env(): Env {
     return cached;
   }
 
-  // If load is still in progress, throw instructive error
-  if (loadPromise) {
-    throw new Error(
-      'Environment is still initializing. Call initializeEnv() and wait for it to complete ' +
-        'before accessing env(). Ensure initializeEnv() is called in instrumentation-node.ts ' +
-        'during application startup.',
-    );
-  }
-
-  // Should not reach here in normal operation (initializeEnv should be called during startup)
-  throw new Error(
-    'Environment not initialized. Ensure initializeEnv() is called during app startup ' +
-      '(see instrumentation-node.ts).',
-  );
+  /*
+   * Not initialised *in this module instance* — which is the normal case, not an error.
+   *
+   * `instrumentation.ts` is compiled into its own bundle, so the copy of this module that
+   * `register()` touches is a different one from the copy a route renders against: `cached`
+   * is set over there and null over here. Throwing here 500ed every page behind the login
+   * wall while the startup log cheerfully said the environment had been initialised.
+   *
+   * Re-reading is safe and cheap. `load()` merges whatever the secrets manager returned into
+   * `process.env`, and `process.env` *is* shared across bundles — so by the time any request
+   * is served, parsing it again yields exactly what `initializeEnv()` computed. The async
+   * path still owns fetching; this owns nothing but validation.
+   */
+  cached = parseEnv();
+  return cached;
 }
 
 /**
@@ -153,7 +159,7 @@ export async function initializeEnv(): Promise<Env> {
 
   try {
     cached = await loadPromise;
-    console.log('[Env] Environment initialized and validated');
+    console.warn('[Env] Environment initialized and validated');
     return cached;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

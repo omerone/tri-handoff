@@ -1,5 +1,5 @@
 import 'server-only';
-// eslint-disable-next-line no-restricted-imports
+ 
 import { prisma } from '@/lib/db/prisma';
 import { Prisma } from '@prisma/client';
 import { headers } from 'next/headers';
@@ -37,6 +37,19 @@ const SENSITIVE_FIELDS = new Set([
   'sessionSecret',
   'jwtSecret',
 ]);
+
+/**
+ * What `Prisma.MiddlewareParams` used to carry.
+ *
+ * Prisma removed `$use` and its types in v5; this file was written against them and did not
+ * compile against the v6 client the project ships. The shape is reconstructed here because
+ * the helpers below are worth keeping as they are — only the plumbing changed.
+ */
+interface AuditParams {
+  model?: string;
+  action: string;
+  args: { data?: unknown; where?: unknown } & Record<string, unknown>;
+}
 
 interface AuditContext {
   userId?: string;
@@ -92,7 +105,7 @@ function redactSensitiveFields(obj: unknown): unknown {
  * Determine if an operation is suspicious
  */
 function checkSuspicious(
-  params: Prisma.MiddlewareParams,
+  params: AuditParams,
   executionTimeMs: number
 ): { suspicious: boolean; reason?: string } {
   // Flag slow queries (>5 seconds)
@@ -130,7 +143,7 @@ function checkSuspicious(
 /**
  * Extract user context from operation params
  */
-function extractUserContext(params: Prisma.MiddlewareParams): {
+function extractUserContext(params: AuditParams): {
   userId?: string;
   tenantId?: string;
 } {
@@ -145,72 +158,91 @@ function extractUserContext(params: Prisma.MiddlewareParams): {
   return {};
 }
 
+/** Only mutations are logged; reads would bury the trail in noise. */
+const MUTATING_ACTIONS = new Set([
+  'create',
+  'createMany',
+  'update',
+  'updateMany',
+  'delete',
+  'deleteMany',
+  'upsert',
+]);
+
 /**
- * Setup audit middleware on the Prisma client
- * Call this once during app initialization
+ * The audit trail, as a Prisma client extension.
+ *
+ * Prisma removed `$use` in v5 and this project is on v6, so the middleware this file was
+ * written as could not run at all. Extensions are the replacement, with one consequence worth
+ * knowing: `$extends` *returns a new client* rather than mutating the one it is given, so
+ * this cannot be a `setupAuditMiddleware()` called for its side effect. The extended client
+ * has to become the client the app uses:
+ *
+ *     export const prisma = new PrismaClient(...).$extends(auditExtension);
+ *
+ * It is exported rather than applied here on purpose. Switching it on writes a row for every
+ * mutation the product makes, which is a decision about storage and write latency, not a
+ * detail of this module.
  */
-export function setupAuditMiddleware() {
-  // Only log mutating operations, not reads
-  const MUTATING_ACTIONS = new Set([
-    'create',
-    'createMany',
-    'update',
-    'updateMany',
-    'delete',
-    'deleteMany',
-    'upsert',
-  ]);
+export const auditExtension = Prisma.defineExtension({
+  name: 'audit-log',
+  query: {
+    $allModels: {
+      async $allOperations({ model, operation, args, query }) {
+        // The audit write is itself a `create`. Without this the extension would audit its
+        // own row, and audit that, until the stack gave out.
+        if (model === 'DatabaseAuditLog' || !MUTATING_ACTIONS.has(operation)) {
+          return query(args);
+        }
 
-  prisma.$use(async (params, next) => {
-    const startTime = Date.now();
-    let result;
-    let error: Error | null = null;
+        const startTime = Date.now();
+        let result: unknown;
+        let failed = false;
+        try {
+          result = await query(args);
+          return result;
+        } catch (err) {
+          failed = true;
+          throw err;
+        } finally {
+          const executionTimeMs = Date.now() - startTime;
+          const params: AuditParams = {
+            model,
+            action: operation,
+            args: (args ?? {}) as AuditParams['args'],
+          };
 
-    try {
-      result = await next(params);
-    } catch (err) {
-      error = err as Error;
-      throw err;
-    } finally {
-      const executionTimeMs = Date.now() - startTime;
+          // Deliberately not awaited: the trail must not sit in front of the write it
+          // describes. Failures are swallowed by `logAuditOperation` itself.
+          void (async () => {
+            try {
+              const context = await getAuditContext();
+              const userContext = extractUserContext(params);
+              const { suspicious, reason } = checkSuspicious(params, executionTimeMs);
 
-      // Only log mutating operations
-      if (!MUTATING_ACTIONS.has(params.action)) {
-        return;
-      }
+              let logged = 'INSERT';
+              if (operation.includes('update') || operation === 'upsert') logged = 'UPDATE';
+              if (operation.includes('delete')) logged = 'DELETE';
 
-      // Log asynchronously to avoid performance impact
-      try {
-        const context = await getAuditContext();
-        const userContext = extractUserContext(params);
-        const { suspicious, reason } = checkSuspicious(params, executionTimeMs);
-
-        // Determine operation type
-        let operation = 'INSERT';
-        if (params.action.includes('update')) operation = 'UPDATE';
-        if (params.action.includes('delete')) operation = 'DELETE';
-
-        // Log to database
-        // Note: Running in background doesn't await, preventing performance degradation
-        logAuditOperation({
-          tableName: params.model || 'unknown',
-          operation,
-          params,
-          result: error ? null : result,
-          context: { ...context, ...userContext },
-          executionTimeMs,
-          suspicious,
-          suspicionReason: reason,
-        }).catch((err) => {
-          // Audit logging failure should not crash the app
-          console.error('Failed to log audit operation:', err);
-        });
-      } catch (err) {
-        console.error('Error in audit middleware:', err);
-      }
-    }
-  });
-}
+              await logAuditOperation({
+                tableName: model ?? 'unknown',
+                operation: logged,
+                params,
+                result: failed ? null : result,
+                context: { ...context, ...userContext },
+                executionTimeMs,
+                suspicious,
+                suspicionReason: reason,
+              });
+            } catch (err) {
+              console.error('Error in audit extension:', err);
+            }
+          })();
+        }
+      },
+    },
+  },
+});
 
 /**
  * Log an audit operation (called asynchronously)
@@ -218,7 +250,7 @@ export function setupAuditMiddleware() {
 async function logAuditOperation(opts: {
   tableName: string;
   operation: string;
-  params: Prisma.MiddlewareParams;
+  params: AuditParams;
   result: unknown;
   context: AuditContext;
   executionTimeMs: number;

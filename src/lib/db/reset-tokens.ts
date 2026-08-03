@@ -13,7 +13,11 @@ export async function createResetToken(params: {
   ]);
 }
 
-export type ResetTokenRecord = { id: string; userId: string; tenantId: string };
+/**
+ * `email` is carried so the strength check on the new password can penalise a password built
+ * out of the address it protects — zxcvbn only knows the words it is handed.
+ */
+export type ResetTokenRecord = { id: string; userId: string; tenantId: string; email: string };
 
 /**
  * Resolves a reset token. Scoped by tenant for the same reason sessions are: a link issued
@@ -30,9 +34,11 @@ export async function findValidResetToken(
       expiresAt: { gt: new Date() },
       user: { tenantId },
     },
-    select: { id: true, userId: true, user: { select: { tenantId: true } } },
+    select: { id: true, userId: true, user: { select: { tenantId: true, email: true } } },
   });
-  return row ? { id: row.id, userId: row.userId, tenantId: row.user.tenantId } : null;
+  return row
+    ? { id: row.id, userId: row.userId, tenantId: row.user.tenantId, email: row.user.email }
+    : null;
 }
 
 export async function consumeResetToken(id: string): Promise<void> {

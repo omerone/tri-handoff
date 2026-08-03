@@ -20,7 +20,7 @@ import path from 'path';
  *   process.env.DATABASE_URL = secrets.DATABASE_URL;
  */
 
-interface SecretValue {
+interface _SecretValue {
   [key: string]: string;
 }
 
@@ -176,7 +176,7 @@ export async function loadSecrets(): Promise<Record<string, string>> {
 
     // Log which sources were used (without values)
     if (loadedFrom.length > 0) {
-      console.log(`[Secrets] Loaded from: ${loadedFrom.join(', ')}`);
+      console.warn(`[Secrets] Loaded from: ${loadedFrom.join(', ')}`);
     }
 
     if (Object.keys(secrets).length === 0) {

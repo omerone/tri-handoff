@@ -31,7 +31,7 @@ export const options = {
   },
 };
 
-export default function () {
+export default function rateLimitLoadTest() {
   // Test: Multiple login attempts (should hit rate limit)
   const loginEmail = `user_${__VU}_${__ITER}@example.com`;
   const loginPayload = JSON.stringify({

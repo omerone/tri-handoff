@@ -218,7 +218,7 @@
     "close": "Close",
     "cost": "Cost",
     "empty": "No positions yet",
-    "subtitle": "Entered by hand — you set the current value (no automatic price feed).",
+    "subtitle": "Tracked positions are marked to the last close automatically; the rest you set by hand.",
     "symbol": "Symbol",
     "buyDate": "Buy date",
     "fees": "Fees",
@@ -237,7 +237,14 @@
     "stalest": "Oldest price: {days} days",
     "priceToday": "Updated today",
     "priceDays": "{days} days ago",
-    "fxUnavailable": "No exchange rate for some currencies — totals are not shown."
+    "fxUnavailable": "No exchange rate for some currencies — totals are not shown.",
+    "searchHint": "Company name or symbol",
+    "searching": "Searching…",
+    "noMatches": "No matching listing",
+    "auto": "auto",
+    "autoOn": "Priced automatically from the market",
+    "autoOff": "Price this position automatically",
+    "trackAll": "Price all {count} automatically"
   },
   "settings": {
     "language": "Language",
@@ -257,11 +264,7 @@
     "connectSyncFailed": "The account was saved, but the first sync failed. Try \"Refresh data\".",
     "connected": "Account connected. {count} trades imported.",
     "tooSoon": "Give it a moment before trying again.",
-    "investorPassword": "Investor password (read-only)",
-    "notConnected": "No MT5 account connected",
-    "notConnectedHint": "Connect your MT5 account to import your trade history.",
     "disconnectConfirm": "Disconnect the account? Trades already imported will stay.",
-    "backfillNote": "The first connection pulls your entire account history from MT5.",
     "balance": "Balance",
     "equity": "Equity",
     "theme": "Theme",
@@ -271,6 +274,8 @@
       "title": "Connect your MT5 account",
       "step": "Step",
       "of": "of",
+      "back": "Back",
+      "help": "Where do I find this?",
       "welcome": {
         "title": "Let's connect your MT5 account",
         "subtitle": "Complete 4 simple steps to get started",
@@ -293,7 +298,6 @@
       "password": {
         "title": "Step 3: Investor password",
         "label": "Investor password",
-        "warning": "Not your regular password — this is a special read-only password you create yourself",
         "hint": "This password allows read-only access (no ability to trade)",
         "help": "Where to find it? In MT5 Terminal → Tools → Options → Account tab → Investment Password. If you haven't created one yet, you can create it now."
       },
@@ -308,7 +312,12 @@
         "action": "Back to dashboard"
       }
     },
-    "themeSystem": "System"
+    "themeSystem": "System",
+    "account": {
+      "deleteFailedUserNotFound": "That account no longer exists. Sign in again and retry.",
+      "deleteFailedInvalidPassword": "That password is not correct. Deletion was not carried out.",
+      "deleteFailedSystem": "The account could not be deleted. Nothing was removed — try again, and contact support if it keeps failing."
+    }
   },
   "calendar": {
     "weekdays": [

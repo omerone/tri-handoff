@@ -1,6 +1,10 @@
 import 'server-only';
 import { hash, verify, type Options } from '@node-rs/argon2';
-import { zxcvbn, zxcvbnOptions } from 'zxcvbn';
+// `zxcvbn` v4 is a single CommonJS function with no named exports — the `{ zxcvbn,
+// zxcvbnOptions }` shape belongs to `@zxcvbn-ts/core`, a different package. Importing it
+// that way left `zxcvbnOptions` undefined and threw on module evaluation, which took down
+// every route that reaches this file: the login page 500ed before it rendered.
+import zxcvbn from 'zxcvbn';
 
 /**
  * `Algorithm` is an ambient `const enum`, which `isolatedModules` forbids importing as a
@@ -26,12 +30,8 @@ const OPTIONS = {
 export const MIN_PASSWORD_LENGTH = 12; // Increased from 10 to 12 for strength validation
 export const MIN_PASSWORD_STRENGTH_SCORE = 3; // zxcvbn score: 3 = good, 4 = strong
 
-// Configure zxcvbn for password strength analysis
-zxcvbnOptions({
-  dictionary: {
-    userInputs: [],
-  },
-});
+// No global configuration step: v4 takes the user's own words as the second argument to each
+// call, which is where they belong — the email to penalise differs per password checked.
 
 export function hashPassword(plain: string): Promise<string> {
   return hash(plain, OPTIONS);
@@ -104,7 +104,8 @@ export function analyzePasswordStrength(
     score: result.score as 0 | 1 | 2 | 3 | 4,
     feedback: result.feedback,
     isStrong: result.score >= MIN_PASSWORD_STRENGTH_SCORE,
-    guessesLog10: result.guessesLog10,
+    // v4 reports this in snake_case.
+    guessesLog10: result.guesses_log10,
   };
 }
 

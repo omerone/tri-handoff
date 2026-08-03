@@ -41,6 +41,32 @@ export async function requireAdmin(): Promise<AdminIdentity> {
   return admin;
 }
 
+/**
+ * The same gate for a route handler, which cannot answer with a redirect.
+ *
+ * Returns the operator, or the response to send instead. Two failures, told apart on purpose:
+ * a request to the wrong host gets a 404 — the operator API does not exist on a client's
+ * domain, and saying "unauthorized" would confirm that it exists somewhere — while a request
+ * to the right host without a session gets a 401.
+ */
+export async function adminForApi(): Promise<
+  { admin: AdminIdentity; response?: never } | { admin?: never; response: Response }
+> {
+  const expected = normalizeDomain(env().APP_BASE_DOMAIN);
+  const actual = await getRequestHost();
+  if (!expected || actual !== expected) {
+    return { response: new Response('not found', { status: 404 }) };
+  }
+
+  const admin = await getAdmin();
+  if (!admin) {
+    return {
+      response: Response.json({ error: 'Unauthorized: operator session required' }, { status: 401 }),
+    };
+  }
+  return { admin };
+}
+
 export async function startAdminSession(superAdminId: string): Promise<void> {
   const token = generateToken();
   await createAdminSession({

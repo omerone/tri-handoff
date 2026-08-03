@@ -1,8 +1,10 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
+import Link from 'next/link';
 import { AlertCircle, Check, ChevronRight, HelpCircle, Lock, Server } from 'lucide-react';
 import { FormMessage } from '@/components/ui/form';
+import { Num } from '@/components/ui/kpi';
 import { connectMt5Action, type Mt5FormState } from './mt5-actions';
 
 type Step = 'welcome' | 'login' | 'server' | 'password' | 'processing' | 'success';
@@ -18,10 +20,17 @@ const SERVERS = [
 ];
 
 export interface WizardLabels {
+  /** The account's own words, shared with the connected card so both name things alike. */
+  login: string;
+  server: string;
+  connect: string;
+  investorWarning: string;
   wizard: {
-    title: string;
     step: string;
     of: string;
+    back: string;
+    /** The disclosure that opens a step's "where do I find this?" note. */
+    help: string;
     welcome: {
       title: string;
       subtitle: string;
@@ -44,7 +53,6 @@ export interface WizardLabels {
     password: {
       title: string;
       label: string;
-      warning: string;
       hint: string;
       help: string;
     };
@@ -59,13 +67,9 @@ export interface WizardLabels {
       action: string;
     };
   };
-  investorWarning: string;
-  connectInvalid: string;
-  connectRejected: string;
-  connectUnreachable: string;
-  connectSyncFailed: string;
-  connected: string;
-  tooSoon: string;
+  /* The connect outcomes (invalid / rejected / unreachable / sync-failed / connected / too-soon)
+     are not passed in: the server action already returns them translated and filled in, and the
+     wizard renders that text as-is. */
 }
 
 export function Mt5ConnectWizard({
@@ -79,7 +83,11 @@ export function Mt5ConnectWizard({
     server: SERVERS[0] || 'MetaQuotes-Live01',
     investorPassword: '',
   });
-  const [state, action] = useActionState<Mt5FormState, FormData>(connectMt5Action, {});
+  // The action is called directly rather than through `useActionState`. Its state only lands on
+  // the *next* render, so the branch below read the state from before the attempt: the first
+  // connect always looked like a success, and a broker rejection put "Done! Your account is
+  // connected" on screen with the error left on a step nobody was looking at any more.
+  const [state, setState] = useState<Mt5FormState>({});
   const [showHelp, setShowHelp] = useState<string | null>(null);
 
   const stepIndex = Math.max(0, STEPS.indexOf(step));
@@ -106,12 +114,9 @@ export function Mt5ConnectWizard({
       formDataObj.append('server', formData.server || '');
       formDataObj.append('investorPassword', formData.investorPassword || '');
 
-      await action(formDataObj);
-      if (!state?.error) {
-        setStep('success');
-      } else {
-        setStep('password');
-      }
+      const result = await connectMt5Action({}, formDataObj);
+      setState(result);
+      setStep(result.error ? 'password' : 'success');
     }
   };
 
@@ -130,7 +135,7 @@ export function Mt5ConnectWizard({
 
   return (
     <div className="flex flex-col gap-4">
-      <ProgressBar current={stepIndex + 1} total={totalSteps} />
+      <ProgressBar current={stepIndex + 1} total={totalSteps} labels={labels} />
 
       <div className="rounded-[10px] border border-line bg-raised p-6">
         {step === 'welcome' && (
@@ -187,7 +192,15 @@ export function Mt5ConnectWizard({
   );
 }
 
-function ProgressBar({ current, total }: { current: number; total: number }) {
+function ProgressBar({
+  current,
+  total,
+  labels,
+}: {
+  current: number;
+  total: number;
+  labels: WizardLabels;
+}) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 overflow-hidden rounded-full bg-line/40">
@@ -196,8 +209,10 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
           style={{ width: `${(current / total) * 100}%` }}
         />
       </div>
-      <span className="text-dim text-xs font-medium">
-        {current} / {total}
+      {/* "Step 1 of 4" rather than "1 / 4": the words are already written and translated, and
+          the bare fraction next to a bar reads as a ratio of something rather than a position. */}
+      <span className="text-dim text-xs font-medium whitespace-nowrap">
+        {labels.wizard.step} <Num>{current}</Num> {labels.wizard.of} <Num>{total}</Num>
       </span>
     </div>
   );
@@ -271,38 +286,102 @@ function LoginStep({
         </label>
       </div>
 
-      {showHelp && (
+      <HelpNote
+        labels={labels}
+        text={labels.wizard.login.help}
+        open={showHelp}
+        onToggle={onToggleHelp}
+      />
+
+      <StepNav
+        labels={labels}
+        onBack={onBack}
+        onNext={onNext}
+        next={labels.wizard.welcome.action}
+        disabled={!value.trim()}
+      />
+    </div>
+  );
+}
+
+/**
+ * A step's "where do I find this?" note.
+ *
+ * The label is its own string. It used to be the first thirty characters of the help text
+ * itself with an ellipsis stuck on — so the button read as a sentence cut in half, and opening
+ * it showed the same sentence again in full — with a hard-coded English "Help" behind it on
+ * one step and a hard-coded Hebrew "איפה למצוא?" on the other.
+ */
+function HelpNote({
+  labels,
+  text,
+  open,
+  onToggle,
+}: {
+  labels: WizardLabels;
+  text: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      {open ? (
         <div className="border-info/30 bg-info/10 flex gap-2 rounded-[10px] border p-3">
           <HelpCircle size={16} className="text-info mt-0.5 shrink-0" />
-          <p className="text-text/80 text-xs leading-relaxed">{labels.wizard.login.help}</p>
+          <p className="text-text/80 text-xs leading-relaxed">{text}</p>
         </div>
-      )}
+      ) : null}
 
       <button
         type="button"
-        onClick={onToggleHelp}
-        className="text-dim hover:text-text text-xs font-medium transition-colors text-left"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="text-dim hover:text-text text-start text-xs font-medium transition-colors"
       >
-        {showHelp ? '▼' : '▶'} {labels.wizard.login.help ? labels.wizard.login.help.substring(0, 30) + '…' : 'Help'}
+        {open ? '▼' : '▶'} {labels.wizard.help}
       </button>
+    </>
+  );
+}
 
-      <div className="flex gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onBack}
-          className="border-line text-dim flex-1 rounded-[10px] border px-3 py-2 text-sm font-medium transition-colors hover:text-text"
-        >
-          ← {labels.wizard.welcome.action}
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={!value.trim()}
-          className="bg-brand flex-1 rounded-[10px] px-3 py-2 text-sm font-bold text-white transition-opacity disabled:opacity-40"
-        >
-          {labels.wizard.welcome.action} →
-        </button>
-      </div>
+/**
+ * Back and forward, the same pair on every step.
+ *
+ * No arrow glyphs: `←` and `→` are physical directions, and in Hebrew — which is the default
+ * locale — "back" points the other way, so every step pointed its buttons at the wrong sides.
+ * Both buttons say where they go, which needs no direction at all. Back was also labelled with
+ * the *next* step's word, so it read "← Next" in English and "← התחל" ("Start") in Hebrew.
+ */
+function StepNav({
+  labels,
+  onBack,
+  onNext,
+  next,
+  disabled = false,
+}: {
+  labels: WizardLabels;
+  onBack: () => void;
+  onNext: () => void;
+  next: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex gap-2 pt-2">
+      <button
+        type="button"
+        onClick={onBack}
+        className="border-line text-dim hover:text-text flex-1 rounded-[10px] border px-3 py-2 text-sm font-medium transition-colors"
+      >
+        {labels.wizard.back}
+      </button>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={disabled}
+        className="bg-brand flex-1 rounded-[10px] px-3 py-2 text-sm font-bold text-white transition-opacity disabled:opacity-40"
+      >
+        {next}
+      </button>
     </div>
   );
 }
@@ -361,22 +440,12 @@ function ServerStep({
         </p>
       </div>
 
-      <div className="flex gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onBack}
-          className="border-line text-dim flex-1 rounded-[10px] border px-3 py-2 text-sm font-medium transition-colors hover:text-text"
-        >
-          ← {labels.wizard.welcome.action}
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          className="bg-brand flex-1 rounded-[10px] px-3 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90"
-        >
-          {labels.wizard.welcome.action} →
-        </button>
-      </div>
+      <StepNav
+        labels={labels}
+        onBack={onBack}
+        onNext={onNext}
+        next={labels.wizard.welcome.action}
+      />
     </div>
   );
 }
@@ -430,38 +499,22 @@ function PasswordStep({
         </label>
       </div>
 
-      {showHelp && (
-        <div className="border-info/30 bg-info/10 flex gap-2 rounded-[10px] border p-3">
-          <HelpCircle size={16} className="text-info mt-0.5 shrink-0" />
-          <p className="text-text/80 text-xs leading-relaxed">{labels.wizard.password.help}</p>
-        </div>
-      )}
+      <HelpNote
+        labels={labels}
+        text={labels.wizard.password.help}
+        open={showHelp}
+        onToggle={onToggleHelp}
+      />
 
-      <button
-        type="button"
-        onClick={onToggleHelp}
-        className="text-dim hover:text-text text-xs font-medium transition-colors text-left"
-      >
-        {showHelp ? '▼' : '▶'} איפה למצוא?
-      </button>
-
-      <div className="flex gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onBack}
-          className="border-line text-dim flex-1 rounded-[10px] border px-3 py-2 text-sm font-medium transition-colors hover:text-text"
-        >
-          ← {labels.wizard.welcome.action}
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={!value}
-          className="bg-brand flex-1 rounded-[10px] px-3 py-2 text-sm font-bold text-white transition-opacity disabled:opacity-40"
-        >
-          {labels.wizard.welcome.action} ✓
-        </button>
-      </div>
+      {/* The last step's button says what it does — this is where the account is connected,
+          and "Next" on the button that submits credentials undersells the moment. */}
+      <StepNav
+        labels={labels}
+        onBack={onBack}
+        onNext={onNext}
+        next={labels.connect}
+        disabled={!value}
+      />
     </div>
   );
 }
@@ -506,16 +559,20 @@ function SuccessStep({
         </div>
       </div>
 
-      <div className="border-line grid gap-3 border-t pt-3">
+      {/* `dt`/`dd` only mean anything inside a `dl` — they were sitting in plain `div`s, which
+          is invalid markup and leaves a screen reader with two labels attached to nothing. */}
+      <dl className="border-line grid gap-3 border-t pt-3">
         <div>
-          <dt className="text-dim text-xs">Login</dt>
-          <dd className="text-text mt-1 text-sm font-medium">#{login}</dd>
+          <dt className="text-dim text-xs">{labels.login}</dt>
+          <dd className="text-text mt-1 text-sm font-medium">
+            <Num>#{login}</Num>
+          </dd>
         </div>
         <div>
-          <dt className="text-dim text-xs">Server</dt>
+          <dt className="text-dim text-xs">{labels.server}</dt>
           <dd className="text-text mt-1 text-sm font-medium">{server}</dd>
         </div>
-      </div>
+      </dl>
 
       <div className="bg-pos/5 rounded-[10px] p-3 text-center">
         <p className="text-text text-xs font-medium">{labels.wizard.success.status}</p>
@@ -523,6 +580,16 @@ function SuccessStep({
             "connected", and the action already returns it. */}
         {imported ? <p className="text-dim mt-1 text-xs">{imported}</p> : null}
       </div>
+
+      {/* Connecting revalidates the layout, so this card is usually replaced by the connected
+          one within a moment — but "usually" is not "always", and without this the last step of
+          a four-step wizard is a screen with nothing to press. */}
+      <Link
+        href="/dashboard"
+        className="bg-brand rounded-[10px] px-3 py-2 text-center text-sm font-bold text-white transition-opacity hover:opacity-90"
+      >
+        {labels.wizard.success.action}
+      </Link>
     </div>
   );
 }

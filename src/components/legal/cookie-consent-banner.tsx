@@ -16,7 +16,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const STORAGE_KEY = 'tri_cookie_consent';
-const CONSENT_EXPIRY_DAYS = 365;
+const _CONSENT_EXPIRY_DAYS = 365;
 
 export interface CookieConsent {
   analytics: boolean;
@@ -29,7 +29,17 @@ interface CookieConsentBannerProps {
   companyEmail?: string;
 }
 
-export function CookieConsentBanner({ onConsent, companyEmail = 'privacy@tri.com' }: CookieConsentBannerProps) {
+/**
+ * Google Analytics installs `gtag` on the window at runtime; TypeScript has no way to know
+ * that, and casting at each call site hides the optionality that the guards below rely on.
+ */
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
+export function CookieConsentBanner({ onConsent, companyEmail: _companyEmail = 'privacy@tri.com' }: CookieConsentBannerProps) {
   const [showBanner, setShowBanner] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
   const [analytics, setAnalytics] = useState(false);

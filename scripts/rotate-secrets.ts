@@ -52,7 +52,7 @@ interface RotatedSecrets {
   ENCRYPTION_KEY: string;
 }
 
-interface BackupFile {
+interface _BackupFile {
   timestamp: string;
   rotatedSecretsCount: number;
   backupPath: string;
@@ -165,7 +165,7 @@ async function rotateSecretsInAws(
  */
 async function logRotationEvent(
   adminId: string | undefined,
-  rotatedSecrets: RotatedSecrets,
+  _rotatedSecrets: RotatedSecrets,
 ): Promise<void> {
   try {
     await SecurityLogger.logAdminAction({

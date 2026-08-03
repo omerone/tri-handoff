@@ -105,7 +105,7 @@ class AWSWAFSetup {
     this.managedRules = this.initializeManagedRules();
 
     try {
-      const rules = this.generateRuleStatements();
+      const _rules = this.generateRuleStatements();
 
       console.log('[AWS WAF] ✓ Web ACL configuration prepared');
       console.log(`[AWS WAF] Managed Rules: ${this.managedRules.map(r => r.name).join(', ')}`);
@@ -119,7 +119,7 @@ class AWSWAFSetup {
    * Generate WAF rule statements from managed rules
    */
   private generateRuleStatements(): unknown[] {
-    return this.managedRules.map((rule, index) => ({
+    return this.managedRules.map((rule) => ({
       name: rule.name,
       priority: rule.priority,
       statement: {

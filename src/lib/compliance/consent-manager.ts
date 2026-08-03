@@ -12,9 +12,7 @@
  * All consent changes are audit-logged for compliance.
  */
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { userConsents } from '@/lib/db/consents';
 
 /**
  * Consent types
@@ -89,7 +87,7 @@ export async function grantConsent(
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
   // Create consent record
-  const consent = await (prisma as any).userConsent.create({
+  const consent = await userConsents.create({
     data: {
       userId,
       type,
@@ -118,7 +116,7 @@ export async function getUserConsentStatus(
   userId: string
 ): Promise<UserConsentStatus> {
   // Get latest consent for each type
-  const consents = await (prisma as any).userConsent.findMany({
+  const consents = await userConsents.findMany({
     where: { userId },
     distinct: ['type'],
     orderBy: { grantedAt: 'desc' },
@@ -184,7 +182,7 @@ export async function hasConsent(
     return true;
   }
 
-  const consent = await (prisma as any).userConsent.findFirst({
+  const consent = await userConsents.findFirst({
     where: { userId, type },
     orderBy: { grantedAt: 'desc' },
   });
@@ -215,7 +213,7 @@ export async function revokeConsent(
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
   // Create revocation record
-  const consent = await (prisma as any).userConsent.create({
+  const consent = await userConsents.create({
     data: {
       userId,
       type,
@@ -241,7 +239,7 @@ export async function revokeConsent(
 export async function getUserConsentHistory(
   userId: string
 ): Promise<ConsentRecord[]> {
-  const consents = await (prisma as any).userConsent.findMany({
+  const consents = await userConsents.findMany({
     where: { userId },
     orderBy: { grantedAt: 'desc' },
   });
@@ -347,7 +345,7 @@ export async function saveCookieConsent(
  * @param userId - User ID
  */
 export async function deleteUserConsents(userId: string): Promise<number> {
-  const result = await (prisma as any).userConsent.deleteMany({
+  const result = await userConsents.deleteMany({
     where: { userId },
   });
 
@@ -371,7 +369,7 @@ async function logConsentChange(
 ): Promise<void> {
   try {
     // Log to security/audit logs (implement based on your logging system)
-    console.log(`[COMPLIANCE] Consent change for user ${userId}:`, {
+    console.warn(`[COMPLIANCE] Consent change for user ${userId}:`, {
       type,
       granted,
       source,
@@ -419,7 +417,7 @@ export async function getConsentStatistics(
   dateFrom: Date,
   dateTo: Date
 ): Promise<Record<string, number>> {
-  const consents = await (prisma as any).userConsent.findMany({
+  const consents = await userConsents.findMany({
     where: {
       grantedAt: {
         gte: dateFrom,
@@ -430,27 +428,27 @@ export async function getConsentStatistics(
 
   const stats: Record<string, number> = {
     totalConsents: consents.length,
-    uniqueUsers: new Set(consents.map((c: ConsentRecord) => c.userId)).size,
-    gdprProcessing: consents.filter((c: ConsentRecord) => c.type === 'gdpr_processing' && c.granted)
+    uniqueUsers: new Set(consents.map((c) => c.userId)).size,
+    gdprProcessing: consents.filter((c) => c.type === 'gdpr_processing' && c.granted)
       .length,
-    marketingEmail: consents.filter((c: ConsentRecord) => c.type === 'marketing_email' && c.granted)
+    marketingEmail: consents.filter((c) => c.type === 'marketing_email' && c.granted)
       .length,
     analyticsCookies: consents.filter(
-      (c: ConsentRecord) => c.type === 'analytics_cookies' && c.granted
+      (c) => c.type === 'analytics_cookies' && c.granted
     ).length,
     preferenceCookies: consents.filter(
-      (c: ConsentRecord) => c.type === 'preference_cookies' && c.granted
+      (c) => c.type === 'preference_cookies' && c.granted
     ).length,
-    termsOfService: consents.filter((c: ConsentRecord) => c.type === 'terms_of_service' && c.granted)
+    termsOfService: consents.filter((c) => c.type === 'terms_of_service' && c.granted)
       .length,
-    privacyPolicy: consents.filter((c: ConsentRecord) => c.type === 'privacy_policy' && c.granted)
+    privacyPolicy: consents.filter((c) => c.type === 'privacy_policy' && c.granted)
       .length,
   };
 
   return stats;
 }
 
-export default {
+const consentManager = {
   grantConsent,
   getUserConsentStatus,
   hasConsent,
@@ -464,3 +462,5 @@ export default {
   hasAcceptedRequiredConsents,
   getConsentStatistics,
 };
+
+export default consentManager;

@@ -78,8 +78,9 @@ describe('SQL Injection Protection', () => {
         },
       });
 
-      // Should not return any data
-      expect(result).toBeUndefined();
+      // Should not return any data. `findFirst` reports "no match" as null, never undefined —
+      // asserting undefined passed for the wrong reason on a query that returned a row.
+      expect(result).toBeNull();
     });
   });
 
@@ -274,22 +275,26 @@ describe('SQL Injection Protection', () => {
       }
     });
 
-    it('should handle null bytes and control characters', async () => {
-      const payloads = [
-        "'\x00 OR '1'='1",
-        "'\n OR '1'='1",
-        "'\r OR '1'='1",
-      ];
-
-      for (const payload of payloads) {
+    it('should handle control characters', async () => {
+      for (const payload of ["'\n OR '1'='1", "'\r OR '1'='1"]) {
         const result = await prisma.user.findFirst({
           where: {
             email: payload,
           },
         });
 
-        expect(result).toBeUndefined();
+        expect(result).toBeNull();
       }
+    });
+
+    it('should reject a null byte rather than smuggle it into the query', async () => {
+      // Postgres refuses 0x00 in a text value outright (SQLSTATE 22021), so the payload never
+      // reaches a query at all. Rejection *is* the safe outcome here — the earlier version of
+      // this test expected a row lookup to succeed and returned the connector error instead,
+      // which read as "the injection worked" when it means the opposite.
+      await expect(
+        prisma.user.findFirst({ where: { email: "'\x00 OR '1'='1" } }),
+      ).rejects.toThrow();
     });
 
     it('should handle unicode and international characters', async () => {
@@ -306,7 +311,7 @@ describe('SQL Injection Protection', () => {
           },
         });
 
-        expect(result).toBeUndefined();
+        expect(result).toBeNull();
       }
     });
   });

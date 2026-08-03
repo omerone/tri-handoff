@@ -23,8 +23,18 @@ vi.mock('@/lib/db/prisma', () => ({
   },
 }));
 
-// eslint-disable-next-line no-restricted-imports
+ 
 import { prisma } from '@/lib/db/prisma';
+
+/**
+ * Fills the audit columns a given case does not care about.
+ *
+ * `findMany` is typed against the whole `DatabaseAuditLog` row, so a fixture that omits
+ * `archived`/`archivePath` — which none of these tests exercise — fails to type-check at the
+ * mock boundary rather than anywhere meaningful.
+ */
+const auditRows = <T extends Record<string, unknown>>(rows: T[]) =>
+  rows.map((row) => ({ archived: false, archivePath: null, ...row }));
 
 describe('Database Audit Logging', () => {
   beforeEach(() => {
@@ -56,11 +66,11 @@ describe('Database Audit Logging', () => {
         },
       ];
 
-      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(mockLogs);
+      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(auditRows(mockLogs) as never);
 
       const result = await getUserAuditLog('user123', { limit: 100 });
 
-      expect(result).toEqual(mockLogs);
+      expect(result).toEqual(auditRows(mockLogs));
       expect(prisma.databaseAuditLog.findMany).toHaveBeenCalledWith({
         where: { userId: 'user123' },
         orderBy: { createdAt: 'desc' },
@@ -104,11 +114,11 @@ describe('Database Audit Logging', () => {
         },
       ];
 
-      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(mockLogs);
+      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(auditRows(mockLogs) as never);
 
       const result = await getTableAuditLog('users');
 
-      expect(result).toEqual(mockLogs);
+      expect(result).toEqual(auditRows(mockLogs));
       expect(prisma.databaseAuditLog.findMany).toHaveBeenCalledWith({
         where: { tableName: 'users' },
         orderBy: { createdAt: 'desc' },
@@ -155,11 +165,11 @@ describe('Database Audit Logging', () => {
         },
       ];
 
-      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(mockLogs);
+      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(auditRows(mockLogs) as never);
 
       const result = await getRecordAuditLog('trades', 'trade123');
 
-      expect(result).toEqual(mockLogs);
+      expect(result).toEqual(auditRows(mockLogs));
       expect(prisma.databaseAuditLog.findMany).toHaveBeenCalledWith({
         where: { tableName: 'trades', recordId: 'trade123' },
         orderBy: { createdAt: 'desc' },
@@ -189,11 +199,11 @@ describe('Database Audit Logging', () => {
         },
       ];
 
-      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(mockLogs);
+      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(auditRows(mockLogs) as never);
 
       const result = await getSuspiciousActivity({ timeWindowHours: 24 });
 
-      expect(result).toEqual(mockLogs);
+      expect(result).toEqual(auditRows(mockLogs));
       expect(prisma.databaseAuditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
@@ -211,13 +221,15 @@ describe('Database Audit Logging', () => {
       await getSuspiciousActivity({ timeWindowHours: 48 });
       const after = Date.now();
 
-      const call = vi.mocked(prisma.databaseAuditLog.findMany).mock.calls[0][0];
-      const whereClause = call.where as Record<string, unknown>;
+      const call = vi.mocked(prisma.databaseAuditLog.findMany).mock.calls[0]?.[0];
+      expect(call).toBeDefined();
+      const whereClause = call!.where as Record<string, unknown>;
       const createdAtGte = (whereClause.createdAt as Record<string, Date>).gte;
+      expect(createdAtGte).toBeInstanceOf(Date);
 
       // Should be approximately 48 hours ago (with small tolerance for test execution time)
-      expect(createdAtGte.getTime()).toBeGreaterThan(before - 48 * 60 * 60 * 1000 - 1000);
-      expect(createdAtGte.getTime()).toBeLessThan(after - 48 * 60 * 60 * 1000 + 1000);
+      expect(createdAtGte!.getTime()).toBeGreaterThan(before - 48 * 60 * 60 * 1000 - 1000);
+      expect(createdAtGte!.getTime()).toBeLessThan(after - 48 * 60 * 60 * 1000 + 1000);
     });
   });
 
@@ -242,11 +254,11 @@ describe('Database Audit Logging', () => {
         },
       ];
 
-      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(mockLogs);
+      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(auditRows(mockLogs) as never);
 
       const result = await getSlowQueries({ thresholdMs: 5000 });
 
-      expect(result).toEqual(mockLogs);
+      expect(result).toEqual(auditRows(mockLogs));
       expect(prisma.databaseAuditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
@@ -285,7 +297,7 @@ describe('Database Audit Logging', () => {
         },
       ];
 
-      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(mockLogs as any);
+      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(auditRows(mockLogs) as never);
 
       const result = await getAuditStatistics({ hoursBack: 24 });
 
@@ -346,16 +358,18 @@ describe('Database Audit Logging', () => {
 
       await deleteArchivedLogs({ retentionMonths: 12 });
 
-      const call = vi.mocked(prisma.databaseAuditLog.deleteMany).mock.calls[0][0];
-      const whereClause = call.where as Record<string, unknown>;
+      const call = vi.mocked(prisma.databaseAuditLog.deleteMany).mock.calls[0]?.[0];
+      expect(call).toBeDefined();
+      const whereClause = call!.where as Record<string, unknown>;
       const createdAtLt = (whereClause.createdAt as Record<string, Date>).lt;
+      expect(createdAtLt).toBeInstanceOf(Date);
 
       // Should be approximately 12 months ago
       const now = new Date();
       const expectedTime = new Date(now.getTime());
       expectedTime.setMonth(expectedTime.getMonth() - 12);
 
-      const diff = Math.abs(createdAtLt.getTime() - expectedTime.getTime());
+      const diff = Math.abs(createdAtLt!.getTime() - expectedTime.getTime());
       expect(diff).toBeLessThan(2000); // Within 2 seconds
     });
   });
@@ -397,11 +411,11 @@ describe('Database Audit Logging', () => {
         },
       ];
 
-      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(mockLogs);
+      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(auditRows(mockLogs) as never);
 
       const result = await getUserAuditLog('user123');
 
-      expect(result[0].userId).toBe('user123');
+      expect(result[0]?.userId).toBe('user123');
     });
 
     it('captures tenantId in audit log', async () => {
@@ -424,11 +438,11 @@ describe('Database Audit Logging', () => {
         },
       ];
 
-      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(mockLogs);
+      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(auditRows(mockLogs) as never);
 
       const result = await getTableAuditLog('trades');
 
-      expect(result[0].tenantId).toBe('tenant1');
+      expect(result[0]?.tenantId).toBe('tenant1');
     });
 
     it('captures IP address in audit log', async () => {
@@ -451,11 +465,11 @@ describe('Database Audit Logging', () => {
         },
       ];
 
-      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(mockLogs);
+      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(auditRows(mockLogs) as never);
 
       const result = await getTableAuditLog('trades');
 
-      expect(result[0].ipAddress).toBe('192.168.1.100');
+      expect(result[0]?.ipAddress).toBe('192.168.1.100');
     });
   });
 
@@ -481,11 +495,11 @@ describe('Database Audit Logging', () => {
         },
       ];
 
-      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(mockLogs);
+      vi.mocked(prisma.databaseAuditLog.findMany).mockResolvedValueOnce(auditRows(mockLogs) as never);
 
       const result = await getUserAuditLog('user123');
 
-      expect(result[0].createdAt).toEqual(now);
+      expect(result[0]?.createdAt).toEqual(now);
     });
   });
 });

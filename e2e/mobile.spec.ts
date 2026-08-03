@@ -102,6 +102,27 @@ test.describe('on a phone', () => {
     }
   });
 
+  test('keeps the thirty-day panel folded until it is asked for', async ({ page }) => {
+    // The strip becomes a row per trading day on a phone, which is most of the screen — so
+    // whatever the trader arranged under it starts below the fold. It arrives closed, as one
+    // header row carrying the count, and its header is the disclosure. On a desktop the header
+    // is plain text and the panel is a compact strip that already fits.
+    await page.goto('/dashboard');
+    const card = page.locator('[data-widget="rStrip"]');
+    const days = card.locator('li');
+    const toggle = card.getByRole('button');
+
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(days.first()).toBeHidden();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(days.first()).toBeVisible();
+
+    await toggle.click();
+    await expect(days.first()).toBeHidden();
+  });
+
   test('gives its controls a finger-sized target', async ({ page }) => {
     // 24 CSS px is WCAG 2.5.8's floor. The nav links were 32×85 and the header buttons 39×27
     // before the hit areas grew; this asserts the floor rather than the 44 the CSS aims for,
@@ -122,5 +143,22 @@ test.describe('on a phone', () => {
         .filter((el) => el.h > 0 && (el.h < 24 || el.w < 24));
     });
     expect(cramped).toEqual([]);
+  });
+});
+
+test.describe('on a wide screen', () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 768, 'the phone sweep covers the rest');
+
+  test('shows the thirty-day strip, with no fold', async ({ page }) => {
+    // The counterpart to the phone's disclosure. Here the panel is the strip, which fits, so
+    // there is nothing to fold — and a control that changes nothing is worse than no control.
+    //
+    // The visible strip is the half that matters: the card starts closed on a phone, and the
+    // closed state is a class the wide breakpoint overrides. Get that override wrong and the
+    // desktop dashboard shows an empty card with no way to open it.
+    await page.goto('/dashboard');
+    const card = page.locator('[data-widget="rStrip"]');
+    await expect(card.getByText(/^\d{2}\/\d{2}$/).first()).toBeVisible();
+    await expect(card.getByRole('button')).toHaveCount(0);
   });
 });

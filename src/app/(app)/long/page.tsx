@@ -2,7 +2,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { EmptyState, KPI } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
-import { listLongPositions } from '@/lib/db';
+import { listLongPositions, type StoredLongPosition } from '@/lib/db';
 import {
   isStale,
   portfolioTotals,
@@ -22,6 +22,7 @@ import { getFxRate, hasRate } from '@/lib/money/fx';
 import { wallClock } from '@/lib/time/zone';
 import { AddPositionForm } from './add-form';
 import { PositionRow } from './position-row';
+import { trackAllAction } from './actions';
 import { formatDateAt } from '@/lib/time/format';
 
 /**
@@ -81,7 +82,7 @@ export default async function LongPositionsPage() {
   const open = positions.filter((position) => position.closedAt === null);
   const closed = positions.filter((position) => position.closedAt !== null);
 
-  const rowFor = (position: LongPosition) => {
+  const rowFor = (position: StoredLongPosition) => {
     const valuation = valuePosition(position, now);
     const currency = asCurrency(position.currency, 'USD');
     return {
@@ -99,6 +100,7 @@ export default async function LongPositionsPage() {
       staleMessage: isStale(valuation)
         ? t('staleWarning', { days: valuation.priceAgeDays })
         : null,
+      tracked: position.priceSource === 'auto',
       closed: position.closedAt !== null,
       realized:
         position.realizedPnl === null
@@ -128,7 +130,14 @@ export default async function LongPositionsPage() {
     deleteConfirm: t('deleteConfirm'),
     updated: t('updated'),
     cancel: (await getTranslations('finance'))('cancel'),
+    auto: t('auto'),
+    autoOn: t('autoOn'),
+    autoOff: t('autoOff'),
   };
+
+  // Offered only while there is something to switch — once the book is on the feed the
+  // button is an invitation to do nothing.
+  const untracked = open.filter((position) => position.priceSource !== 'auto').length;
 
   const headers = [
     t('symbol'),
@@ -176,11 +185,26 @@ export default async function LongPositionsPage() {
       {allConverted ? null : <p className="text-warn text-xs">{t('fxUnavailable')}</p>}
 
       <Card title={t('title')}>
-        <p className="text-dim mb-3 text-xs">{t('subtitle')}</p>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-dim text-xs">{t('subtitle')}</p>
+          {untracked > 0 ? (
+            <form action={trackAllAction}>
+              <button
+                type="submit"
+                className="border-line bg-raised text-brand rounded-lg border px-2 py-1 text-[11px]"
+              >
+                {t('trackAll', { count: untracked })}
+              </button>
+            </form>
+          ) : null}
+        </div>
         <div className="border-line border-b pb-3">
           <AddPositionForm
             labels={{
               symbol: t('symbol'),
+              searchHint: t('searchHint'),
+              searching: t('searching'),
+              noMatches: t('noMatches'),
               qty: t('qty'),
               buyPrice: t('buyPrice'),
               buyDate: t('buyDate'),
