@@ -1,7 +1,34 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * The time range, against the seeded demo book (92 trades, ending in July 2026).
+ * The calendar's month heading, and the month before it.
+ *
+ * Read from the page rather than written down. The demo book is generated as a window ending
+ * "now", so a spec that names a month is a spec that passes until the seed is next run — which
+ * is exactly how "July 2026" came to be asserted in three places and wrong in all of them the
+ * morning someone added trades dated today.
+ */
+const MONTHS = Array.from({ length: 12 }, (_, index) =>
+  new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(2026, index, 15)),
+  ),
+);
+
+async function shownMonth(page: Page): Promise<string> {
+  const text = await page.locator('main').innerText();
+  const found = text.match(new RegExp(`(${MONTHS.join('|')})\\s+(\\d{4})`));
+  if (!found) throw new Error(`no month heading on the page: ${text.slice(0, 120)}`);
+  return `${found[1]} ${found[2]}`;
+}
+
+function monthBefore(label: string): string {
+  const [name, year] = label.split(' ');
+  const previous = new Date(Date.UTC(Number(year), MONTHS.indexOf(name as string) - 1, 15));
+  return `${MONTHS[previous.getUTCMonth()]} ${previous.getUTCFullYear()}`;
+}
+
+/**
+ * The time range, against the seeded demo book — a rolling window of trades ending today.
  *
  * The unit tests own the arithmetic — what the range resolves to, which days are inside it,
  * where the equity curve starts. What only a browser can show is whether the one control
@@ -218,7 +245,9 @@ test.describe('the custom panel', () => {
     await page.goto('/dashboard');
     await open(page);
 
-    await page.locator('main').click({ position: { x: 5, y: 5 } });
+    // The footer, not the top of `main`: at 412px the popover is most of the width and hangs
+    // over the first thing on the page, so a click there lands *inside* it.
+    await page.locator('footer').click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 

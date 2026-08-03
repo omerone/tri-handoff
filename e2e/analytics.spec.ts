@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /**
  * The calendar's month heading, and the month before it.
@@ -14,7 +14,7 @@ const MONTHS = Array.from({ length: 12 }, (_, index) =>
   ),
 );
 
-async function shownMonth(page: import('@playwright/test').Page): Promise<string> {
+async function shownMonth(page: Page): Promise<string> {
   const text = await page.locator('main').innerText();
   const found = text.match(new RegExp(`(${MONTHS.join('|')})\\s+(\\d{4})`));
   if (!found) throw new Error(`no month heading on the page: ${text.slice(0, 120)}`);
