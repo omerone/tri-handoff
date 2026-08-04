@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly TRi database backup
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+RandomizedDelaySec=10min
+# Catch up after downtime rather than silently skipping a night.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -26,3 +26,8 @@ pgdata/
 # Playwright's saved sign-in state
 e2e/.auth/
 .vercel
+
+# Deployment credentials — never commit. This repo is public.
+ops/.secrets.env
+ops/deploy_key
+ops/deploy_key.pub

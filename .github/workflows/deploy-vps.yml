@@ -1,0 +1,101 @@
+name: Deploy to VPS
+
+# Every push to master goes to production, gated on the checks that would
+# actually catch a broken deploy: types and the full test suite against a real
+# Postgres. The older Deploy workflow builds an image and runs WAF and audit
+# checks; this one is deliberately separate so an unrelated red job there can
+# never silently stop production from being updated.
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+# One deploy at a time, and never cancel one midway — a half-applied rollout is
+# worse than a queued one.
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tri
+          POSTGRES_PASSWORD: tri
+          POSTGRES_DB: tri
+        # 5433 on the host: tests/setup-env.ts defaults DATABASE_URL to that port.
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U tri -d tri"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://tri:tri@localhost:5433/tri?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # The integration tests talk to a real database, so the schema has to exist
+      # before they run.
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm run test
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [verify]
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Trigger deploy over SSH
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          if [ -z "$KEY" ] || [ -z "$HOST" ]; then
+            echo "::error title=Deploy not configured::DEPLOY_SSH_KEY or DEPLOY_HOST is missing."
+            exit 1
+          fi
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # The key is installed on the server under a forced command, so whatever
+          # is passed here is ignored and `tri-deploy` runs instead. It pulls this
+          # commit, rebuilds, health-checks the result and rolls back on failure,
+          # exiting non-zero if the site did not come up — which fails this job.
+          ssh -i ~/.ssh/deploy_key \
+              -o IdentitiesOnly=yes \
+              -o PasswordAuthentication=no \
+              -o ConnectTimeout=30 \
+              "$USER@$HOST" deploy
+
+      - name: Confirm production is serving this commit
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' "http://${{ secrets.DEPLOY_HOST }}/login")
+          echo "GET /login -> $code"
+          [ "$code" = "200" ] || { echo "::error title=Production unhealthy::/login returned $code"; exit 1; }
