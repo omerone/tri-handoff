@@ -68,7 +68,21 @@ export type Mt5Credentials = {
 
 export type Mt5VerifyResult =
   | { ok: true; account: Mt5AccountState }
-  | { ok: false; reason: 'invalid-credentials' | 'unreachable' | 'unsupported'; detail?: string };
+  | {
+      ok: false;
+      reason: 'invalid-credentials' | 'unknown-server' | 'unreachable' | 'unsupported';
+      detail?: string;
+      /**
+       * Server names the provider recognised as close to the one that was typed.
+       *
+       * `unknown-server` is the most likely first failure and the least self-explanatory:
+       * every broker names its servers its own way — `FTMO-Server4`, `ICMarketsSC-MT5` — and a
+       * trader who mistypes one gets told only that something is wrong. MetaApi answers an
+       * unrecognised name with the near matches from the broker it did detect, so the wizard
+       * can ask "did you mean this?" instead of leaving them to guess.
+       */
+      suggestions?: string[];
+    };
 
 export type FetchDealsOptions = {
   /**

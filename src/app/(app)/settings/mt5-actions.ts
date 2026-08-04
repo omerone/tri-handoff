@@ -24,6 +24,33 @@ const connectSchema = z.object({
   investorPassword: z.string().min(1).max(200),
 });
 
+type Translate = Awaited<ReturnType<typeof getTranslations<'settings'>>>;
+
+/**
+ * Turns a refused connection into something the user can act on.
+ *
+ * The server name is the field most likely to be wrong and the least guessable — every broker
+ * names its servers its own way, and the one in front of the trader is written in MetaTrader,
+ * not in this form. When the provider answers with the names it *does* know for that broker,
+ * they go straight into the message: "did you mean FTMO-Server4?" is a fix, "we couldn't reach
+ * the MT5 server" is a shrug.
+ */
+function connectError(
+  verified: { reason: string; suggestions?: string[] },
+  t: Translate,
+): string {
+  if (verified.reason === 'invalid-credentials') return t('connectRejected');
+
+  if (verified.reason === 'unknown-server') {
+    const names = (verified.suggestions ?? []).slice(0, 3);
+    return names.length > 0
+      ? t('connectUnknownServerDidYouMean', { names: names.join(', ') })
+      : t('connectUnknownServer');
+  }
+
+  return t('connectUnreachable');
+}
+
 /**
  * Connects the account.
  *
@@ -61,9 +88,7 @@ export async function connectMt5Action(
 
   const verified = await mt5Provider().verify(credentials);
   if (!verified.ok) {
-    return {
-      error: verified.reason === 'invalid-credentials' ? t('connectRejected') : t('connectUnreachable'),
-    };
+    return { error: connectError(verified, t) };
   }
 
   const existing = await getMt5Account(session.ctx);

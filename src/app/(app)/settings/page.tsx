@@ -77,8 +77,8 @@ export default async function SettingsPage() {
                 title: tWizard('server.title'),
                 label: tWizard('server.label'),
                 hint: tWizard('server.hint'),
-                live: tWizard('server.live'),
-                demo: tWizard('server.demo'),
+                placeholder: tWizard('server.placeholder'),
+                help: tWizard('server.help'),
               },
               password: {
                 title: tWizard('password.title'),

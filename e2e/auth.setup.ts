@@ -51,7 +51,9 @@ setup('authenticate and connect MT5', async ({ page }) => {
     await next.click();
     await page.locator('#login-field').fill('50214437');
     await next.click();
-    await page.locator('#server').selectOption('MetaQuotes-Live01');
+    // A free-text field now, not a list: every broker names its servers its own way, so a
+    // closed dropdown could not express a real account.
+    await page.locator('#server').fill('MetaQuotes-Live01');
     await next.click();
     await page.locator('#password-field').fill('investor-read-only');
     await page.getByRole('button', { name: 'Connect account' }).click();

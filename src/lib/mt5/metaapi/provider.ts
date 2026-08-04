@@ -28,6 +28,72 @@ import { normalizeSymbol } from '../symbols';
 
 const DEFAULT_REGION = 'new-york';
 
+/**
+ * A MetaApi failure, with the parts of the response worth acting on.
+ *
+ * The previous version threw `new Error('MetaApi 400 Bad Request')` and dropped the body,
+ * which is where MetaApi puts the reason. For a wrong server name the body says
+ * `E_SRV_NOT_FOUND` and lists the names it *does* know for the broker it detected — the one
+ * piece of information that turns "connection failed" into a fixable mistake.
+ */
+class MetaApiError extends Error {
+  private constructor(
+    readonly status: number,
+    message: string,
+    private readonly body: unknown,
+  ) {
+    super(message);
+    this.name = 'MetaApiError';
+  }
+
+  static async from(response: Response): Promise<MetaApiError> {
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      // Not JSON, or empty. The status alone still tells the caller something.
+    }
+    const detail =
+      body && typeof body === 'object' && 'message' in body
+        ? String((body as { message: unknown }).message)
+        : response.statusText;
+    return new MetaApiError(response.status, `MetaApi ${response.status} ${detail}`, body);
+  }
+
+  isUnknownServer(): boolean {
+    const record = this.body as { id?: unknown; code?: unknown } | null;
+    if (record && (record.id === 'E_SRV_NOT_FOUND' || record.code === 'E_SRV_NOT_FOUND')) {
+      return true;
+    }
+    // MetaApi has not always used a machine-readable code here; the sentence is stable.
+    return /\.dat file for server|please check the server name/i.test(this.message);
+  }
+
+  /**
+   * The near-miss server names MetaApi returns alongside the error.
+   *
+   * Read from a couple of shapes because the field has moved between versions of the API, and
+   * an empty list is a perfectly good answer — the wizard simply asks the user to check the
+   * name themselves.
+   */
+  serverSuggestions(): string[] {
+    const record = this.body as Record<string, unknown> | null;
+    const candidates = [record?.metadata, record?.details, record]
+      .map((value) =>
+        value && typeof value === 'object'
+          ? (value as Record<string, unknown>).recommendedServers ??
+            (value as Record<string, unknown>).similarServerNames ??
+            (value as Record<string, unknown>).servers
+          : undefined,
+      )
+      .find(Array.isArray);
+
+    return Array.isArray(candidates)
+      ? candidates.filter((name): name is string => typeof name === 'string').slice(0, 5)
+      : [];
+  }
+}
+
 type MetaApiDeal = {
   id: string;
   type: string;
@@ -70,8 +136,10 @@ export class MetaApiProvider implements Mt5Provider {
     });
 
     if (!response.ok) {
-      // Never include the request body in the message — it carries the investor password.
-      throw new Error(`MetaApi ${response.status} ${response.statusText}`);
+      // The *response* body is safe to read — it is MetaApi's own error, and it carries the
+      // detail that makes a failure actionable (see `MetaApiError`). The *request* body is
+      // the one that must never be logged: it holds the investor password.
+      throw await MetaApiError.from(response);
     }
     return (await response.json()) as T;
   }
@@ -115,10 +183,23 @@ export class MetaApiProvider implements Mt5Provider {
       const account = await this.fetchAccountState(credentials);
       return { ok: true, account };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('401') || message.includes('403')) {
-        return { ok: false, reason: 'invalid-credentials' };
+      if (error instanceof MetaApiError) {
+        if (error.status === 401 || error.status === 403) {
+          return { ok: false, reason: 'invalid-credentials' };
+        }
+        // The name is not one this broker publishes. Told apart from "we could not reach the
+        // broker" because the two ask the user for completely different things: one is a typo
+        // in a field, the other is "wait and try again".
+        if (error.isUnknownServer()) {
+          return {
+            ok: false,
+            reason: 'unknown-server',
+            detail: error.message,
+            suggestions: error.serverSuggestions(),
+          };
+        }
       }
+      const message = error instanceof Error ? error.message : String(error);
       return { ok: false, reason: 'unreachable', detail: message };
     }
   }

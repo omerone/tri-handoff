@@ -11,13 +11,19 @@ type Step = 'welcome' | 'login' | 'server' | 'password' | 'processing' | 'succes
 
 const STEPS: Step[] = ['welcome', 'login', 'server', 'password'];
 
-const SERVERS = [
-  'MetaQuotes-Live01',
-  'MetaQuotes-Live02',
-  'MetaQuotes-Live03',
-  'MetaQuotes-Demo01',
-  'MetaQuotes-Demo02',
-];
+/*
+ * There is no list of servers here, and there cannot be one.
+ *
+ * This step used to be a `<select>` over five invented `MetaQuotes-*` names. Every MetaTrader
+ * broker runs its own servers under its own naming — `FTMO-Server4`, `ICMarketsSC-MT5`,
+ * `Pepperstone-MT5-Live1` — so a closed list of five could not express a single real account,
+ * including the one this product was being connected to. The field is what the broker calls
+ * the server, typed exactly; MetaApi resolves the broker from that name.
+ *
+ * MetaApi publishes no catalogue to autocomplete against. What it does do is answer an
+ * unrecognised name with the near matches for the broker it detected, which the connect
+ * action turns into "did you mean…" — see `MetaApiError.serverSuggestions`.
+ */
 
 export interface WizardLabels {
   /** The account's own words, shared with the connected card so both name things alike. */
@@ -47,8 +53,10 @@ export interface WizardLabels {
       title: string;
       label: string;
       hint: string;
-      live: string;
-      demo: string;
+      /** An example of the shape, not a suggestion: brokers name servers however they like. */
+      placeholder: string;
+      /** Where to read the name off MetaTrader, on the desktop and on the phone. */
+      help: string;
     };
     password: {
       title: string;
@@ -80,7 +88,7 @@ export function Mt5ConnectWizard({
   const [step, setStep] = useState<Step>('welcome');
   const [formData, setFormData] = useState({
     login: '',
-    server: SERVERS[0] || 'MetaQuotes-Live01',
+    server: '',
     investorPassword: '',
   });
   // The action is called directly rather than through `useActionState`. Its state only lands on
@@ -102,6 +110,7 @@ export function Mt5ConnectWizard({
       }
       setStep('server');
     } else if (step === 'server') {
+      if (!formData.server.trim()) return;
       setStep('password');
     } else if (step === 'password') {
       if (!formData.investorPassword) {
@@ -410,34 +419,25 @@ function ServerStep({
         <label htmlFor="server" className="text-dim text-xs font-semibold">
           {labels.wizard.server.label}
         </label>
-        <select
+        <input
           id="server"
+          type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="border-line bg-raised text-text rounded-[10px] border px-3 py-2.5 text-sm"
-        >
-          <optgroup label={labels.wizard.server.live}>
-            {SERVERS.filter((s) => s.includes('Live')).map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label={labels.wizard.server.demo}>
-            {SERVERS.filter((s) => s.includes('Demo')).map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </optgroup>
-        </select>
+          placeholder={labels.wizard.server.placeholder}
+          dir="ltr"
+          autoFocus
+          required
+          maxLength={120}
+          autoComplete="off"
+          spellCheck={false}
+          className="border-line bg-raised text-text placeholder:text-dim/60 rounded-[10px] border px-3 py-2.5 text-sm"
+        />
       </div>
 
       <div className="border-dim/30 bg-dim/5 flex gap-2 rounded-[10px] border p-3">
         <Server size={16} className="text-dim mt-0.5 shrink-0" />
-        <p className="text-dim text-xs leading-relaxed">
-          {value.includes('Live') ? labels.wizard.server.live : labels.wizard.server.demo}
-        </p>
+        <p className="text-dim text-xs leading-relaxed">{labels.wizard.server.help}</p>
       </div>
 
       <StepNav

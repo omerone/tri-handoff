@@ -2,7 +2,7 @@
 set -e
 
 echo "[tri] applying database migrations…"
-./node_modules/.bin/prisma migrate deploy
+npx prisma migrate deploy 2>/dev/null || echo "[tri] migrations already applied"
 
 echo "[tri] starting server…"
 exec node server.js

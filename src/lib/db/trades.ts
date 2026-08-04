@@ -252,10 +252,10 @@ export async function realisedProfitBefore(ctx: TenantContext, instant: Date): P
 
 export async function countTrades(ctx: TenantContext, filter: TradeFilter = {}): Promise<number> {
   assertContext(ctx);
-  return prisma.trade.count({ where: whereClause(ctx, filter) });
+  return prisma.trade.count({ where: whereClause(ctx, filter, { closedOnly: true }) });
 }
 
-/** Paginated table view, newest first. */
+/** Paginated table view of closed trades, newest first. */
 export async function pageTrades(
   ctx: TenantContext,
   filter: TradeFilter,
@@ -263,7 +263,7 @@ export async function pageTrades(
 ): Promise<TradeRecord[]> {
   assertContext(ctx);
   const rows = await prisma.trade.findMany({
-    where: whereClause(ctx, filter),
+    where: whereClause(ctx, filter, { closedOnly: true }),
     orderBy: [{ closeAt: 'desc' }, { ticket: 'desc' }],
     skip: page.offset,
     take: page.limit,

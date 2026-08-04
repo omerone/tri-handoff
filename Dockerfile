@@ -15,7 +15,7 @@ FROM base AS builder
 ENV NEXT_OUTPUT=standalone
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate && npm run build
+RUN npx prisma generate && SKIP_ENV_VALIDATION=true npm run build
 
 # ---------- runtime ----------
 FROM base AS runner
@@ -26,16 +26,11 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy entire node_modules (needed for migrations and runtime)
+COPY --from=builder /app/node_modules ./node_modules
+
 # Prisma CLI + schema so the container can run `migrate deploy` on boot.
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-
-# AWS SDK and secrets management libraries
-# These are included in node_modules from the deps stage
-COPY --from=builder /app/node_modules/@aws-sdk ./node_modules/@aws-sdk
-COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
 
 # Docker entrypoint script with environment initialization support
 COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh

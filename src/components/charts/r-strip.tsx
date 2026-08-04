@@ -57,14 +57,32 @@ const LABELS_FIT_ANYWHERE = 24;
 const LABELS_FIT_WIDE = 33;
 
 /**
- * Columns at each end that anchor their card, scaled to how thin the columns are.
+ * Columns at each end that anchor their card instead of centring it.
  *
- * `EDGE_COLUMNS` was measured against a thirty-day strip, where a column is 20px and five of
- * them clear the card's 160px. At ninety-two days a column is 8px, and the same five columns
- * are 40px — a card centred on the sixth still hangs off the edge. Roughly an eighth of the
- * strip is what half a card costs at the narrowest width, whatever the column count.
+ * Not a constant, because the thing being cleared is measured in pixels and the thing doing
+ * the clearing is measured in columns. `EDGE_COLUMNS` was calibrated on a thirty-day strip,
+ * where a column is 20px and five of them clear half a card. Once a range can widen the strip
+ * to ninety-two days a column is 5px, and five of them clear 25 — a card centred near the end
+ * hangs off the screen.
+ *
+ * So the count is derived instead:
+ *
+ *     columns needed = half a card ÷ column width
+ *                    = CARD_HALF_PX ÷ (STRIP_MIN_PX ÷ count)
+ *                    = count × CARD_HALF_PX ÷ STRIP_MIN_PX
+ *
+ * A fixed fraction was tried first — `count × 0.12` — and it failed in the middle of the
+ * range it was meant to cover: at forty columns it still rounds to five, while the columns
+ * have already shrunk to 14px. The numbers below are the measured ones, so the arithmetic can
+ * be checked rather than tuned.
  */
-const edgeColumns = (count: number) => Math.max(EDGE_COLUMNS, Math.ceil(count * 0.12));
+/** The narrowest the wide layout ever draws the strip: a 768px viewport, less the padding. */
+const STRIP_MIN_PX = 700;
+/** Half the widest card — a busy day, with a long weekday name in the heading. */
+const CARD_HALF_PX = 105;
+
+const edgeColumns = (count: number) =>
+  Math.max(EDGE_COLUMNS, Math.ceil((count * CARD_HALF_PX) / STRIP_MIN_PX));
 
 export type DailyREntry = {
   date: string;

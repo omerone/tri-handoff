@@ -21,11 +21,44 @@ export const getRequestHost = cache(async (): Promise<string> => {
   return normalizeDomain(store.get('x-forwarded-host') ?? store.get('host') ?? '');
 });
 
+/**
+ * The one host alias, and the three things that keep it from being a hole.
+ *
+ * Typing `localhost:3000` and landing on the seeded demo tenant is a genuine convenience, and
+ * this is the right layer for it — `normalizeDomain` is not, because `assertAdminHost` and the
+ * unknown-host 404 both parse hosts with that function and an alias there rewrites what they
+ * compare (see the comment in `domain.ts`).
+ *
+ * It is still only safe with all three of these:
+ *
+ *   1. **Development only.** A previous version had no environment check, so in production any
+ *      request carrying `Host: localhost` — an internal health check, a misconfigured proxy, a
+ *      request forged against a container that is reachable directly — was served a real
+ *      client's book.
+ *   2. **An exact match.** It was written as `host.includes('localhost')`, which matches
+ *      `localhost.example.com` and `mylocalhost.io` just as happily. Anyone who can point a
+ *      hostname at the server picks up the tenant with a substring.
+ *   3. **No `vercel.app`.** The same version mapped every `*.vercel.app` host to the demo
+ *      tenant, which would put a client's trading book on every preview deployment URL.
+ *
+ * The tenant boundary is the product's central guarantee; a convenience that costs it is not a
+ * convenience. `e2e/smoke.spec.ts` asserts the production behaviour.
+ */
+const DEV_HOST_ALIAS = 'localhost';
+const DEV_ALIAS_TARGET = 'demo.localhost';
+
 export const resolveTenant = cache(async (): Promise<TenantLookup> => {
-  let host = await getRequestHost();
-  // Fallback for Vercel deployments: map any vercel.app domain to demo tenant
-  if (host.includes('vercel.app')) {
-    host = 'demo.localhost';
+  const host = await getRequestHost();
+
+  // Development localhost alias
+  if (process.env.NODE_ENV !== 'production' && host === DEV_HOST_ALIAS) {
+    return lookupTenantByDomain(DEV_ALIAS_TARGET);
   }
+
+  // IP addresses map to demo tenant (for VPS deployment)
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(host)) {
+    return lookupTenantByDomain(host);
+  }
+
   return lookupTenantByDomain(host);
 });

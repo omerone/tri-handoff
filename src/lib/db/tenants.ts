@@ -17,10 +17,33 @@ export async function lookupTenantByDomain(host: string): Promise<TenantLookup> 
   const domain = normalizeDomain(host);
   if (!domain) return { state: 'unknown' };
 
-  const row = await prisma.tenant.findUnique({
+  let row = await prisma.tenant.findUnique({
     where: { domain },
     select: { id: true, name: true, domain: true, status: true },
   });
+
+  // Auto-create tenant for IP addresses (for VPS deployment)
+  if (!row && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(domain)) {
+    try {
+      const created = await prisma.tenant.create({
+        data: {
+          id: `tenant-${Date.now()}`,
+          name: `Tenant ${domain}`,
+          domain,
+          status: 'active',
+        },
+        select: { id: true, name: true, domain: true, status: true },
+      });
+      row = created;
+    } catch {
+      // Conflict means another request created it simultaneously; retry
+      row = await prisma.tenant.findUnique({
+        where: { domain },
+        select: { id: true, name: true, domain: true, status: true },
+      });
+    }
+  }
+
   if (!row) return { state: 'unknown' };
 
   const tenant: ActiveTenant = { id: row.id, name: row.name, domain: row.domain };
