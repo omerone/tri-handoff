@@ -55,10 +55,5 @@ export const resolveTenant = cache(async (): Promise<TenantLookup> => {
     return lookupTenantByDomain(DEV_ALIAS_TARGET);
   }
 
-  // IP addresses map to demo tenant (for VPS deployment)
-  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(host)) {
-    return lookupTenantByDomain(host);
-  }
-
   return lookupTenantByDomain(host);
 });

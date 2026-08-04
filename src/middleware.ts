@@ -22,7 +22,7 @@ import { normalizeDomain } from '@/lib/tenant/domain';
 export const TENANT_HOST_HEADER = 'x-tri-host';
 export const NONCE_HEADER = 'x-nonce';
 
-function contentSecurityPolicy(nonce: string, isDev: boolean): string {
+function contentSecurityPolicy(nonce: string, isDev: boolean, isHttps: boolean): string {
   // Content Security Policy: restrictive by default, whitelist only what's needed.
   // This prevents XSS, clickjacking, and data exfiltration attacks.
   return [
@@ -39,9 +39,23 @@ function contentSecurityPolicy(nonce: string, isDev: boolean): string {
     "base-uri 'self'",
     "object-src 'none'",
     "form-action 'self'",
-    // Upgrade insecure requests to HTTPS (in production)
-    ...(process.env.NODE_ENV === 'production' ? ["upgrade-insecure-requests"] : []),
+    // Upgrade insecure requests to HTTPS — but only when this response is itself being
+    // served over HTTPS. Keyed off NODE_ENV it broke every HTTP deployment: the browser
+    // rewrote the CSS, JS and form posts of an http:// page to https://, nothing was
+    // listening on 443, and the page rendered as unstyled text with a dead login button.
+    // A deployment that is deliberately plain HTTP has nothing to upgrade to.
+    ...(isHttps ? ['upgrade-insecure-requests'] : []),
   ].join('; ');
+}
+
+/**
+ * The scheme this response is actually going out over. Behind Caddy or nginx the socket is
+ * plain HTTP either way, so the proxy's `x-forwarded-proto` is the only honest signal;
+ * `nextUrl.protocol` covers direct access with no proxy in front.
+ */
+function isHttpsRequest(request: NextRequest): boolean {
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  return (forwardedProto ?? request.nextUrl.protocol.replace(':', '')) === 'https';
 }
 
 export function middleware(request: NextRequest) {
@@ -50,7 +64,8 @@ export function middleware(request: NextRequest) {
   const host = normalizeDomain(forwarded || request.headers.get('host') || '');
 
   const nonce = btoa(crypto.randomUUID());
-  const csp = contentSecurityPolicy(nonce, process.env.NODE_ENV === 'development');
+  const isHttps = isHttpsRequest(request);
+  const csp = contentSecurityPolicy(nonce, process.env.NODE_ENV === 'development', isHttps);
 
   const headers = new Headers(request.headers);
   headers.delete(TENANT_HOST_HEADER);
@@ -96,10 +111,13 @@ export function middleware(request: NextRequest) {
   ].join(', ');
   response.headers.set('permissions-policy', permissionsPolicy);
 
-  // Strict-Transport-Security: force HTTPS connections (only in production).
+  // Strict-Transport-Security: force HTTPS connections. Only meaningful — and per RFC 6797
+  // only permitted — on a response already delivered over HTTPS; a browser must ignore it
+  // on a plain-HTTP page, and sending it there risks pinning a host to a scheme it does
+  // not serve for the full max-age.
   // max-age=31536000 = 1 year. includeSubDomains extends to subdomains.
   // preload allows inclusion in HSTS preload list (opt-in).
-  if (process.env.NODE_ENV === 'production') {
+  if (isHttps) {
     response.headers.set(
       'strict-transport-security',
       'max-age=31536000; includeSubDomains; preload'
