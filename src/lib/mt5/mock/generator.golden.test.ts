@@ -79,8 +79,13 @@ describe('parity with the prototype', () => {
       const actual = trades[index]!;
       const open = wallClock(actual.openAt);
       const close = wallClock(actual.closeAt!);
-      const expectedOpen = new Date(expected.open);
-      const expectedClose = new Date(expected.close);
+      // Both sides go through wallClock. The prototype's numbers are Israeli local time by
+      // construction (see the TZ pin on the subprocess above), and `wallClock` resolves to
+      // that zone explicitly — whereas Date's own getters resolve to whatever zone the
+      // machine running the test happens to be in. Comparing one against the other passed
+      // only in Israel and was three hours out on CI, which runs in UTC.
+      const expectedOpen = wallClock(new Date(expected.open));
+      const expectedClose = wallClock(new Date(expected.close));
 
       const differences: string[] = [];
       if (actual.symbol !== expected.symbol) {
@@ -91,14 +96,14 @@ describe('parity with the prototype', () => {
       }
       if (open.hour !== expected.hour) differences.push(`hour ${open.hour} ≠ ${expected.hour}`);
       if (open.weekday !== expected.dow) differences.push(`dow ${open.weekday} ≠ ${expected.dow}`);
-      if (open.day !== expectedOpen.getDate()) {
-        differences.push(`open day ${open.day} ≠ ${expectedOpen.getDate()}`);
+      if (open.day !== expectedOpen.day) {
+        differences.push(`open day ${open.day} ≠ ${expectedOpen.day}`);
       }
-      if (close.day !== expectedClose.getDate()) {
-        differences.push(`close day ${close.day} ≠ ${expectedClose.getDate()}`);
+      if (close.day !== expectedClose.day) {
+        differences.push(`close day ${close.day} ≠ ${expectedClose.day}`);
       }
-      if (close.hour !== expectedClose.getHours()) {
-        differences.push(`close hour ${close.hour} ≠ ${expectedClose.getHours()}`);
+      if (close.hour !== expectedClose.hour) {
+        differences.push(`close hour ${close.hour} ≠ ${expectedClose.hour}`);
       }
 
       if (differences.length > 0) mismatches.push(`#${index}: ${differences.join(', ')}`);
