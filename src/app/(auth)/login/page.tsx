@@ -27,10 +27,17 @@ export default async function LoginPage({
         initialNotice={params.reset === 'done' ? t('resetDone') : undefined}
       />
 
-      <div className="mt-4 text-center">
-        <Link href="/forgot" className="text-dim hover:text-text text-xs">
-          {t('forgot')}
-        </Link>
+      <div className="mt-4 space-y-2 text-center">
+        <div>
+          <Link href="/forgot" className="text-dim hover:text-text text-xs">
+            {t('forgot')}
+          </Link>
+        </div>
+        <div>
+          <Link href="/signup" className="text-dim hover:text-text text-xs">
+            אין לך חשבון? הירשם
+          </Link>
+        </div>
       </div>
     </Card>
   );
