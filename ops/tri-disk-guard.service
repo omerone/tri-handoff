@@ -1,0 +1,13 @@
+[Unit]
+Description=TRi disk guard — reclaim regenerable caches before the disk fills
+Documentation=file:/usr/local/bin/tri-disk-guard
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tri-disk-guard check
+# The guard only deletes regenerable caches, but it runs unattended, so keep it
+# from ever competing with Postgres for IO or CPU.
+Nice=10
+IOSchedulingClass=idle

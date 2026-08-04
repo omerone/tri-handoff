@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the TRi disk guard hourly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+# Spread the load so the check never lands exactly on a deploy or backup minute.
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
