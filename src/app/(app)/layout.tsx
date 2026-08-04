@@ -1,5 +1,6 @@
 import { TenantGate } from '@/components/tenant-gate';
 import { AppShell } from '@/components/shell/app-shell';
+import { LiveRefresh } from '@/components/shell/live-refresh';
 import { requireSession } from '@/lib/auth/session';
 
 /**
@@ -27,5 +28,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
 async function Protected({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
-  return <AppShell session={session}>{children}</AppShell>;
+  return (
+    <AppShell session={session}>
+      <LiveRefresh />
+      {children}
+    </AppShell>
+  );
 }

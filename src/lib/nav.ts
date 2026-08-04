@@ -2,7 +2,11 @@
  * The navigation strip.
  *
  * `enabled` is flipped on as each milestone lands its page, so the nav never advertises a
- * route that 404s. Order matches the prototype.
+ * route that 404s.
+ *
+ * The order below is the order the user reads. Hebrew is the default locale, so the strip
+ * renders right to left and this array runs from the rightmost tab to the leftmost — the
+ * first entry is the one under the reader's thumb, not the one on the far side of the screen.
  */
 export type NavKey =
   | 'dash'
@@ -33,11 +37,15 @@ export type NavDefinition = {
 };
 
 export const NAV: readonly NavDefinition[] = [
-  { key: 'dash', href: '/dashboard', label: 'dash', enabled: true, ranged: true },
-  { key: 'analytics', href: '/analytics', label: 'analytics', enabled: true, ranged: true }, // M1.5
-  { key: 'trades', href: '/trades', label: 'trades', enabled: true, ranged: true }, // M1.6
-  { key: 'calendar', href: '/calendar', label: 'calendar', enabled: true, ranged: true }, // M1.7
+  // Finance, trades, then analytics: the three screens this trader opens most, in that order,
+  // starting at the right-hand edge. The prototype led with the dashboard; it now follows
+  // them, and `HOME_PATH` still points there — where a form returns to is a separate question
+  // from what the nav puts first.
   { key: 'finance', href: '/finance', label: 'finance', enabled: true, ranged: true },
+  { key: 'trades', href: '/trades', label: 'trades', enabled: true, ranged: true }, // M1.6
+  { key: 'analytics', href: '/analytics', label: 'analytics', enabled: true, ranged: true }, // M1.5
+  { key: 'dash', href: '/dashboard', label: 'dash', enabled: true, ranged: true },
+  { key: 'calendar', href: '/calendar', label: 'calendar', enabled: true, ranged: true }, // M1.7
   { key: 'long', href: '/long', label: 'long', enabled: true, ranged: false },
   { key: 'settings', href: '/settings', label: 'settings', enabled: true, ranged: false },
 ];

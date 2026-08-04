@@ -63,6 +63,8 @@ export async function createPositionAction(
 
   await createLongPosition(session.ctx, parsed.data);
   revalidatePath('/long');
+  // The finance page's total wealth is computed from these positions, so it goes stale too.
+  revalidatePath('/finance');
   return { ok: true };
 }
 
@@ -89,6 +91,8 @@ export async function setPriceSourceAction(formData: FormData): Promise<void> {
 
   await setPriceSource(session.ctx, parsed.data.id, parsed.data.priceSource);
   revalidatePath('/long');
+  // The finance page's total wealth is computed from these positions, so it goes stale too.
+  revalidatePath('/finance');
 }
 
 /** Switches a whole existing book onto the feed at once — see `trackAllOpenPositions`. */
@@ -96,6 +100,8 @@ export async function trackAllAction(): Promise<void> {
   const session = await requireSession();
   await trackAllOpenPositions(session.ctx);
   revalidatePath('/long');
+  // The finance page's total wealth is computed from these positions, so it goes stale too.
+  revalidatePath('/finance');
 }
 
 const priceSchema = z.object({
@@ -118,6 +124,8 @@ export async function updatePriceAction(
 
   await updateCurrentPrice(session.ctx, parsed.data.id, parsed.data.currentPrice);
   revalidatePath('/long');
+  // The finance page's total wealth is computed from these positions, so it goes stale too.
+  revalidatePath('/finance');
   return { ok: true };
 }
 
@@ -156,6 +164,8 @@ export async function closePositionAction(
   });
 
   revalidatePath('/long');
+  // The finance page's total wealth is computed from these positions, so it goes stale too.
+  revalidatePath('/finance');
   return { ok: true };
 }
 
@@ -166,4 +176,6 @@ export async function deletePositionAction(formData: FormData): Promise<void> {
 
   await deleteLongPosition(session.ctx, id);
   revalidatePath('/long');
+  // The finance page's total wealth is computed from these positions, so it goes stale too.
+  revalidatePath('/finance');
 }
