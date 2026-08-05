@@ -41,9 +41,13 @@ export function DonutChart({
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <div className="relative shrink-0" style={{ width: 168, height: 168 }}>
         {drawable.length === 0 ? (
-          <div className="border-line text-dim absolute inset-2 flex items-center justify-center rounded-full border border-dashed text-center text-[11px]">
-            {emptyLabel}
-          </div>
+          /*
+           * A dashed ring where the chart would be, and nothing written inside it. The
+           * message belongs beside the ring rather than in it: the hole already holds the
+           * total, and stacking a sentence on top of a number produced two lines of text
+           * overlapping each other.
+           */
+          <div className="border-line absolute inset-2 rounded-full border border-dashed" />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -88,6 +92,14 @@ export function DonutChart({
         </div>
       </div>
 
+      {/*
+        The legend doubles as the empty state. A zeroed legend is honest but says nothing
+        about *why* it is zero, and the sentence that explains it has nowhere else to go once
+        the ring's centre is spoken for.
+      */}
+      {drawable.length === 0 ? (
+        <p className="text-dim min-w-0 flex-1 text-xs leading-relaxed">{emptyLabel}</p>
+      ) : (
       <ul className="flex min-w-0 flex-1 flex-col gap-1.5">
         {data.map((slice) => (
           <li key={slice.key} className="flex items-baseline gap-2 text-xs">
@@ -101,6 +113,7 @@ export function DonutChart({
           </li>
         ))}
       </ul>
+      )}
     </div>
   );
 }

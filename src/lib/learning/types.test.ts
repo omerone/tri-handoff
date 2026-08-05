@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { learningTotals, type LearningEntry } from './types';
+import { hoursDecimals, learningTotals, type LearningEntry } from './types';
 
 const session = (over: Partial<LearningEntry> = {}): LearningEntry => ({
   id: crypto.randomUUID(),
@@ -60,5 +60,27 @@ describe('learning totals', () => {
     expect(totals.hours).toBe(0);
     expect(totals.sessions).toBe(0);
     expect(totals.byTopic).toHaveLength(2);
+  });
+});
+
+describe('hours formatting', () => {
+  it('drops the decimals a whole number does not need', () => {
+    expect(hoursDecimals(3)).toBe(0);
+    expect(hoursDecimals(0)).toBe(0);
+  });
+
+  it('keeps one decimal for a half hour', () => {
+    // 2.5 rendered as "2.50h" was the reported eyesore.
+    expect(hoursDecimals(2.5)).toBe(1);
+    expect(hoursDecimals(1.5)).toBe(1);
+  });
+
+  it('keeps two for a quarter', () => {
+    expect(hoursDecimals(0.75)).toBe(2);
+    expect(hoursDecimals(1.25)).toBe(2);
+  });
+
+  it('is not fooled by binary floating point', () => {
+    expect(hoursDecimals(0.1 + 0.2)).toBe(1);
   });
 });

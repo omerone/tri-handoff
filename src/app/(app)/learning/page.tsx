@@ -6,7 +6,7 @@ import { Chip, EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { listLearningEntries } from '@/lib/db';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
-import { learningTotals, type LearningTopic } from '@/lib/learning/types';
+import { hoursDecimals, learningTotals, type LearningTopic } from '@/lib/learning/types';
 import { formatNumber } from '@/lib/money/currency';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { TOPIC_COLOR } from '@/lib/review/colors';
@@ -43,7 +43,7 @@ export default async function LearningPage({
   const entries = await listLearningEntries(session.ctx, { from: window.from, to: window.to });
   const totals = learningTotals(entries);
 
-  const hours = (value: number) => `${formatNumber(value, locale, value % 1 === 0 ? 0 : 2)}h`;
+  const hours = (value: number) => `${formatNumber(value, locale, hoursDecimals(value))}h`;
   const percent = (value: number) => `${formatNumber(value * 100, locale, 0)}%`;
 
   const slices = totals.byTopic.map((bucket) => ({

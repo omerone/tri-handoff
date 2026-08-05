@@ -64,3 +64,19 @@ export function learningTotals(entries: readonly LearningEntry[]): LearningTotal
     sessions: entries.length,
   };
 }
+
+/**
+ * How many decimals an hours figure deserves.
+ *
+ * Three hours reads better as "3h" than "3.00h", and forty-five minutes has to keep its
+ * quarter — so the count follows the value rather than being fixed. Computed rather than
+ * trimmed from a formatted string, because the decimal separator is not a dot in every
+ * locale and trimming would eat the wrong character.
+ */
+export function hoursDecimals(value: number): 0 | 1 | 2 {
+  if (Number.isInteger(value)) return 0;
+  // A tenth is exact enough when the stored column is two decimals; the epsilon is there
+  // because 0.1 + 0.2 is not 0.3 in binary floating point and 1.5 must not become 1.50.
+  if (Math.abs(value * 10 - Math.round(value * 10)) < 1e-9) return 1;
+  return 2;
+}

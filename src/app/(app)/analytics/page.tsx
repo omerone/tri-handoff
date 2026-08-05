@@ -24,7 +24,7 @@ import { displayMoney } from '@/lib/money/display';
 import { SESSIONS, WEEKDAYS } from '@/lib/analytics/dimensions';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { listLearningEntries } from '@/lib/db';
-import { learningTotals } from '@/lib/learning/types';
+import { hoursDecimals, learningTotals } from '@/lib/learning/types';
 import { originalTpBreakdown, tpTimingBreakdown } from '@/lib/review/stats';
 import { ORIGINAL_TP_COLOR, TIMING_COLOR, TOPIC_COLOR } from '@/lib/review/colors';
 
@@ -70,7 +70,7 @@ export default async function AnalyticsPage({
 
   const sharePct = (value: number) => `${formatNumber(value * 100, locale, 0)}%`;
   const learningHours = (value: number) =>
-    `${formatNumber(value, locale, value % 1 === 0 ? 0 : 2)}h`;
+    `${formatNumber(value, locale, hoursDecimals(value))}h`;
 
   const timingSlices = timing.slices.map((slice) => ({
     key: slice.key,
