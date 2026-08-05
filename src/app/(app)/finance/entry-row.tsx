@@ -84,7 +84,7 @@ export function EntryRow({
             <input type="hidden" name="month" value={month.month} />
             <button
               type="submit"
-              title={labels.endSeries}
+              data-tip={labels.endSeries}
               aria-label={labels.endSeries}
               onClick={(event) => {
                 if (!window.confirm(labels.endSeriesConfirm)) event.preventDefault();
@@ -100,7 +100,7 @@ export function EntryRow({
           <input type="hidden" name="id" value={entry.id} />
           <button
             type="submit"
-            title={labels.delete}
+            data-tip={labels.delete}
             aria-label={labels.delete}
             onClick={(event) => {
               const message = entry.isRecurring ? labels.deleteSeriesConfirm : labels.deleteConfirm;

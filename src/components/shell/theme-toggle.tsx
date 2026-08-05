@@ -16,7 +16,7 @@ export function ThemeToggle({ current }: { current: Theme }) {
       onClick={() => startTransition(() => setThemeAction(next))}
       aria-label={next === 'light' ? 'Switch to light mode' : 'Switch to dark mode'}
       className="tri-tap border-line bg-raised text-text rounded-full border p-2 disabled:opacity-60"
-      title={next === 'light' ? 'Light mode' : 'Dark mode'}
+      data-tip={next === 'light' ? 'Light mode' : 'Dark mode'}
     >
       {current === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
     </button>

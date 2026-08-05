@@ -159,7 +159,10 @@ export default async function TenantDetailPage({
                   </td>
                   <td className="tri-num px-3 py-2 text-xs">{log.tradesImported}</td>
                   <td className="tri-num px-3 py-2 text-xs">{log.tradesUpdated}</td>
-                  <td className="text-neg max-w-[24rem] truncate px-3 py-2 text-xs" title={log.error ?? ''}>
+                  <td
+                    className="text-neg max-w-[24rem] truncate px-3 py-2 text-xs"
+                    data-tip={log.error ?? ''}
+                  >
                     {log.error ?? ''}
                   </td>
                 </tr>

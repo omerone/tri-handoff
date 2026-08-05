@@ -10,7 +10,7 @@ export function SignOutButton({ label, withText = false }: { label: string; with
     <form action={signOutAction}>
       <button
         type="submit"
-        title={label}
+        data-tip={label}
         aria-label={label}
         className={
           withText

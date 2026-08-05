@@ -69,7 +69,7 @@ export function ReviewControl({
     <div className="flex items-center gap-1.5">
       <select
         aria-label={labels.tpTiming}
-        title={labels.tpTiming}
+        data-tip={labels.tpTiming}
         value={timing}
         onChange={(event) => save('tpTiming', event.target.value)}
         className={`${select} w-[5.5rem]`}
@@ -82,7 +82,7 @@ export function ReviewControl({
 
       <select
         aria-label={labels.originalTp}
-        title={labels.originalTp}
+        data-tip={labels.originalTp}
         value={original}
         onChange={(event) => save('tookOriginalTp', event.target.value)}
         className={`${select} w-[4.5rem]`}

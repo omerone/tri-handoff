@@ -59,8 +59,7 @@ export type PositionRowData = {
 };
 
 const cell = 'px-3 py-2.5';
-const input =
-  'border-line bg-raised text-text rounded-lg border px-2 py-1 text-xs w-24';
+const input = 'border-line bg-raised text-text rounded-lg border px-2 py-1 text-xs w-24';
 
 export function PositionRow({
   position,
@@ -98,7 +97,7 @@ export function PositionRow({
 
             {position.tracked ? (
               <span
-                title={labels.autoOn}
+                data-tip={labels.autoOn}
                 className="bg-brand/10 text-brand inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
               >
                 <RefreshCw size={9} aria-hidden />
@@ -123,7 +122,7 @@ export function PositionRow({
                     <input type="hidden" name="priceSource" value="auto" />
                     <button
                       type="submit"
-                      title={labels.autoOff}
+                      data-tip={labels.autoOff}
                       aria-label={labels.autoOff}
                       className="text-dim hover:text-brand p-1"
                     >
@@ -189,7 +188,7 @@ export function PositionRow({
                 <input type="hidden" name="id" value={position.id} />
                 <button
                   type="submit"
-                  title={labels.delete}
+                  data-tip={labels.delete}
                   aria-label={labels.delete}
                   onClick={(event) => {
                     if (!window.confirm(labels.deleteConfirm)) event.preventDefault();
@@ -240,13 +239,18 @@ function PriceForm({
         aria-invalid={state.error ? true : undefined}
         className={input}
       />
-      <button type="submit" title={labels.update} aria-label={labels.update} className="text-pos p-1">
+      <button
+        type="submit"
+        data-tip={labels.update}
+        aria-label={labels.update}
+        className="text-pos p-1"
+      >
         <Check size={14} aria-hidden />
       </button>
       <button
         type="button"
         onClick={onDone}
-        title={labels.cancel}
+        data-tip={labels.cancel}
         aria-label={labels.cancel}
         className="text-dim p-1"
       >
@@ -288,7 +292,7 @@ function CloseForm({
       />
       <button
         type="submit"
-        title={labels.closeTitle}
+        data-tip={labels.closeTitle}
         aria-label={labels.closeTitle}
         className="text-pos p-1"
       >
@@ -297,7 +301,7 @@ function CloseForm({
       <button
         type="button"
         onClick={onDone}
-        title={labels.cancel}
+        data-tip={labels.cancel}
         aria-label={labels.cancel}
         className="text-dim p-1"
       >

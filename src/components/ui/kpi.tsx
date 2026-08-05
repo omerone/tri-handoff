@@ -51,7 +51,7 @@ export function KPI({
   title?: string;
 }) {
   return (
-    <div className="border-line bg-surface rounded-[18px] border px-4 py-3" title={title}>
+    <div className="border-line bg-surface rounded-[18px] border px-4 py-3" data-tip={title}>
       <div className="text-dim text-xs">{label}</div>
       {/*
         The figure scales with the tile rather than overflowing it: a seven-figure balance at

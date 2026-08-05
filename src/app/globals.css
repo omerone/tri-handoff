@@ -331,6 +331,20 @@ button {
   animation: tri-spin 1s linear infinite;
 }
 
+/*
+ * The hover hint's entrance (src/components/ui/tooltip.tsx). Kept short and small: the whole
+ * point of replacing the browser's own tooltip was that it took over a second to appear, and
+ * a long fade would spend back what the delay saved. The reduced-motion block below removes
+ * it, leaving the hint to appear outright — which is the correct answer for anyone who asked
+ * for that, not a degraded one.
+ */
+@keyframes tri-tip {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -69,7 +69,7 @@ export async function AppShell({
             <ThemeToggle current={theme} />
             <Link
               href={navRoute('settings').href}
-              title={t('nav.settings')}
+              data-tip={t('nav.settings')}
               aria-label={t('nav.settings')}
               className="tri-tap border-line bg-raised text-dim hover:text-text flex items-center rounded-full border px-3 py-1.5 text-xs"
             >

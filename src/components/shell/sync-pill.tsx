@@ -99,7 +99,7 @@ export function SyncPill({
       type="button"
       onClick={() => connected && !syncing && run(false)}
       disabled={!connected || syncing}
-      title={labels.refresh}
+      data-tip={labels.refresh}
       aria-label={labels.refresh}
       aria-busy={syncing}
       className={`border-line bg-raised flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${tone} disabled:cursor-default`}

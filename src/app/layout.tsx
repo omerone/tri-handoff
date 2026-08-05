@@ -7,6 +7,7 @@ import { LOCALE_DIR } from '@/i18n/config';
 import { resolveLocale } from '@/i18n/request';
 import { resolveTheme, THEME_COOKIE } from '@/lib/theme';
 import { getSession } from '@/lib/auth/session';
+import { TooltipLayer } from '@/components/ui/tooltip';
 import './globals.css';
 
 // Heebo carries both Hebrew and Latin, so the UI keeps one voice across both locales.
@@ -57,6 +58,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
         </NextIntlClientProvider>
+        {/*
+          Here rather than in the app shell, because the admin console and the login screen
+          have controls with hints too and neither goes through that shell. One listener for
+          the whole document costs nothing and is the only way a hint cannot be forgotten on
+          a page that was added later.
+        */}
+        <TooltipLayer />
       </body>
     </html>
   );

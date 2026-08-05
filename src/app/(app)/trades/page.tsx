@@ -387,7 +387,7 @@ export default async function TradesPage({
                       <Link
                         href={trade.href}
                         aria-label={t('journal.title')}
-                        title={trade.strategy ?? t('journal.title')}
+                        data-tip={trade.strategy ?? t('journal.title')}
                         className={`inline-flex ${trade.journalled ? 'text-brand' : 'text-dim/50 hover:text-text'}`}
                       >
                         <NotebookPen size={14} aria-hidden />
