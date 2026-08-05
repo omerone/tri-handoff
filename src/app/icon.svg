@@ -1,22 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <!-- The mark from src/components/brand/logo.tsx, with the dark-theme brand colours baked
-       in: a file served as a favicon has no page to read CSS variables from. Keep the two in
-       step by hand. -->
-  <defs>
-    <linearGradient id="f" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#5b8cff"/>
-      <stop offset="1" stop-color="#8b5bff"/>
-    </linearGradient>
-    <linearGradient id="s" x1="0" y1="0" x2="0" y2="48" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.22"/>
-      <stop offset="0.55" stop-color="#fff" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
-  <rect width="48" height="48" rx="14" fill="url(#f)"/>
-  <rect width="48" height="48" rx="14" fill="url(#s)"/>
-  <rect x="0.75" y="0.75" width="46.5" height="46.5" rx="13.25" fill="none" stroke="#fff" stroke-opacity="0.18" stroke-width="1.5"/>
-  <rect x="10" y="29" width="5.5" height="11" rx="2.75" fill="#fff" fill-opacity="0.5"/>
-  <rect x="21.25" y="23" width="5.5" height="17" rx="2.75" fill="#fff" fill-opacity="0.75"/>
-  <rect x="32.5" y="17" width="5.5" height="23" rx="2.75" fill="#fff"/>
-  <circle cx="35.25" cy="11" r="3" fill="#fff"/>
+  <!-- The mark from src/components/brand/logo.tsx: the R-strip, four days around the zero
+       line. A file served as a favicon has no page to read CSS variables from, so the dark
+       theme's green and red are baked in. Keep the two in step by hand.
+
+       Two deliberate differences from the component, both because of where this is drawn. A
+       favicon lands at 16px on whatever colour a browser paints its tab strip, so this version
+       keeps a tile — the product's own dark surface — or the red bar disappears against a dark
+       chrome and the green one against a light one. And the bars are a touch wider with more
+       air between them, because at 16px the component's spacing closes up into a smudge. -->
+  <rect width="48" height="48" rx="12" fill="#12141b"/>
+  <rect x="0.75" y="0.75" width="46.5" height="46.5" rx="11.25" fill="none" stroke="#fff" stroke-opacity="0.1" stroke-width="1.5"/>
+
+  <rect x="6.5" y="22.75" width="35" height="2" rx="1" fill="#e8eaf0" fill-opacity="0.3"/>
+
+  <rect x="6.5" y="14" width="7" height="8.75" rx="2" fill="#2dd4a7"/>
+  <rect x="16" y="24.75" width="7" height="7" rx="2" fill="#ff5c7a"/>
+  <rect x="25.5" y="7.75" width="7" height="15" rx="2" fill="#2dd4a7"/>
+  <rect x="35" y="17.25" width="7" height="5.5" rx="2" fill="#2dd4a7"/>
 </svg>

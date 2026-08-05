@@ -1,20 +1,27 @@
 /**
- * The TRi mark.
+ * The TRi mark: the R-strip.
  *
- * It used to be the three letters set in the mono face inside a gradient square, which is a
- * placeholder rather than a logo: at 36px the middle letter is four pixels wide, and the mark
- * only repeats the wordmark standing next to it.
+ * The strip is the product's signature element — one column per trading day, winners growing
+ * up from a centre line and losers down — and it is the one picture no other trading app
+ * shows. So the mark is not a picture *of* the product, it is a small piece of it: four days,
+ * three green and one red, around the zero line.
  *
- * What is drawn instead is three ascending bars — Trade, Risk, Insight, the three the name is
- * made of — where the tallest one is not just a bar: the gap and the dot above it make it the
- * lowercase `i` of TRi. So the mark is a chart and a letter at once, and it is still legible
- * at 16px, which a trio of letters is not.
+ * Two earlier marks were rejected on the way here, both for the same reason. Three letters in
+ * a gradient square is a placeholder: at 36px the middle letter is four pixels wide and the
+ * mark only repeats the wordmark beside it. Three ascending bars is better drawn, but it is
+ * the most common image in finance and says nothing this product does that others do not.
  *
- * The bars fade back as they shorten, which puts the reading order where the eye already goes.
+ * No tile. A rounded square behind the bars puts an indigo ground under green and red, which
+ * muddies both, and the tile was only ever there to give the letters something to sit on.
+ * Without it the mark is the data, and it takes the page's own background.
  *
- * The gradient reads the theme's brand variables rather than fixed hex, so the mark follows
- * light and dark the way every other brand surface does. `src/app/icon.svg` is the same
- * drawing with the dark-theme colours baked in — a static file cannot see a CSS variable.
+ * Colour comes from the theme's own tokens — the same green and red every profit and loss in
+ * the product is drawn in — so the mark follows light and dark rather than carrying frozen
+ * hex. `src/app/icon.svg` is the same drawing with the dark values baked in, because a file
+ * served as a favicon has no page to read a variable from; the two are kept in step by hand.
+ *
+ * At 16px it is four marks around a rule. That is the trade this direction makes: less legible
+ * in a browser tab than a solid tile, and unmistakable everywhere else.
  */
 export function TriMark({ size = 36, className = '' }: { size?: number; className?: string }) {
   return (
@@ -26,41 +33,29 @@ export function TriMark({ size = 36, className = '' }: { size?: number; classNam
       role="img"
       aria-label="TRi"
     >
-      <defs>
-        <linearGradient id="tri-mark-fill" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0" style={{ stopColor: 'var(--tri-brand)' }} />
-          <stop offset="1" style={{ stopColor: 'var(--tri-brand-2)' }} />
-        </linearGradient>
-        {/* A light source at the top-left corner, so the tile reads as a surface and not a
-            flat swatch. Fades out by the middle — below that the gradient carries it. */}
-        <linearGradient id="tri-mark-sheen" x1="0" y1="0" x2="0" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#fff" stopOpacity="0.22" />
-          <stop offset="0.55" stopColor="#fff" stopOpacity="0" />
-        </linearGradient>
-      </defs>
+      {/* The zero line, in the interface's own text colour at a low opacity — the same way the
+          strip draws it on the dashboard, where it separates a green day from a red one. */}
+      <rect x="2" y="22.75" width="44" height="2" rx="1" fill="currentColor" fillOpacity="0.3" />
 
-      <rect width="48" height="48" rx="14" fill="url(#tri-mark-fill)" />
-      <rect width="48" height="48" rx="14" fill="url(#tri-mark-sheen)" />
-      {/* Inset hairline: keeps the tile's edge from disappearing into a light background. */}
-      <rect
-        x="0.75"
-        y="0.75"
-        width="46.5"
-        height="46.5"
-        rx="13.25"
-        fill="none"
-        stroke="#fff"
-        strokeOpacity="0.18"
-        strokeWidth="1.5"
-      />
-
-      {/* Three bars on one baseline, six units apart in height, `rx` half the width so the
-          tops are caps rather than corners. */}
-      <rect x="10" y="29" width="5.5" height="11" rx="2.75" fill="#fff" fillOpacity="0.5" />
-      <rect x="21.25" y="23" width="5.5" height="17" rx="2.75" fill="#fff" fillOpacity="0.75" />
-      <rect x="32.5" y="17" width="5.5" height="23" rx="2.75" fill="#fff" />
-      {/* The tittle. Its gap from the bar below is what turns the tallest bar into a letter. */}
-      <circle cx="35.25" cy="11" r="3" fill="#fff" />
+      {/*
+       * Four days, sitting on the line rather than crossing it: a winner's base is the line's
+       * top edge, a loser's is its bottom.
+       *
+       * `rx` is 2 on a 9-wide bar — the same soft corner the strip itself uses on the
+       * dashboard. Rounding to half the width was tried first and turned the mark into four
+       * lozenges: the short bars became dots, the red one a pill, and the row of columns read
+       * as scattered confetti rather than as days on an axis.
+       *
+       * They fill the box, too. The first cut used two thirds of the width and height, which
+       * left half the square empty and made the mark a smudge beside a bold wordmark.
+       *
+       * The shape is a month worth having — two good days, one small, one bad — because a mark
+       * showing four winners would be the one thing a trading journal must never claim.
+       */}
+      <rect x="2.25" y="13" width="9" height="9.75" rx="2" fill="var(--tri-pos)" />
+      <rect x="13.75" y="24.75" width="9" height="8" rx="2" fill="var(--tri-neg)" />
+      <rect x="25.25" y="6" width="9" height="16.75" rx="2" fill="var(--tri-pos)" />
+      <rect x="36.75" y="16.75" width="9" height="6" rx="2" fill="var(--tri-pos)" />
     </svg>
   );
 }
