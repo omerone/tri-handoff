@@ -133,8 +133,15 @@ test.describe('what the range does to a screen', () => {
       await expect(page.locator('main').getByText(new RegExp(month))).toBeVisible();
     }
 
-    // Stepping out of the range would show a month the picker says is not selected.
-    await expect(page.getByRole('link', { name: 'Previous month' })).toHaveCount(0);
+    // The arrows shift the window rather than escaping it. They used to be absent here, on
+    // the reasoning that stepping out of the range would show a month the picker says is not
+    // selected — true, and it left a calendar with a range on it unable to reach last month
+    // at all. Moving the range keeps the picker honest and the arrow obvious.
+    await page.getByRole('link', { name: 'Previous month' }).click();
+    for (const month of ['June 2026', 'May 2026', 'April 2026']) {
+      await expect(page.locator('main').getByText(new RegExp(month))).toBeVisible();
+    }
+    await expect(page.locator('main').getByText(/July 2026/)).toHaveCount(0);
   });
 
   test('leaves the calendar browsable when nothing is pinned down', async ({ page }) => {

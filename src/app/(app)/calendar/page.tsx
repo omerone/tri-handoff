@@ -8,7 +8,7 @@ import { parseYearMonth, stepMonth, type YearMonth } from '@/lib/finance/bounds'
 import { dailyTotals } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { currentResolvedRange } from '@/lib/preferences/range';
-import { monthsIn, toTradeFilter } from '@/lib/time/range';
+import { monthsIn, RANGE_PARAM, toTradeFilter } from '@/lib/time/range';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { displayMoney } from '@/lib/money/display';
 import { wallClock } from '@/lib/time/zone';
@@ -84,9 +84,30 @@ export default async function CalendarPage({
     noTrades: t('calendar.noTrades'),
   };
 
+  /*
+   * The arrows move a month in both modes, and what they move depends on which one is showing.
+   *
+   * Unbounded, they step `?m=` — browsing, which is what an unfiltered calendar is for.
+   *
+   * With a range chosen they used to disappear entirely, on the reasoning that stepping out of
+   * the range would show a month the picker says is not selected. True, and the conclusion was
+   * wrong: it left the screen with no way to reach last month at all. Someone who has picked
+   * "this month" and wants the one before it has to reopen the picker and build a custom range
+   * — for the most ordinary move a calendar has.
+   *
+   * So they shift the *range* instead, by a month, keeping its length. The picker above stays
+   * honest because the range really did change, and the arrow does the obvious thing.
+   */
+  const token = (value: YearMonth) => `${value.year}-${String(value.month).padStart(2, '0')}`;
+
   const step = (delta: number) => {
-    const next = stepMonth(browsed, delta);
-    return `?m=${next.year}-${String(next.month).padStart(2, '0')}`;
+    if (!range.months) {
+      const next = stepMonth(browsed, delta);
+      return `?m=${token(next)}`;
+    }
+    const from = stepMonth(range.months.from, delta);
+    const to = stepMonth(range.months.to, delta);
+    return `?${RANGE_PARAM}=${token(from)}..${token(to)}`;
   };
 
   const navButton =
@@ -94,7 +115,7 @@ export default async function CalendarPage({
   const Prev = rtl ? ChevronRight : ChevronLeft;
   const Next = rtl ? ChevronLeft : ChevronRight;
 
-  const arrows = range.bounded ? null : (
+  const arrows = (
     <div className="flex gap-1.5">
       <Link href={step(-1)} aria-label={t('calendar.prevMonth')} className={navButton}>
         <Prev size={14} aria-hidden />
@@ -113,7 +134,7 @@ export default async function CalendarPage({
         </p>
       ) : null}
 
-      {months.map((month) => (
+      {months.map((month, index) => (
         <Card
           key={`${month.year}-${month.month}`}
           title={
@@ -122,7 +143,10 @@ export default async function CalendarPage({
               <MonthTotal month={month} totals={totals} money={money} />
             </span>
           }
-          action={arrows}
+          // On the newest card only. The arrows move the whole range, so one pair belongs to
+          // the screen; a three-month range was drawing three identical pairs, each claiming
+          // to step the month it sat on.
+          action={index === 0 ? arrows : undefined}
         >
           <div className="grid grid-cols-7 gap-1 md:gap-1.5">
             {weekdayNames.map((name, index) => (

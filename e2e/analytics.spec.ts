@@ -348,6 +348,21 @@ test.describe('calendar', () => {
     await page.getByRole('link', { name: 'Previous month' }).click();
     await expect(page.locator('main').getByText(monthBefore(opened))).toBeVisible();
   });
+
+  test('still steps a month when a range is chosen', async ({ page }) => {
+    // The arrows used to disappear the moment a range was picked, on the reasoning that
+    // stepping out of it would show a month the picker says is not selected. That left the
+    // screen with no way to reach last month at all: someone on "this month" had to reopen
+    // the picker and build a custom range for the most ordinary move a calendar has. They
+    // shift the range itself now, so the picker above stays true to what is on screen.
+    await page.goto('/calendar?range=this-month');
+    const opened = await shownMonth(page);
+
+    await page.getByRole('link', { name: 'Previous month' }).click();
+    await expect(page.locator('main').getByText(monthBefore(opened))).toBeVisible();
+    // The range moved with it, rather than the month escaping the range.
+    expect(page.url()).toMatch(/range=\d{4}-\d{2}\.\.\d{4}-\d{2}/);
+  });
 });
 
 test.describe('Hebrew', () => {
