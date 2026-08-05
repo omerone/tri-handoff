@@ -1,10 +1,10 @@
-import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
-import { isAtOrBefore, parseYearMonth, stepMonth } from '@/lib/finance/bounds';
+import { isAtOrBefore, stepMonth } from '@/lib/finance/bounds';
+import { applyRangeAction } from '@/app/actions/range';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { describeRange } from '@/lib/time/range';
 import { getMt5Account, listFinanceEntries, listLongPositions } from '@/lib/db';
@@ -18,7 +18,7 @@ import { getFxRate, hasRate } from '@/lib/money/fx';
 import { wallClock } from '@/lib/time/zone';
 import { EntryForm } from './entry-form';
 import { EntryRow } from './entry-row';
-import { formatDayMonthAt, formatMonthName, type DateParts } from '@/lib/time/format';
+import { formatDayMonthAt, type DateParts } from '@/lib/time/format';
 
 /**
  * The personal-finance screen (SPEC §3.1) — the module that makes TRi more than a trading
@@ -48,18 +48,20 @@ export default async function FinancePage({
 
   const today = wallClock(new Date());
   const range = await currentResolvedRange(params.range);
-  const { year, month } = parseYearMonth(params.m) ?? { year: today.year, month: today.month };
 
   /*
-   * The window this screen is about.
+   * The window this screen is about, and the only thing that decides it.
    *
-   * A chosen range is the window. Without one the screen keeps the month-at-a-time browsing it
-   * has always had, with `?m=` as the position — the arrows are navigation, and navigation only
-   * makes sense while nothing has been pinned down.
+   * This screen used to carry a second control: `?m=`, stepped by the arrows below, which took
+   * over whenever no range was pinned. One screen with two date controls is one too many, and
+   * the pair could contradict each other outright — picking "maximum" left the arrows in charge,
+   * so the picker said *everything* while the page showed a single month, sometimes an empty
+   * future one. The range is now the single source of truth and the arrows move it, so the
+   * control at the top always describes what is below it.
    */
   const period = range.bounded
     ? { from: range.fromDate!, to: range.toDate! }
-    : { from: firstOf(year, month), to: lastOf(year, month) };
+    : allTimeBounds(entries, today);
 
   const balance = rangeBalance(entries, period.from, period.to);
 
@@ -144,12 +146,17 @@ export default async function FinancePage({
     isKnownCategory(category) ? t(`categories.${category}`) : category;
 
   // The period, named the way it was chosen: a month by its name, a range by its bounds.
-  const periodName = describeRange(range, locale) ?? formatMonthName({ year, month }, locale);
+  const periodName = describeRange(range, locale) ?? t('allTime');
 
-  const step = (delta: number) => {
-    const next = stepMonth({ year, month }, delta);
-    return `?m=${next.year}-${String(next.month).padStart(2, '0')}`;
-  };
+  /*
+   * The month the arrows step from — set only when the window is exactly one calendar month,
+   * whether that came from a preset, a custom range or an arrow.
+   */
+  const viewedMonth =
+    range.months && range.months.from.year === range.months.to.year &&
+    range.months.from.month === range.months.to.month
+      ? range.months.from
+      : null;
 
   const navButton =
     'border-line bg-raised text-dim hover:text-text flex h-7 w-7 items-center justify-center rounded-lg border';
@@ -200,18 +207,34 @@ export default async function FinancePage({
           </span>
         }
         action={
-          // Stepping out of a chosen range would show a month the picker above says is not
-          // selected. With no range the arrows *are* the navigation.
-          range.bounded ? null : (
+          /*
+           * Only while the window is a single month, because that is the only case where
+           * "previous" and "next" have one obvious meaning. Across a quarter, or across
+           * everything, the window was chosen deliberately and stepping it by a month would
+           * be answering a question nobody asked.
+           *
+           * They submit the same action the picker does rather than linking, so a month
+           * reached with an arrow is stored like any other choice and is still selected
+           * after a trip to another tab.
+           */
+          viewedMonth ? (
             <div className="flex gap-1.5">
-              <Link href={step(-1)} aria-label={t('prevMonth')} className={navButton}>
+              <MonthStep
+                month={stepMonth(viewedMonth, -1)}
+                label={t('prevMonth')}
+                className={navButton}
+              >
                 <Prev size={14} aria-hidden />
-              </Link>
-              <Link href={step(1)} aria-label={t('nextMonth')} className={navButton}>
+              </MonthStep>
+              <MonthStep
+                month={stepMonth(viewedMonth, 1)}
+                label={t('nextMonth')}
+                className={navButton}
+              >
                 <Next size={14} aria-hidden />
-              </Link>
+              </MonthStep>
             </div>
-          )
+          ) : null
         }
       >
         <div className="border-line border-b pb-3">
@@ -229,6 +252,7 @@ export default async function FinancePage({
             }}
             categories={{ income: suggestions('income'), expense: suggestions('expense') }}
             defaultDate={defaultDateFor(period, today)}
+            window={{ from: iso(period.from), to: iso(period.to) }}
           />
         </div>
 
@@ -302,18 +326,66 @@ export default async function FinancePage({
 const iso = (parts: DateParts) =>
   `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
 
-const firstOf = (year: number, month: number): DateParts => ({ year, month, day: 1 });
-const lastOf = (year: number, month: number): DateParts => ({
-  year,
-  month,
-  day: new Date(Date.UTC(year, month, 0)).getUTCDate(),
-});
 
 /**
  * Today when today is inside the window, otherwise where the window starts — so adding an
  * entry while looking at March does not silently date it today, and an entry added to a range
  * lands somewhere the user can still see it.
  */
+/**
+ * The window "maximum" means on this screen.
+ *
+ * `rangeBalance` walks month by month, so an unbounded window still needs two ends. They are
+ * taken from the data rather than from an arbitrary epoch: starting at the first entry keeps
+ * a recurring salary from being expanded across decades of months nobody recorded anything in,
+ * and ending today keeps "everything" a statement about money that has actually moved.
+ */
+function allTimeBounds(
+  entries: readonly { entryDate: Date }[],
+  today: { year: number; month: number; day: number },
+): { from: DateParts; to: DateParts } {
+  const to = { year: today.year, month: today.month, day: today.day };
+  if (entries.length === 0) return { from: { year: today.year, month: today.month, day: 1 }, to };
+
+  let earliest = entries[0]!.entryDate;
+  for (const entry of entries) {
+    if (entry.entryDate.getTime() < earliest.getTime()) earliest = entry.entryDate;
+  }
+  const start = wallClock(earliest);
+  return { from: { year: start.year, month: start.month, day: 1 }, to };
+}
+
+/**
+ * One arrow. A form rather than a link because the range lives in a cookie as well as the
+ * URL, and only the action writes both — a link would move the page and leave the stored
+ * choice behind, so the next tab would snap back.
+ */
+function MonthStep({
+  month,
+  label,
+  className,
+  children,
+}: {
+  month: { year: number; month: number };
+  label: string;
+  className: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <form action={applyRangeAction}>
+      <input type="hidden" name="path" value="/finance" />
+      <input type="hidden" name="intent" value="months" />
+      <input type="hidden" name="fromMonthYear" value={month.year} />
+      <input type="hidden" name="fromMonthMonth" value={month.month} />
+      <input type="hidden" name="toMonthYear" value={month.year} />
+      <input type="hidden" name="toMonthMonth" value={month.month} />
+      <button type="submit" aria-label={label} className={className}>
+        {children}
+      </button>
+    </form>
+  );
+}
+
 function defaultDateFor(
   period: { from: DateParts; to: DateParts },
   today: { year: number; month: number; day: number },

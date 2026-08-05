@@ -33,11 +33,18 @@ export function EntryForm({
   labels,
   categories,
   defaultDate,
+  window,
 }: {
   labels: EntryFormLabels;
   categories: { income: CategoryOption[]; expense: CategoryOption[] };
   /** Today, formatted on the server so the field does not depend on the client's clock. */
   defaultDate: string;
+  /**
+   * What the screen is currently showing, as `yyyy-mm-dd` bounds. Posted with the entry so
+   * the action can tell whether the thing just added would land somewhere the user cannot
+   * see, and move the window to it if so.
+   */
+  window: { from: string; to: string };
 }) {
   const [state, action] = useActionState<FinanceFormState, FormData>(
     createFinanceEntryAction,
@@ -52,6 +59,8 @@ export function EntryForm({
   return (
     <form action={action} className="flex flex-col gap-3">
       <FormMessage error={state.error} />
+      <input type="hidden" name="windowFrom" value={window.from} />
+      <input type="hidden" name="windowTo" value={window.to} />
 
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">

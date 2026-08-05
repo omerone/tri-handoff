@@ -19,6 +19,10 @@ export const INCOME_CATEGORIES = [
 ] as const;
 
 export const EXPENSE_CATEGORIES = [
+  // First, because this is a trading product: money moved to the broker is the expense this
+  // user records most, and it was at the bottom of a twelve-item list — past every household
+  // category — for no reason other than the order they were first written in.
+  'tradingDeposit',
   'rent',
   'mortgage',
   'food',
@@ -29,7 +33,6 @@ export const EXPENSE_CATEGORIES = [
   'education',
   'leisure',
   'shopping',
-  'tradingDeposit',
   'other',
 ] as const;
 

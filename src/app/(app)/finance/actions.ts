@@ -1,12 +1,17 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth/session';
 import { createFinanceEntry, deleteFinanceEntry, endRecurringSeries } from '@/lib/db';
 import { isPlausibleDate, isPlausibleMonth, MIN_YEAR } from '@/lib/finance/bounds';
 import { DEFAULT_CATEGORY, resolveCategoryKey } from '@/lib/finance/categories';
+import { setRangeCookie } from '@/lib/preferences/cookies';
+import { parseIsoDate } from '@/lib/time/format';
+import { formatRange, RANGE_PARAM, type TimeRange } from '@/lib/time/range';
+import { wallClock } from '@/lib/time/zone';
 
 export type FinanceFormState = { error?: string; ok?: boolean };
 
@@ -73,7 +78,44 @@ export async function createFinanceEntryAction(
   });
 
   revalidatePath('/finance');
+
+  /*
+   * An entry dated outside the window that is open would be saved and then not appear, which
+   * reads exactly like a failure. The date field deliberately accepts any month — recording
+   * next month's rent while paying this month's is the ordinary case — so the screen follows
+   * the entry rather than the entry disappearing from the screen.
+   *
+   * Only when it actually falls outside. Adding to the month already open, or anywhere inside
+   * a wider range that was chosen on purpose, leaves the view alone.
+   */
+  const target = monthOutsideWindow(formData, parsed.data.entryDate);
+  if (target) {
+    const range: TimeRange = { kind: 'months', from: target, to: target };
+    await setRangeCookie(range);
+    redirect(`/finance?${RANGE_PARAM}=${formatRange(range)}`);
+  }
+
   return { ok: true };
+}
+
+/**
+ * The month to jump to, or null to stay put. Returns null when the posted window is missing
+ * or unparseable, because a redirect is the more disruptive guess of the two.
+ */
+function monthOutsideWindow(
+  formData: FormData,
+  entryDate: Date,
+): { year: number; month: number } | null {
+  const from = parseIsoDate(String(formData.get('windowFrom') ?? ''));
+  const to = parseIsoDate(String(formData.get('windowTo') ?? ''));
+  if (!from || !to) return null;
+
+  const at = wallClock(entryDate);
+  const day = (parts: { year: number; month: number; day: number }) =>
+    parts.year * 10000 + parts.month * 100 + parts.day;
+
+  const inside = day(at) >= day(from) && day(at) <= day(to);
+  return inside ? null : { year: at.year, month: at.month };
 }
 
 /*
