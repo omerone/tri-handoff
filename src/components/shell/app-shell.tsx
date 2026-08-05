@@ -8,6 +8,7 @@ import { monthNames, selectableYears } from '@/lib/time/range-options';
 import type { TenantSession } from '@/lib/tenant/context';
 import Link from 'next/link';
 import { Settings as SettingsIcon } from 'lucide-react';
+import { TriMark } from '@/components/brand/logo';
 import { ThemeToggle } from './theme-toggle';
 import { MainNav, type NavItem } from './main-nav';
 import { RangePicker } from './range-picker';
@@ -46,14 +47,7 @@ export async function AppShell({
       <header className="border-line bg-header sticky top-0 z-20 border-b backdrop-blur-[8px]">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
-            <div
-              className="tri-num flex h-9 w-9 items-center justify-center rounded-xl text-[15px] font-extrabold text-white"
-              style={{
-                background: 'linear-gradient(135deg, var(--tri-brand), var(--tri-brand-2))',
-              }}
-            >
-              TRi
-            </div>
+            <TriMark size={36} />
             <div>
               <div className="text-base leading-none font-extrabold">{t('app.name')}</div>
               {/* Decoration, and at 320px it wraps to two lines and grows the sticky header

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { TenantGate } from '@/components/tenant-gate';
+import { TriMark } from '@/components/brand/logo';
 import { LanguageToggle } from '@/components/shell/language-toggle';
 import type { Locale } from '@/i18n/config';
 import { getSession } from '@/lib/auth/session';
@@ -37,12 +38,7 @@ async function AuthFrame({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="mb-6 flex items-center gap-3">
-        <div
-          className="tri-num flex h-9 w-9 items-center justify-center rounded-xl text-[15px] font-extrabold text-white"
-          style={{ background: 'linear-gradient(135deg, var(--tri-brand), var(--tri-brand-2))' }}
-        >
-          TRi
-        </div>
+        <TriMark size={40} />
         <div>
           <div className="text-base leading-none font-extrabold">{t('name')}</div>
           <div className="text-dim text-[11px]">{t('tagline')}</div>
