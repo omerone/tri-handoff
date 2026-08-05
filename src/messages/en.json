@@ -12,7 +12,8 @@
     "finance": "Finance",
     "long": "Long Trades",
     "settings": "Settings",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "learning": "Learning"
   },
   "range": {
     "title": "Time range",
@@ -403,5 +404,52 @@
     "unlabelled": "No strategy",
     "byStrategy": "By strategy",
     "journalled": "{count} trades journalled"
+  },
+  "learning": {
+    "title": "Learning ledger",
+    "subtitle": "What you studied, for how long, and which half of the craft",
+    "add": "Add",
+    "what": "What I learned",
+    "whatPlaceholder": "Market structure · risk management · patience…",
+    "hours": "Hours",
+    "topic": "Topic",
+    "date": "Date",
+    "note": "Notes",
+    "notePlaceholder": "What you took from it",
+    "empty": "No learning entries in this range yet",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this learning entry?",
+    "invalid": "Enter what you learned and a positive number of hours.",
+    "totalHours": "Total hours",
+    "sessions": "Sessions",
+    "sessionsCount": "{count, plural, one {one session} other {# sessions}}",
+    "hoursValue": "{hours} hours",
+    "byTopic": "Hours by topic",
+    "topics": {
+      "psychology": "Psychology",
+      "technical": "Technical"
+    }
+  },
+  "review": {
+    "tpTiming": "Exit timing",
+    "originalTp": "Original TP",
+    "originalTpQuestion": "Did the trade take the original TP?",
+    "tpTimingQuestion": "Was the TP taken early, on time, or late?",
+    "unset": "Not answered",
+    "saved": "Saved",
+    "saveFailed": "Could not save. Try again.",
+    "timings": {
+      "early": "Early",
+      "onTime": "On time",
+      "late": "Late"
+    },
+    "answers": {
+      "yes": "Yes",
+      "no": "No",
+      "unanswered": "Not answered"
+    },
+    "reviewedOf": "{answered} of {total} trades answered",
+    "noneReviewed": "No trade has been reviewed yet",
+    "ofTrades": "{count} trades"
   }
 }

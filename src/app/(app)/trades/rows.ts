@@ -1,5 +1,6 @@
 import 'server-only';
 import type { AssetClass, Direction } from '@/lib/mt5/types';
+import type { TpTiming } from '@/lib/review/types';
 import type { StoredLongPosition } from '@/lib/db';
 import type { TradeRecord } from '@/lib/db/trades';
 import { getFxRate, hasRate } from '@/lib/money/fx';
@@ -40,6 +41,12 @@ export type TableRow = {
   /** Whether anything has been written about this row; always false for a holding. */
   journalled: boolean;
   strategy: string | null;
+  /**
+   * The two exit questions. Null on a holding, which has no take-profit to have hit — the
+   * row renders nothing rather than an unanswerable control.
+   */
+  tpTiming: TpTiming | null;
+  tookOriginalTp: boolean | null;
 };
 
 export type RowFilter = {
@@ -68,6 +75,8 @@ function tradeRow(trade: TradeRecord): TableRow {
       trade.note || trade.tags.length > 0 || trade.rating || trade.mood || trade.strategy,
     ),
     strategy: trade.strategy,
+    tpTiming: trade.tpTiming,
+    tookOriginalTp: trade.tookOriginalTp,
   };
 }
 
@@ -119,6 +128,8 @@ async function positionRows(
       isPosition: true,
       journalled: false,
       strategy: null,
+      tpTiming: null,
+      tookOriginalTp: null,
     };
   });
 }

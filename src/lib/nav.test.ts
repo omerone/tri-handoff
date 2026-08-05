@@ -83,7 +83,16 @@ describe('ranged routes', () => {
     const ranged = NAV.filter((item) => item.ranged)
       .map((item) => item.href)
       .sort();
-    expect(ranged).toEqual(['/analytics', '/calendar', '/dashboard', '/finance', '/trades']);
+    // Learning is here because the study ledger is a period like any other — "how many hours
+    // this month" is the question it exists to answer.
+    expect(ranged).toEqual([
+      '/analytics',
+      '/calendar',
+      '/dashboard',
+      '/finance',
+      '/learning',
+      '/trades',
+    ]);
   });
 
   it('leaves out the screens that are statements about now', () => {

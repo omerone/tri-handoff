@@ -1,5 +1,6 @@
 import type { AssetClass, Direction, TradeStyle } from '@/lib/mt5/types';
 import type { Session } from '@/lib/time/zone';
+import type { TpTiming } from '@/lib/review/types';
 
 /**
  * The analytics engine's own view of a trade.
@@ -27,6 +28,13 @@ export type AnalyticsTrade = {
    * Null until they write one — an unlabelled trade is its own bucket, not a missing row.
    */
   strategy: string | null;
+  /**
+   * The two exit-review answers. They are on the trade rather than in a side table because
+   * every screen that charts them already has the book loaded, and because a review is a
+   * property of the trade it is about.
+   */
+  tpTiming: TpTiming | null;
+  tookOriginalTp: boolean | null;
 };
 
 export type Metrics = {

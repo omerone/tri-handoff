@@ -15,6 +15,7 @@ export type NavKey =
   | 'calendar'
   | 'finance'
   | 'long'
+  | 'learning'
   | 'settings';
 
 export type NavDefinition = {
@@ -54,6 +55,7 @@ export const NAV: readonly NavDefinition[] = [
   { key: 'long', href: '/long', label: 'long', enabled: true, ranged: false, inStrip: true },
   { key: 'calendar', href: '/calendar', label: 'calendar', enabled: true, ranged: true, inStrip: true }, // M1.7
   { key: 'analytics', href: '/analytics', label: 'analytics', enabled: true, ranged: true, inStrip: true }, // M1.5
+  { key: 'learning', href: '/learning', label: 'learning', enabled: true, ranged: true, inStrip: true },
   { key: 'settings', href: '/settings', label: 'settings', enabled: true, ranged: false, inStrip: false },
 ];
 

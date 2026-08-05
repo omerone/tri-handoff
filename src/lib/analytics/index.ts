@@ -28,6 +28,8 @@ export function toAnalyticsTrades(records: readonly TradeRecord[]): AnalyticsTra
       risk: record.risk,
       rr: record.rr,
       strategy: record.strategy,
+      tpTiming: record.tpTiming,
+      tookOriginalTp: record.tookOriginalTp,
     });
   }
 

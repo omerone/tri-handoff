@@ -22,6 +22,11 @@ import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { SESSIONS, WEEKDAYS } from '@/lib/analytics/dimensions';
+import { DonutChart } from '@/components/charts/donut-chart';
+import { listLearningEntries } from '@/lib/db';
+import { learningTotals } from '@/lib/learning/types';
+import { originalTpBreakdown, tpTimingBreakdown } from '@/lib/review/stats';
+import { ORIGINAL_TP_COLOR, TIMING_COLOR, TOPIC_COLOR } from '@/lib/review/colors';
 
 /**
  * "Where am I most profitable" — SPEC §3.5, and the reason the product exists beyond a
@@ -40,18 +45,80 @@ export default async function AnalyticsPage({
   // Every breakdown, insight and heatmap cell below is computed from this one list, so the
   // range is applied once, here, and the "buckets sum to the total" guarantee survives it.
   const range = await currentResolvedRange((await searchParams).range);
-  const book = await loadBook(session.ctx, toTradeFilter(range));
+  const window = toTradeFilter(range);
+  const [book, learning] = await Promise.all([
+    loadBook(session.ctx, window),
+    // The study ledger is not part of the book — nothing about it comes from the broker —
+    // but it is narrowed by the same window, so the three donuts below all describe the
+    // same stretch of time.
+    listLearningEntries(session.ctx, { from: window.from, to: window.to }),
+  ]);
   const { money, display } = await displayMoney({
     source: book.accountCurrency,
     display: session.user.displayCurrency,
     locale,
   });
 
+  /*
+   * Two of these are shares of the *reviewed* trades and one is a share of the whole book —
+   * see the comments in `review/stats.ts`. The captions carry both the count and the share so
+   * the legend answers "how many" and "what fraction" without a second glance at the ring.
+   */
+  const timing = tpTimingBreakdown(book.trades);
+  const original = originalTpBreakdown(book.trades);
+  const learned = learningTotals(learning);
+
+  const sharePct = (value: number) => `${formatNumber(value * 100, locale, 0)}%`;
+  const learningHours = (value: number) =>
+    `${formatNumber(value, locale, value % 1 === 0 ? 0 : 2)}h`;
+
+  const timingSlices = timing.slices.map((slice) => ({
+    key: slice.key,
+    label: t(`review.timings.${slice.key}`),
+    value: slice.count,
+    caption: `${formatNumber(slice.count, locale)} · ${sharePct(slice.share)}`,
+    color: TIMING_COLOR[slice.key],
+  }));
+
+  const originalSlices = original.slices.map((slice) => ({
+    key: slice.key,
+    label: t(`review.answers.${slice.key}`),
+    value: slice.count,
+    caption: `${formatNumber(slice.count, locale)} · ${sharePct(slice.share)}`,
+    color: ORIGINAL_TP_COLOR[slice.key],
+  }));
+
+  const learningSlices = learned.byTopic.map((bucket) => ({
+    key: bucket.topic,
+    label: t(`learning.topics.${bucket.topic}`),
+    value: bucket.hours,
+    caption: `${learningHours(bucket.hours)} · ${sharePct(learned.hours === 0 ? 0 : bucket.hours / learned.hours)}`,
+    color: TOPIC_COLOR[bucket.topic],
+  }));
+
   if (book.trades.length === 0) {
+    /*
+     * Every trade-derived section below has nothing to draw, but the study ledger is not
+     * derived from trades at all — a week spent reading and not trading is a real week, and
+     * hiding the hours because the book was empty would be the opposite of the point.
+     */
     return (
-      <Card title={t('nav.analytics')}>
-        <EmptyState>{range.bounded ? t('range.empty') : t('dash.empty')}</EmptyState>
-      </Card>
+      <div className="flex flex-col gap-4">
+        <Card title={t('nav.analytics')}>
+          <EmptyState>{range.bounded ? t('range.empty') : t('dash.empty')}</EmptyState>
+        </Card>
+        <Card title={t('learning.byTopic')}>
+          <DonutChart
+            data={learningSlices}
+            total={learningHours(learned.hours)}
+            centerLabel={t('learning.totalHours')}
+            emptyLabel={t('learning.empty')}
+          />
+          <p className="text-dim mt-3 text-[11px]">
+            {t('learning.sessionsCount', { count: learned.sessions })}
+          </p>
+        </Card>
+      </div>
     );
   }
 
@@ -176,6 +243,48 @@ export default async function AnalyticsPage({
             <BreakdownChart data={chart.data} rtl={rtl} display={display} />
           </Card>
         ))}
+      </div>
+
+      {/*
+        Three questions about habit rather than about money, which is why they are donuts
+        rather than the signed bars above: each is a share of one whole. They sit before the
+        heatmap because they answer "am I following my plan", and the heatmap answers "when
+        does my plan work" — the first is the one worth reading first.
+      */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card title={t('review.tpTiming')}>
+          <DonutChart
+            data={timingSlices}
+            total={formatNumber(timing.total, locale)}
+            centerLabel={t('review.ofTrades', { count: '' }).trim()}
+            emptyLabel={t('review.noneReviewed')}
+          />
+          <p className="text-dim mt-3 text-[11px]">
+            {t('review.reviewedOf', { answered: timing.total, total: book.trades.length })}
+          </p>
+        </Card>
+
+        <Card title={t('review.originalTp')}>
+          <DonutChart
+            data={originalSlices}
+            total={formatNumber(original.total, locale)}
+            centerLabel={t('review.ofTrades', { count: '' }).trim()}
+            emptyLabel={t('review.noneReviewed')}
+          />
+          <p className="text-dim mt-3 text-[11px]">{t('review.originalTpQuestion')}</p>
+        </Card>
+
+        <Card title={t('learning.byTopic')}>
+          <DonutChart
+            data={learningSlices}
+            total={learningHours(learned.hours)}
+            centerLabel={t('learning.totalHours')}
+            emptyLabel={t('learning.empty')}
+          />
+          <p className="text-dim mt-3 text-[11px]">
+            {t('learning.sessionsCount', { count: learned.sessions })}
+          </p>
+        </Card>
       </div>
 
       <Card title={t('analytics.heatmap')}>

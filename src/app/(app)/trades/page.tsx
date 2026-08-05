@@ -17,6 +17,7 @@ import { toTradeFilter } from '@/lib/time/range';
 import { displayMoney } from '@/lib/money/display';
 import { TradeFilters } from './filters';
 import { summarize, toRows, type RowStyle, type TableRow } from './rows';
+import { ReviewControl, type ReviewLabels } from './review-control';
 import { Pager } from './pager';
 
 const PAGE_SIZE = 40;
@@ -123,6 +124,18 @@ export default async function TradesPage({
       : money(row.profit ?? 0, { signed: true });
 
   const rowSign = (row: TableRow) => (row.profit ?? row.profitInOwnCurrency?.amount ?? 0) >= 0;
+
+  const reviewLabels: ReviewLabels = {
+    tpTiming: t('review.tpTiming'),
+    originalTp: t('review.originalTp'),
+    unset: t('review.unset'),
+    timings: {
+      early: t('review.timings.early'),
+      onTime: t('review.timings.onTime'),
+      late: t('review.timings.late'),
+    },
+    answers: { yes: t('review.answers.yes'), no: t('review.answers.no') },
+  };
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const align = rtl ? 'text-right' : 'text-left';
@@ -251,6 +264,22 @@ export default async function TradesPage({
                       </span>
                     </div>
                   </Link>
+
+                  {/*
+                    Outside the Link on purpose. A select nested inside an anchor is opened
+                    by a tap that the anchor also handles, so answering a question would
+                    navigate away from the row being answered.
+                  */}
+                  {trade.isPosition ? null : (
+                    <div className="px-4 pb-3">
+                      <ReviewControl
+                        tradeId={trade.key.replace('trade:', '')}
+                        tpTiming={trade.tpTiming}
+                        tookOriginalTp={trade.tookOriginalTp}
+                        labels={reviewLabels}
+                      />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -268,6 +297,7 @@ export default async function TradesPage({
                     t('table.risk'),
                     t('table.rr'),
                     t('table.pnl'),
+                    t('review.tpTiming'),
                     '',
                   ].map((header, index) => (
                     <th
@@ -333,6 +363,20 @@ export default async function TradesPage({
                       }`}
                     >
                       <Num>{rowMoney(trade)}</Num>
+                    </td>
+                    <td className="px-3.5 py-2.5">
+                      {/*
+                        Blank for a holding: it has no take-profit, so neither question has an
+                        answer that would mean anything.
+                      */}
+                      {trade.isPosition ? null : (
+                        <ReviewControl
+                          tradeId={trade.key.replace('trade:', '')}
+                          tpTiming={trade.tpTiming}
+                          tookOriginalTp={trade.tookOriginalTp}
+                          labels={reviewLabels}
+                        />
+                      )}
                     </td>
                     <td className="px-3.5 py-2.5 text-end">
                       {/*

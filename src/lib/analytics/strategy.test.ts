@@ -25,6 +25,8 @@ function trade(overrides: Partial<AnalyticsTrade> = {}): AnalyticsTrade {
     risk: 100,
     rr: 1,
     strategy: null,
+    tpTiming: null,
+    tookOriginalTp: null,
     ...overrides,
   };
 }

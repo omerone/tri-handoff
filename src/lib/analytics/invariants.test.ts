@@ -58,6 +58,8 @@ const FIXTURE: AnalyticsTrade[] = generateMockDeals()
       // The mock book is un-journalled, which is the honest default: a freshly synced
       // account has no strategies on it until the trader writes them.
       strategy: null,
+      tpTiming: null,
+      tookOriginalTp: null,
     } satisfies AnalyticsTrade;
   });
 
@@ -450,6 +452,8 @@ function trade(overrides: Partial<AnalyticsTrade> = {}): AnalyticsTrade {
     risk: 100,
     rr: 0,
     strategy: null,
+    tpTiming: null,
+    tookOriginalTp: null,
     ...overrides,
   };
 }

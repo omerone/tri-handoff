@@ -12,7 +12,8 @@
     "finance": "פיננסי",
     "long": "Long Trades",
     "settings": "הגדרות",
-    "signOut": "התנתקות"
+    "signOut": "התנתקות",
+    "learning": "למידה"
   },
   "range": {
     "title": "טווח זמן",
@@ -403,5 +404,52 @@
     "unlabelled": "ללא אסטרטגיה",
     "byStrategy": "לפי אסטרטגיה",
     "journalled": "{count} עסקאות עם יומן"
+  },
+  "learning": {
+    "title": "מאזן למידה",
+    "subtitle": "מה למדת, כמה זמן, ובאיזה חצי של המקצוע",
+    "add": "הוספה",
+    "what": "מה למדתי",
+    "whatPlaceholder": "מבנה שוק · ניהול סיכון · שליטה עצמית…",
+    "hours": "שעות",
+    "topic": "נושא",
+    "date": "תאריך",
+    "note": "הערות",
+    "notePlaceholder": "מה לקחת מזה",
+    "empty": "אין עדיין רשומות למידה בטווח הזה",
+    "delete": "מחיקה",
+    "deleteConfirm": "למחוק את רשומת הלמידה?",
+    "invalid": "נא למלא מה למדת ומספר שעות חיובי.",
+    "totalHours": "סך שעות",
+    "sessions": "מפגשים",
+    "sessionsCount": "{count, plural, one {מפגש אחד} two {שני מפגשים} other {# מפגשים}}",
+    "hoursValue": "{hours} שעות",
+    "byTopic": "שעות לפי נושא",
+    "topics": {
+      "psychology": "פסיכולוגיה",
+      "technical": "טכני"
+    }
+  },
+  "review": {
+    "tpTiming": "עיתוי היציאה",
+    "originalTp": "TP מקורי",
+    "originalTpQuestion": "האם העסקה לקחה את ה-TP המקורי?",
+    "tpTimingQuestion": "האם ה-TP נלקח לפני הזמן, בזמן, או אחרי?",
+    "unset": "לא נענה",
+    "saved": "נשמר",
+    "saveFailed": "לא הצלחנו לשמור. נסה שוב.",
+    "timings": {
+      "early": "לפני הזמן",
+      "onTime": "בזמן",
+      "late": "אחרי הזמן"
+    },
+    "answers": {
+      "yes": "כן",
+      "no": "לא",
+      "unanswered": "לא נענה"
+    },
+    "reviewedOf": "נענו {answered} מתוך {total} עסקאות",
+    "noneReviewed": "עדיין לא נענתה אף עסקה",
+    "ofTrades": "{count} עסקאות"
   }
 }
