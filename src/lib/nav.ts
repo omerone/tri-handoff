@@ -34,23 +34,42 @@ export type NavDefinition = {
    * is not data at all — a picker over either would be a control that changes nothing.
    */
   ranged: boolean;
+  /**
+   * Whether the tab appears in the nav strip.
+   *
+   * Settings does not. It is a place you go to change something and then leave, not one of
+   * the screens the trader moves between all day, and it was taking a seventh slot from six
+   * that are read constantly. It lives in the header corner instead — see `AppShell` — which
+   * is why this is a property of the route rather than a `filter` inside the shell: the strip
+   * and the corner have to disagree about exactly one entry, and that disagreement should be
+   * written down where the route is defined.
+   */
+  inStrip: boolean;
 };
 
 export const NAV: readonly NavDefinition[] = [
-  // Finance, trades, then analytics: the three screens this trader opens most, in that order,
-  // starting at the right-hand edge. The prototype led with the dashboard; it now follows
-  // them, and `HOME_PATH` still points there — where a form returns to is a separate question
-  // from what the nav puts first.
-  { key: 'finance', href: '/finance', label: 'finance', enabled: true, ranged: true },
-  { key: 'trades', href: '/trades', label: 'trades', enabled: true, ranged: true }, // M1.6
-  { key: 'analytics', href: '/analytics', label: 'analytics', enabled: true, ranged: true }, // M1.5
-  { key: 'dash', href: '/dashboard', label: 'dash', enabled: true, ranged: true },
-  { key: 'calendar', href: '/calendar', label: 'calendar', enabled: true, ranged: true }, // M1.7
-  { key: 'long', href: '/long', label: 'long', enabled: true, ranged: false },
-  { key: 'settings', href: '/settings', label: 'settings', enabled: true, ranged: false },
+  { key: 'finance', href: '/finance', label: 'finance', enabled: true, ranged: true, inStrip: true },
+  { key: 'dash', href: '/dashboard', label: 'dash', enabled: true, ranged: true, inStrip: true },
+  { key: 'trades', href: '/trades', label: 'trades', enabled: true, ranged: true, inStrip: true }, // M1.6
+  { key: 'long', href: '/long', label: 'long', enabled: true, ranged: false, inStrip: true },
+  { key: 'calendar', href: '/calendar', label: 'calendar', enabled: true, ranged: true, inStrip: true }, // M1.7
+  { key: 'analytics', href: '/analytics', label: 'analytics', enabled: true, ranged: true, inStrip: true }, // M1.5
+  { key: 'settings', href: '/settings', label: 'settings', enabled: true, ranged: false, inStrip: false },
 ];
 
 export const enabledNav = (): readonly NavDefinition[] => NAV.filter((item) => item.enabled);
+
+/** What the nav strip shows, in the order it shows it. */
+export const stripNav = (): readonly NavDefinition[] =>
+  NAV.filter((item) => item.enabled && item.inStrip);
+
+/** A route by key — for the pieces of the shell that link to one specific screen. */
+export function navRoute(key: NavKey): NavDefinition {
+  const found = NAV.find((item) => item.key === key);
+  // Unreachable: `NavKey` is the union of the keys in `NAV`.
+  if (!found) throw new Error(`no nav route for ${key}`);
+  return found;
+}
 
 /**
  * Whether the range picker belongs above this path.

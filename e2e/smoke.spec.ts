@@ -64,6 +64,9 @@ test.describe('login wall', () => {
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('link', { name: /דשבורד|Dashboard/ })).toBeVisible();
 
+    // Signing out lives in Settings now, not in the header — it is the one destructive
+    // control in the frame and it was a tap away from every screen.
+    await page.goto('/settings');
     await page.locator('button[aria-label="התנתקות"], button[aria-label="Sign out"]').click();
     await expect(page).toHaveURL(/\/login$/);
 

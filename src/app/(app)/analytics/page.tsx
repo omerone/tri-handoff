@@ -115,6 +115,7 @@ export default async function AnalyticsPage({
   const strategyData = hasStrategies
     ? toData(strategies, (key) => (key === UNLABELLED ? t('journal.unlabelled') : key))
     : [];
+  if (hasStrategies) charts.push({ title: t('journal.byStrategy'), data: strategyData });
 
   const insights = bestConditions(book.trades);
   const cells = heatmap(book.trades);
@@ -162,23 +163,20 @@ export default async function AnalyticsPage({
         )}
       </Card>
 
+      {/*
+        By-strategy is in this grid rather than in a full-width card of its own below it. A
+        book has two or three strategies, so alone on a row it was a pair of bars stretched
+        across twelve hundred pixels — the widest, emptiest panel on the page, and the one
+        with the least in it. Beside the other breakdowns it is the same size as the questions
+        it belongs with, and an odd count simply leaves the last row half full.
+      */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {charts.map((chart) => (
           <Card key={chart.title} title={chart.title}>
-            <BreakdownChart
-              data={chart.data}
-              rtl={rtl}
-              display={display}
-            />
+            <BreakdownChart data={chart.data} rtl={rtl} display={display} />
           </Card>
         ))}
       </div>
-
-      {hasStrategies ? (
-        <Card title={t('journal.byStrategy')}>
-          <BreakdownChart data={strategyData} rtl={rtl} display={display} />
-        </Card>
-      ) : null}
 
       <Card title={t('analytics.heatmap')}>
         <div className="overflow-x-auto">

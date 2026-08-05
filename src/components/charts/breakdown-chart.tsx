@@ -69,7 +69,15 @@ export function BreakdownChart({
               cursor={{ fill: 'rgba(255,255,255,0.04)' }}
             />
             <ReferenceLine y={0} stroke={TOKEN.dim} />
-            <Bar dataKey="net" radius={[6, 6, 0, 0]} isAnimationActive={false}>
+            {/*
+              `maxBarSize`, because a bar's width otherwise depends on how many there are.
+              Recharts divides the plot between the categories, so seven weekdays give sensible
+              columns and two strategies give two slabs a hundred and fifty pixels wide — the
+              same data reading as a much bigger claim, and the reason the by-strategy card
+              looked smeared across the screen. Capped, a chart with two categories is two
+              ordinary bars with space around them, which is what two categories are.
+            */}
+            <Bar dataKey="net" radius={[6, 6, 0, 0]} isAnimationActive={false} maxBarSize={56}>
               {data.map((entry) => (
                 <Cell key={entry.key} fill={entry.net >= 0 ? TOKEN.pos : TOKEN.neg} />
               ))}

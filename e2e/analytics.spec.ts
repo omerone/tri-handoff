@@ -352,9 +352,13 @@ test.describe('calendar', () => {
 
 test.describe('Hebrew', () => {
   test('puts the sign on the correct side of a number in RTL', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.getByRole('button', { name: 'החלף לעברית' }).click();
+    // Through Settings: the one-tap language switch is no longer in the header.
+    await page.goto('/settings');
+    await page.getByRole('button', { name: 'עברית', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    // Back to the screen whose numbers this is about — the switch is a detour now, not the
+    // first thing on the page under test.
+    await page.goto('/dashboard');
 
     // Without an LTR isolate, bidi lays "-₪2,085" out as "₪2,085-", which a trader reads as
     // a positive number. Every number is wrapped in dir="ltr" for exactly this reason, so
@@ -374,8 +378,9 @@ test.describe('Hebrew', () => {
   });
 
   test('renders every P1 screen in Hebrew without falling back to keys', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.getByRole('button', { name: 'החלף לעברית' }).click();
+    // Through Settings: the one-tap language switch is no longer in the header.
+    await page.goto('/settings');
+    await page.getByRole('button', { name: 'עברית', exact: true }).click();
 
     for (const path of ['/dashboard', '/analytics', '/trades', '/calendar', '/settings']) {
       await page.goto(path);

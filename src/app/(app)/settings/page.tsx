@@ -1,6 +1,7 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { CurrencyChoice, LanguageChoice, ThemeChoice } from './choices';
+import { SignOutButton } from '@/components/shell/sign-out-button';
 import { asTheme } from '@/lib/theme';
 import { Mt5Card, type ConnectedAccount } from './mt5-card';
 import { requireSession } from '@/lib/auth/session';
@@ -13,6 +14,7 @@ export default async function SettingsPage() {
   const session = await requireSession();
   const t = await getTranslations('settings');
   const tSync = await getTranslations('sync');
+  const tNav = await getTranslations('nav');
   const locale = (await getLocale()) as Locale;
   const tWizard = await getTranslations('settings.wizard');
 
@@ -115,6 +117,17 @@ export default async function SettingsPage() {
       <Card title={t('currency')}>
         <CurrencyChoice current={asCurrency(session.user.displayCurrency)} />
         <p className="text-dim mt-3 text-xs">{t('fxNote')}</p>
+      </Card>
+
+      {/*
+        Signing out lives here now rather than in the header. It was a one-tap icon beside
+        the sync pill — next to the theme switch, a keystroke away from every screen — and
+        the only destructive control in the frame. Behind a door, with its own card and the
+        account it will sign out of named, it is where someone goes deliberately.
+      */}
+      <Card title={tNav('signOut')}>
+        <p className="text-dim mb-3 text-xs">{session.user.email}</p>
+        <SignOutButton label={tNav('signOut')} withText />
       </Card>
     </div>
   );

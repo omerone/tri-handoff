@@ -36,8 +36,13 @@ setup('authenticate and connect MT5', async ({ page }) => {
 
   // English, because the specs that use this state assert English copy. Hebrew is the
   // default and has its own tests.
-  const toggle = page.getByRole('button', { name: 'Switch to English' });
-  if (await toggle.count()) await toggle.click();
+  //
+  // Through Settings, not the header: the one-tap language switch was removed from the frame
+  // and now lives on the Settings page beside the other preferences. The switch on the
+  // sign-in screen stayed, because there is no Settings to reach before signing in.
+  await page.goto('/settings');
+  const english = page.getByRole('button', { name: 'English', exact: true });
+  if (await english.count()) await english.click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 
   // Connecting is a four-step wizard, one field per step — not the single form it used to be.

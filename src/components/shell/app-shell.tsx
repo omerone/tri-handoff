@@ -2,15 +2,15 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { cookies } from 'next/headers';
 import type { Locale } from '@/i18n/config';
 import { resolveTheme, THEME_COOKIE } from '@/lib/theme';
-import { enabledNav } from '@/lib/nav';
+import { navRoute, stripNav } from '@/lib/nav';
 import { currentRange } from '@/lib/preferences/range';
 import { monthNames, selectableYears } from '@/lib/time/range-options';
 import type { TenantSession } from '@/lib/tenant/context';
-import { LanguageToggle } from './language-toggle';
+import Link from 'next/link';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { MainNav, type NavItem } from './main-nav';
 import { RangePicker } from './range-picker';
-import { SignOutButton } from './sign-out-button';
 import { SyncStatus } from './sync-status';
 
 /**
@@ -30,7 +30,7 @@ export async function AppShell({
   // the theme already on screen.
   const theme = resolveTheme(session.user.theme, (await cookies()).get(THEME_COOKIE)?.value);
 
-  const items: NavItem[] = enabledNav().map((item) => ({
+  const items: NavItem[] = stripNav().map((item) => ({
     key: item.key,
     href: item.href,
     label: t(`nav.${item.label}`),
@@ -64,11 +64,23 @@ export async function AppShell({
             </div>
           </div>
 
+          {/*
+            Settings sits here rather than in the strip below, and signing out and the
+            language switch have moved off the header entirely and into the Settings page.
+            The header is for what is true right now — is the data synced, is it light or
+            dark. Everything you go somewhere to change is behind one door.
+          */}
           <div className="flex items-center gap-2">
             <SyncStatus session={session} lastLoginAt={session.user.lastLoginAt} />
             <ThemeToggle current={theme} />
-            <LanguageToggle current={locale} />
-            <SignOutButton label={t('nav.signOut')} />
+            <Link
+              href={navRoute('settings').href}
+              title={t('nav.settings')}
+              aria-label={t('nav.settings')}
+              className="tri-tap border-line bg-raised text-dim hover:text-text flex items-center rounded-full border px-3 py-1.5 text-xs"
+            >
+              <SettingsIcon size={13} aria-hidden />
+            </Link>
           </div>
         </div>
 
