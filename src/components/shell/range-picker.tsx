@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { CalendarRange, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { applyRangeAction } from '@/app/actions/range';
 import { DateField } from '@/components/ui/date-field';
 import type { Locale } from '@/i18n/config';
@@ -163,14 +163,10 @@ export function RangePicker({
      */
     <div className="flex shrink-0 flex-wrap items-center gap-2">
       <>
-        {/* The sticky header already carries the mark, the sync pill and the nav strip; on a
-            320px screen the words here would push all of it into a third row. The icon stays,
-            and the group's `aria-label` says the same thing to a screen reader either way. */}
-        <span className="text-dim flex items-center gap-1.5 text-[11px] font-semibold">
-          <CalendarRange size={13} aria-hidden />
-          <span className="hidden sm:inline">{labels.title}</span>
-        </span>
-
+        {/* No label and no icon. The buttons say "maximum", "this month", "last month" and
+            name the custom range outright, so a heading in front of them was restating what
+            they already read as. The group keeps its `aria-label`, so a screen reader — which
+            cannot see that the buttons are a set — is told what they are for. */}
         <form action={applyRangeAction}>
           <Where path={pathname} query={query} />
           <div role="group" aria-label={labels.title} className={`${group} inline-flex`}>
