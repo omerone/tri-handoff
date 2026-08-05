@@ -224,3 +224,32 @@ export async function getLongPosition(
   });
   return row ? toPosition(row) : null;
 }
+
+/**
+ * Closed positions whose sale falls inside a window — what the trades table folds in
+ * alongside real deals.
+ *
+ * Ordered by close date descending to match the trades table, and narrowed on `closedAt`
+ * rather than `buyDate` because that table is a record of what was *realised* in the period.
+ * A holding bought two years ago and sold last week belongs to last week.
+ */
+export async function listClosedLongPositions(
+  ctx: TenantContext,
+  window: { from?: Date; to?: Date } = {},
+): Promise<StoredLongPosition[]> {
+  assertContext(ctx);
+  const rows = await prisma.longPosition.findMany({
+    where: {
+      userId: ctx.userId,
+      user: { tenantId: ctx.tenantId },
+      closedAt: {
+        not: null,
+        ...(window.from ? { gte: window.from } : {}),
+        ...(window.to ? { lte: window.to } : {}),
+      },
+    },
+    orderBy: [{ closedAt: 'desc' }],
+    take: 5000,
+  });
+  return rows.map(toPosition);
+}

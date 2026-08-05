@@ -138,6 +138,63 @@ async function main() {
   }
 
   console.log('✓ Seeded 5 sample trades for demo account');
+
+  // Long-term holdings. Two closed ones so the trades table has `Long` rows to show — a
+  // closed holding is money realised on a date, which is what that table records — and two
+  // still open so the holdings tab is not empty either.
+  const day = 24 * 60 * 60 * 1000;
+  const holdings = [
+    {
+      symbol: 'AAPL', qty: 20, buyPrice: 180, fees: 10, currency: 'USD', micCode: 'XNGS',
+      buyDate: new Date(now.getTime() - 120 * day),
+      // Sold: currentPrice carries the sale price, per closeLongPosition.
+      currentPrice: 210, closedAt: new Date(now.getTime() - 5 * day),
+      realizedPnl: 20 * (210 - 180) - 10,
+    },
+    {
+      symbol: 'MSFT', qty: 10, buyPrice: 400, fees: 8, currency: 'USD', micCode: 'XNGS',
+      buyDate: new Date(now.getTime() - 90 * day),
+      currentPrice: 380, closedAt: new Date(now.getTime() - 12 * day),
+      realizedPnl: 10 * (380 - 400) - 8,
+    },
+    {
+      symbol: 'NVDA', qty: 15, buyPrice: 120, fees: 6, currency: 'USD', micCode: 'XNGS',
+      buyDate: new Date(now.getTime() - 60 * day),
+      currentPrice: 138, closedAt: null, realizedPnl: null,
+    },
+    {
+      symbol: 'VOO', qty: 8, buyPrice: 480, fees: 4, currency: 'USD', micCode: 'ARCX',
+      buyDate: new Date(now.getTime() - 200 * day),
+      currentPrice: 512, closedAt: null, realizedPnl: null,
+    },
+  ];
+
+  for (const holding of holdings) {
+    const existing = await prisma.longPosition.findFirst({
+      where: { userId: user.id, symbol: holding.symbol },
+    });
+    if (existing) continue;
+    await prisma.longPosition.create({
+      data: {
+        userId: user.id,
+        symbol: holding.symbol,
+        qty: holding.qty,
+        buyPrice: holding.buyPrice,
+        buyDate: holding.buyDate,
+        currentPrice: holding.currentPrice,
+        valueUpdatedAt: holding.closedAt ?? now,
+        fees: holding.fees,
+        currency: holding.currency,
+        micCode: holding.micCode,
+        priceSource: 'manual',
+        realizedPnl: holding.realizedPnl,
+        closedAt: holding.closedAt,
+      },
+    });
+  }
+
+  console.log(`\u2713 Seeded ${holdings.length} long-term holdings (2 closed, 2 open)`);
+
 }
 
 main()
