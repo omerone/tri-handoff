@@ -78,48 +78,53 @@ export async function AppShell({
           </div>
         </div>
 
-        {/*
-          The tabs and the range on one line — tabs where reading starts, dates at the far end.
-          The range used to have a strip of its own beneath them, which spent a third row of a
-          sticky header on four buttons, on every screen.
-          
-          One row from the tablet breakpoint up, two below it. At 375px the six tabs and four
-          range buttons do not share a line: the tabs scroll, the range does not shrink, and the
-          page ends up wider than the screen — which the mobile sweep catches as a sideways
-          scroll on every screen at once.
-
-          Still inside the sticky header: the range is the frame everything below is read in,
-          and a filter that scrolls away is one the reader stops accounting for. It hides itself
-          where a period means nothing — see `isRangedPath`.
-        */}
-        <div className="mx-auto flex max-w-6xl flex-col gap-1 px-2 pb-2 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4">
+        {/* Tabs alone on this row. The range picker shared it until it went down to the top
+            of the page — at 375px the six tabs and four range buttons did not fit on one line,
+            and the header spent a second row on a control that belongs to the screen below
+            it rather than to the frame around it. */}
+        <div className="mx-auto max-w-6xl px-2 pb-2">
           <MainNav items={items} />
-
-          <RangePicker
-            fallback={range}
-            now={now}
-            locale={locale}
-            years={selectableYears(now)}
-            labels={{
-              title: t('range.title'),
-              presets: {
-                max: t('range.max'),
-                thisMonth: t('range.thisMonth'),
-                lastMonth: t('range.lastMonth'),
-              },
-              custom: t('range.custom'),
-              byMonths: t('range.byMonths'),
-              byDates: t('range.byDates'),
-              from: t('range.from'),
-              to: t('range.to'),
-              apply: t('range.apply'),
-              monthNames: monthNames(locale),
-            }}
-          />
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-5">{children}</main>
+      {/*
+        The range sits at the top of the page rather than in the header.
+        
+        It was in the sticky bar so it would stay visible, but a filter pinned above six tabs
+        competes with them for a row that is already full, and on a narrow screen it pushed the
+        tabs into a second line. Here it reads as what it is: the frame for the screen beneath
+        it, belonging to that screen.
+
+        Aligned to the inline end, which is the left corner in Hebrew and the right one in
+        English — the same corner in both, the one furthest from where reading starts.
+        It renders nothing on the screens where a period means nothing; see `isRangedPath`.
+      */}
+      <main className="mx-auto max-w-6xl px-4 py-5">
+        <div className="mb-3 flex justify-end">
+    <RangePicker
+      fallback={range}
+      now={now}
+      locale={locale}
+      years={selectableYears(now)}
+      labels={{
+        title: t('range.title'),
+        presets: {
+          max: t('range.max'),
+          thisMonth: t('range.thisMonth'),
+          lastMonth: t('range.lastMonth'),
+        },
+        custom: t('range.custom'),
+        byMonths: t('range.byMonths'),
+        byDates: t('range.byDates'),
+        from: t('range.from'),
+        to: t('range.to'),
+        apply: t('range.apply'),
+        monthNames: monthNames(locale),
+      }}
+    />
+        </div>
+        {children}
+      </main>
 
       <footer className="text-dim mx-auto max-w-6xl px-4 pb-6 text-[11px]">
         {session.tenant.name} · {session.user.email}

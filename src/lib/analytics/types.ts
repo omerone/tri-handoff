@@ -72,6 +72,21 @@ export type Drawdown = {
   troughAt: Date | null;
 };
 
+/**
+ * The mirror of a drawdown: the largest trough-to-peak *rise* the account made.
+ *
+ * Not the same as the biggest winning trade, and not the same as total profit. It is the
+ * best run the account put together — which is the figure that belongs beside the worst one,
+ * because both answer "how far did this move in one stretch".
+ */
+export type RunUp = {
+  /** Largest trough-to-peak rise in account currency, as a positive number. */
+  maxRunUp: number;
+  maxRunUpPercent: number;
+  troughAt: Date | null;
+  peakAt: Date | null;
+};
+
 export type Bucket<K extends string = string> = {
   key: K;
   metrics: Metrics;

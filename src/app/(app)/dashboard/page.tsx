@@ -7,7 +7,7 @@ import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { EquityChart } from '@/components/charts/equity-chart';
 import { RStrip } from '@/components/charts/r-strip';
 import { requireSession } from '@/lib/auth/session';
-import { computeMetrics, equityCurve, maxDrawdown, recentDailyR } from '@/lib/analytics';
+import { computeMetrics, equityCurve, maxDrawdown, maxRunUp, recentDailyR } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { toTradeFilter } from '@/lib/time/range';
@@ -76,6 +76,9 @@ export default async function DashboardPage({
   const metrics = computeMetrics(book.trades);
   const curve = equityCurve(book.trades, book.openingBalance);
   const drawdown = maxDrawdown(curve, book.openingBalance);
+  // The same curve read the other way up — see maxRunUp. Cheap enough to compute beside it,
+  // and the pair is only legible together.
+  const runUp = maxRunUp(curve, book.openingBalance);
   const balance = book.openingBalance + metrics.net;
 
   const recent = [...book.trades].slice(-6).reverse();
@@ -137,6 +140,14 @@ export default async function DashboardPage({
         value={money(-drawdown.maxDrawdown)}
         tone="neg"
         sub={formatPercent(drawdown.maxDrawdownPercent, locale)}
+      />
+    ),
+    maxProfit: (
+      <KPI
+        label={t('kpi.maxProfit')}
+        value={money(runUp.maxRunUp, { signed: true })}
+        tone="pos"
+        sub={formatPercent(runUp.maxRunUpPercent, locale)}
       />
     ),
     rStrip: (
@@ -236,6 +247,7 @@ export default async function DashboardPage({
     avgRr: t('kpi.avgRR'),
     profitFactor: t('kpi.profitFactor'),
     maxDd: t('kpi.maxDD'),
+    maxProfit: t('kpi.maxProfit'),
     rStrip: t('dash.rStrip', { days: stripDays }),
     equity: t('dash.equity'),
     recent: t('dash.recent'),

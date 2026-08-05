@@ -12,7 +12,7 @@ import { portfolioTotals } from '@/lib/positions/valuation';
 import { cumulativeCash, expensesByCategory, rangeBalance, totalWealth, yearBalance } from '@/lib/finance/balance';
 import { isKnownCategory, suggestedCategories } from '@/lib/finance/categories';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
-import { formatNumber } from '@/lib/money/currency';
+import { formatMoney, formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { getFxRate, hasRate } from '@/lib/money/fx';
 import { wallClock } from '@/lib/time/zone';
@@ -94,7 +94,24 @@ export default async function FinancePage({
     displayMoney({ source: accountCurrency, display: session.user.displayCurrency, locale }),
   ]);
 
-  const money = cashMoney.money;
+  /*
+   * Three kinds of number pass through this screen and only one of them needs converting at
+   * the point it is printed, so the two formatters are named for what they take rather than
+   * for what they produce.
+   *
+   * `ils` takes a shekel figure — every entry, every total, every category — and converts it
+   * on the way out. `inDisplay` takes something already carried into the display currency,
+   * which the net-worth legs and the long-position total both are by the time they are summed.
+   *
+   * They were one formatter before, wrapped around a manual `fromIls` at each call site, which
+   * applied the rate twice: `money(fromIls(x))` printed x × rate². Reading in shekels hid it
+   * completely, because that rate is 1 — the numbers only went wrong when someone switched to
+   * dollars, which is exactly when nobody has a shekel figure in their head to check against.
+   */
+  const ils = cashMoney.money;
+  const inDisplay = (amount: number, options: { signed?: boolean } = {}) =>
+    formatMoney(amount, cashMoney.currency, locale, options);
+
   const fromIls = (amount: number) => (cashMoney.converted ? amount * cashMoney.fx.rate : amount);
   const fromTrading = (amount: number) =>
     tradingMoney.converted ? amount * tradingMoney.fx.rate : amount;
@@ -170,24 +187,24 @@ export default async function FinancePage({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KPI label={t('income')} value={money(fromIls(balance.income))} tone="pos" />
-        <KPI label={t('expenses')} value={money(fromIls(balance.expenses))} tone="neg" />
+        <KPI label={t('income')} value={ils(balance.income)} tone="pos" />
+        <KPI label={t('expenses')} value={ils(balance.expenses)} tone="neg" />
         <KPI
           label={range.bounded ? t('periodNet') : t('monthNet')}
-          value={money(fromIls(balance.net), { signed: true })}
+          value={ils(balance.net, { signed: true })}
           tone={balance.net >= 0 ? 'pos' : 'neg'}
-          sub={`${lookingAhead ? t('yearToDateAsOfToday') : t('yearToDate')}: ${money(fromIls(ytd.net), { signed: true })}`}
+          sub={`${lookingAhead ? t('yearToDateAsOfToday') : t('yearToDate')}: ${ils(ytd.net, { signed: true })}`}
         />
         <KPI
           label={t('totalWealth')}
-          value={wealth === null ? '—' : money(wealth)}
+          value={wealth === null ? '—' : inDisplay(wealth)}
           sub={
             wealth === null
               ? t('fxUnavailable')
               : [
                   `${t('trading')} ${tradingMoney.money(tradingValue)}`,
-                  longValue && longValue > 0 ? `${t('longPositions')} ${money(longValue)}` : null,
-                  `${t('cash')} ${money(fromIls(cash))}`,
+                  longValue && longValue > 0 ? `${t('longPositions')} ${inDisplay(longValue)}` : null,
+                  `${t('cash')} ${ils(cash)}`,
                 ]
                   .filter(Boolean)
                   .join(' · ')
@@ -275,7 +292,7 @@ export default async function FinancePage({
                   type: occurrence.type,
                   label: occurrence.label,
                   category: categoryLabel(occurrence.category),
-                  amount: money(fromIls(occurrence.amountIls)),
+                  amount: ils(occurrence.amountIls),
                   // Stored as UTC midnight: a calendar date, not an instant.
                   date: formatDayMonthAt(occurrence.occurrenceDate, 'UTC'),
                   isRecurring: occurrence.isRecurring,
@@ -310,7 +327,7 @@ export default async function FinancePage({
                   </div>
                   <div className="text-dim w-28 shrink-0 text-end text-xs">
                     <Num>
-                      {money(fromIls(category.total))} · {formatNumber(share, locale, 0)}%
+                      {ils(category.total)} · {formatNumber(share, locale, 0)}%
                     </Num>
                   </div>
                 </div>

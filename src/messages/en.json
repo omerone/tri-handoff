@@ -74,6 +74,7 @@
     "profitFactor": "Profit factor",
     "avgRR": "Avg RR",
     "maxDD": "Max drawdown",
+    "maxProfit": "Max run-up",
     "expectancy": "Expectancy / trade",
     "avgWin": "Avg win",
     "avgLoss": "Avg loss",

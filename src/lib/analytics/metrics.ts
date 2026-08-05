@@ -1,4 +1,4 @@
-import type { AnalyticsTrade, Drawdown, EquityPoint, Metrics } from './types';
+import type { AnalyticsTrade, Drawdown, RunUp, EquityPoint, Metrics } from './types';
 
 /**
  * The metrics, computed from a list of closed trades. Pure — no I/O, no dates beyond the
@@ -142,4 +142,41 @@ export function maxDrawdown(curve: readonly EquityPoint[], startBalance: number)
     peakAt: bestPeakAt,
     troughAt,
   };
+}
+
+/**
+ * Maximum trough-to-peak rise — the drawdown calculation with its sign turned over.
+ *
+ * Deliberately a separate pass rather than extra fields on `maxDrawdown`: the two are read
+ * as a pair but they are not the same measurement, and a function that returns four numbers
+ * about two different things is one that gets misread. The cost is a second walk of a list
+ * that is a few thousand entries at most.
+ *
+ * The percentage is of the trough it rose from, mirroring the drawdown's "of the peak at the
+ * time". A trough at or below zero has no meaningful base to divide by, so the percentage
+ * stays at zero rather than reporting an infinity.
+ */
+export function maxRunUp(curve: readonly EquityPoint[], startBalance: number): RunUp {
+  let trough = startBalance;
+  let troughAt: Date | null = null;
+  let best = 0;
+  let bestPercent = 0;
+  let bestTroughAt: Date | null = null;
+  let peakAt: Date | null = null;
+
+  for (const point of curve) {
+    if (point.balance < trough) {
+      trough = point.balance;
+      troughAt = point.closeAt;
+    }
+    const rise = point.balance - trough;
+    if (rise > best) {
+      best = rise;
+      bestPercent = trough > 0 ? (rise / trough) * 100 : 0;
+      bestTroughAt = troughAt;
+      peakAt = point.closeAt;
+    }
+  }
+
+  return { maxRunUp: best, maxRunUpPercent: bestPercent, troughAt: bestTroughAt, peakAt };
 }
