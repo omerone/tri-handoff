@@ -57,6 +57,13 @@ export type Mt5AccountState = {
   equity: number;
   /** Broker-declared name, when the provider knows it. */
   name?: string;
+  /**
+   * The provider's own id for this account, when it has one.
+   *
+   * Returned so the caller can store it on `mt5_accounts.provider_account_id` and hand it back
+   * as `Mt5Credentials.providerAccountId` — see the note there.
+   */
+  providerAccountId?: string;
 };
 
 export type Mt5Credentials = {
@@ -64,6 +71,30 @@ export type Mt5Credentials = {
   server: string;
   /** The **investor** (read-only) password. Never the master password. */
   investorPassword: string;
+  /**
+   * Which TRi user these credentials belong to — the tenant boundary, carried into the broker.
+   *
+   * Every client's MT5 account is registered under one shared MetaApi subscription, so the
+   * provider's own account list is a namespace all our users share. Looking an account up by
+   * login and server alone therefore hands the first user's account to the second user who
+   * types the same numbers, and an MT5 login is eight digits and a server name is public: the
+   * lookup would authenticate nobody while returning somebody's balance and their whole
+   * history. Registering under a name that carries this key means each user only ever finds
+   * the account they themselves provisioned, and anyone else's wrong password is rejected by
+   * the broker where it should be.
+   *
+   * Required, not optional, so a new call site cannot omit it and quietly reopen that door.
+   */
+  accountKey: string;
+  /**
+   * The provider's id for this account, if one has already been stored.
+   *
+   * Optional and purely a shortcut: MetaApi registers an account under an id of its own, and
+   * finding that id means listing every account on the subscription. Once it is known it is
+   * kept on `mt5_accounts.provider_account_id`, and passing it back here turns three lookups
+   * per sync into none. A provider that has no such concept ignores it.
+   */
+  providerAccountId?: string | null;
 };
 
 export type Mt5VerifyResult =

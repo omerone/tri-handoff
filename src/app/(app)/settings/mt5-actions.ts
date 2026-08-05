@@ -84,6 +84,9 @@ export async function connectMt5Action(
     login: parsed.data.login,
     server: parsed.data.server,
     investorPassword: parsed.data.investorPassword,
+    // Whose account this is. `verify` runs before anything is stored, and without this the
+    // provider would look the account up by number alone and happily confirm somebody else's.
+    accountKey: session.ctx.userId,
   };
 
   const verified = await mt5Provider().verify(credentials);

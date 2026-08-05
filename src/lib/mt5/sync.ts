@@ -56,6 +56,9 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
       login: stored.login,
       server: stored.server,
       investorPassword: decryptSecret(stored.investorPwEncrypted),
+      // The tenant boundary, carried down to the broker: the provider registers and finds the
+      // account under this, so one client's book cannot be reached from another's session.
+      accountKey: ctx.userId,
     };
 
     const provider = mt5Provider();

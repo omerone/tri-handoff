@@ -32,6 +32,9 @@ async function main() {
     login: required('MT5_LOGIN'),
     server: required('MT5_SERVER'),
     investorPassword: required('MT5_PASSWORD'),
+    // Stands in for the user id the app passes. Constant on purpose: rerunning this script
+    // must find the account it registered last time rather than provisioning a second one.
+    accountKey: process.env.MT5_ACCOUNT_KEY ?? 'verify-script',
   };
 
   const provider = new MetaApiProvider(token, process.env.METAAPI_REGION ?? 'new-york');
