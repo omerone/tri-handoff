@@ -158,7 +158,8 @@
     "next": "Next",
     "page": "Page {page} of {total}",
     "strategy": "Strategy",
-    "allStrategies": "All strategies"
+    "allStrategies": "All strategies",
+    "holdingsCount": "{count, plural, one {# holding} other {# holdings}}"
   },
   "finance": {
     "income": "Income",

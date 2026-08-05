@@ -42,9 +42,21 @@ export type TradeRecord = {
   rating: number | null;
   mood: string | null;
   strategy: string | null;
+  /** How the exit compared to the plan's timing; null while unanswered. */
+  tpTiming: TpTiming | null;
+  /** Whether the original take-profit was the one that closed it; null while unanswered. */
+  tookOriginalTp: boolean | null;
 };
 
-export type TradeUpsert = Omit<TradeRecord, 'id' | 'note' | 'tags' | 'rating' | 'mood' | 'strategy'>;
+/*
+ * The sync writes everything a broker knows and nothing a trader wrote, which is why the
+ * journal columns and the two review answers are excluded here as well as in `upsertTrades`.
+ * A refresh must not be able to erase an answer someone gave.
+ */
+export type TradeUpsert = Omit<
+  TradeRecord,
+  'id' | 'note' | 'tags' | 'rating' | 'mood' | 'strategy' | 'tpTiming' | 'tookOriginalTp'
+>;
 
 const num = (value: Prisma.Decimal | null): number | null => (value === null ? null : Number(value));
 
@@ -73,6 +85,8 @@ type TradeRow = {
   rating: number | null;
   mood: string | null;
   strategy: string | null;
+  tpTiming: TpTiming | null;
+  tookOriginalTp: boolean | null;
 };
 
 function toRecord(row: TradeRow): TradeRecord {
@@ -101,6 +115,8 @@ function toRecord(row: TradeRow): TradeRecord {
     rating: row.rating,
     mood: row.mood,
     strategy: row.strategy,
+    tpTiming: row.tpTiming,
+    tookOriginalTp: row.tookOriginalTp,
   };
 }
 

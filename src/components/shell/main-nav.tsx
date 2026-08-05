@@ -44,7 +44,11 @@ export const MainNav = memo(function MainNav({ items }: { items: NavItem[] }) {
   return (
     <nav
       ref={strip}
-      className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // Full width on a phone, sharing the row with the range picker from `md` up. `min-w-0`
+      // is what makes the sharing work: without a minimum of zero a flex child refuses to
+      // shrink below its content, so the tabs would push the dates off the screen instead of
+      // scrolling — which is the one thing this strip is built to do.
+      className="flex w-full min-w-0 gap-1 overflow-x-auto [scrollbar-width:none] md:w-auto md:flex-1 [&::-webkit-scrollbar]:hidden"
     >
       {items.map((item) => {
         const Icon = ICONS[item.key] ?? LayoutDashboard;

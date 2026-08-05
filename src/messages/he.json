@@ -158,7 +158,8 @@
     "next": "הבא",
     "page": "עמוד {page} מתוך {total}",
     "strategy": "אסטרטגיה",
-    "allStrategies": "כל האסטרטגיות"
+    "allStrategies": "כל האסטרטגיות",
+    "holdingsCount": "{count, plural, one {החזקה אחת} two {שתי החזקות} other {# החזקות}}"
   },
   "finance": {
     "income": "הכנסות",

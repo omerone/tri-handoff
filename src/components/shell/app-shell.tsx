@@ -84,34 +84,45 @@ export async function AppShell({
           </div>
         </div>
 
-        <MainNav items={items} />
-
         {/*
-          Inside the sticky header, under the nav: the range is the frame everything below is
-          read in, and a filter that scrolls away is a filter the reader stops accounting for.
-          It hides itself on the screens where a period means nothing — see `isRangedPath`.
+          The tabs and the range on one line — tabs where reading starts, dates at the far end.
+          The range used to have a strip of its own beneath them, which spent a third row of a
+          sticky header on four buttons, on every screen.
+          
+          One row from the tablet breakpoint up, two below it. At 375px the six tabs and four
+          range buttons do not share a line: the tabs scroll, the range does not shrink, and the
+          page ends up wider than the screen — which the mobile sweep catches as a sideways
+          scroll on every screen at once.
+
+          Still inside the sticky header: the range is the frame everything below is read in,
+          and a filter that scrolls away is one the reader stops accounting for. It hides itself
+          where a period means nothing — see `isRangedPath`.
         */}
-        <RangePicker
-          fallback={range}
-          now={now}
-          locale={locale}
-          years={selectableYears(now)}
-          labels={{
-            title: t('range.title'),
-            presets: {
-              max: t('range.max'),
-              thisMonth: t('range.thisMonth'),
-              lastMonth: t('range.lastMonth'),
-            },
-            custom: t('range.custom'),
-            byMonths: t('range.byMonths'),
-            byDates: t('range.byDates'),
-            from: t('range.from'),
-            to: t('range.to'),
-            apply: t('range.apply'),
-            monthNames: monthNames(locale),
-          }}
-        />
+        <div className="mx-auto flex max-w-6xl flex-col gap-1 px-2 pb-2 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4">
+          <MainNav items={items} />
+
+          <RangePicker
+            fallback={range}
+            now={now}
+            locale={locale}
+            years={selectableYears(now)}
+            labels={{
+              title: t('range.title'),
+              presets: {
+                max: t('range.max'),
+                thisMonth: t('range.thisMonth'),
+                lastMonth: t('range.lastMonth'),
+              },
+              custom: t('range.custom'),
+              byMonths: t('range.byMonths'),
+              byDates: t('range.byDates'),
+              from: t('range.from'),
+              to: t('range.to'),
+              apply: t('range.apply'),
+              monthNames: monthNames(locale),
+            }}
+          />
+        </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-5">{children}</main>

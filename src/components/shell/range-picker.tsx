@@ -153,8 +153,16 @@ export function RangePicker({
     'border-line bg-raised text-text min-h-9 w-full rounded-[10px] border px-2.5 py-1.5 text-xs';
 
   return (
-    <div className="border-line bg-header border-b">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2">
+    /*
+     * No bar of its own. This used to be a full-width strip under the nav — a third row in a
+     * sticky header, spending vertical space on every screen to hold four buttons. It now sits
+     * on the nav's row, at the opposite end: tabs where reading starts, dates where it ends.
+     *
+     * `flex-wrap` on the row above still gives it a line of its own on a narrow phone, where
+     * the tabs and these four buttons genuinely do not fit side by side.
+     */
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <>
         {/* The sticky header already carries the mark, the sync pill and the nav strip; on a
             320px screen the words here would push all of it into a third row. The icon stays,
             and the group's `aria-label` says the same thing to a screen reader either way. */}
@@ -303,7 +311,7 @@ export function RangePicker({
             {summary}
           </span>
         ) : null}
-      </div>
+      </>
     </div>
   );
 }

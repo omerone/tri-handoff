@@ -89,6 +89,7 @@ model User {
   trades         Trade[]
   financeEntries FinanceEntry[]
   longPositions  LongPosition[]
+  learning       LearningEntry[]
   syncLogs       SyncLog[]
 
   @@unique([tenantId, email])
@@ -227,6 +228,15 @@ enum TradeStyle {
   swing
 }
 
+/// When the exit happened relative to the plan. Deliberately three answers rather than a
+/// boolean: "early" and "late" are different mistakes with different fixes, and collapsing
+/// them into "not on time" would hide which one a trader keeps making.
+enum TpTiming {
+  early
+  onTime
+  late
+}
+
 enum DealKind {
   /// A real market position. Only these feed the analytics engine.
   trade
@@ -281,6 +291,13 @@ model Trade {
   rating   Int?
   mood     String?
   strategy String?
+
+  /// How the exit compared to the plan's timing. NULL means unanswered, which is different
+  /// from any of the three answers and is why this is nullable rather than defaulted.
+  tpTiming       TpTiming? @map("tp_timing")
+  /// Whether the trade was closed at the take-profit that was set when it was opened.
+  /// NULL means unanswered.
+  tookOriginalTp Boolean?  @map("took_original_tp")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -389,6 +406,43 @@ model LongPosition {
   @@map("long_positions")
 }
 
+/// What a study session was about. Two answers because they are the two halves a trader can
+/// be weak in independently — reading the chart, and sitting still while it plays out.
+enum LearningTopic {
+  psychology
+  technical
+}
+
+/// A study session: what was learned, for how long, and which half it belongs to.
+///
+/// A sibling of `FinanceEntry` rather than of `Trade` — it is a ledger the trader keeps by
+/// hand, not something the broker reports, so nothing syncs into it and nothing overwrites it.
+model LearningEntry {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+
+  topic LearningTopic
+  /// What was learned, in the trader's own words.
+  title String
+  note  String?
+
+  /// Session length. Two decimals so a 45-minute session is 0.75 rather than a rounded hour;
+  /// the analytics pie is weighted by this, since ten minutes and an afternoon are not the
+  /// same amount of study.
+  hours Decimal @db.Decimal(6, 2)
+
+  learnedOn DateTime @map("learned_on") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, learnedOn])
+  @@map("learning_entries")
+}
+
 // ---------------------------------------------------------------------------
 // Operations
 // ---------------------------------------------------------------------------
@@ -469,10 +523,10 @@ model Quote {
 
   /// When the market produced this price — the close it came from, not when we asked. This
   /// is what decides whether a refresh is owed.
-  asOf DateTime? @map("as_of")
+  asOf      DateTime? @map("as_of")
   /// When we last asked. Separate from `asOf` so a feed that keeps returning the same close
   /// (a holiday, a delisting) cannot put the refresh into a loop.
-  fetchedAt DateTime @default(now()) @map("fetched_at")
+  fetchedAt DateTime  @default(now()) @map("fetched_at")
 
   @@unique([symbol, micCode])
   @@map("quotes")
@@ -570,7 +624,7 @@ model AdminAuditLog {
 
   /// Which tenant/user was affected (optional, null for system actions)
   tenantId String? @map("tenant_id")
-  userId String? @map("user_id")
+  userId   String? @map("user_id")
 
   /// Action type: create_tenant, suspend_tenant, create_user, reset_password, etc.
   actionType String @map("action_type")

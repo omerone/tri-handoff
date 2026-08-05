@@ -155,7 +155,10 @@ export default async function TradesPage({
           />
 
           <div className="text-dim col-span-2 flex gap-4 text-xs sm:col-span-1 sm:ms-auto">
-            <span>{t('kpi.tradesCount', { count: summary.count })}</span>
+            <span>{t('kpi.tradesCount', { count: summary.trades })}</span>
+            {summary.positions > 0 ? (
+              <span>{t('table.holdingsCount', { count: summary.positions })}</span>
+            ) : null}
             <span className={summary.net >= 0 ? 'text-pos' : 'text-neg'}>
               <Num>{money(summary.net, { signed: true })}</Num>
             </span>

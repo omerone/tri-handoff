@@ -166,15 +166,34 @@ export async function toRows(
  * folding it into an average R would be dividing by a denominator it never contributed to.
  */
 export function summarize(rows: readonly TableRow[]): {
-  count: number;
+  /** Deals only — the population the R and win-rate figures beside it are computed over. */
+  trades: number;
+  /** Closed holdings, counted separately rather than folded into the trade count. */
+  positions: number;
   net: number;
   unconverted: number;
 } {
   let net = 0;
   let unconverted = 0;
+  let trades = 0;
+  let positions = 0;
   for (const row of rows) {
+    if (row.isPosition) positions += 1;
+    else trades += 1;
     if (row.profit === null) unconverted += 1;
     else net += row.profit;
   }
-  return { count: rows.length, net, unconverted };
+  /*
+   * Two counts, not one.
+   *
+   * This returned `rows.length` under the name `count`, and the page rendered it as
+   * "98 trades" — 97 deals plus a closed holding. Three things were wrong with one number:
+   * a holding is not a trade, the average RR printed beside it is computed over the deals
+   * alone (see `isPosition` above, which says exactly that), and the dashboard's own trade
+   * count therefore disagreed with this screen by one.
+   *
+   * The net still spans both, because "what did this window make me" is a question about
+   * money and a holding's realised gain is money.
+   */
+  return { trades, positions, net, unconverted };
 }

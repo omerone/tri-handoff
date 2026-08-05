@@ -126,21 +126,35 @@ test.describe('shekel figures are not converted at the trading rate', () => {
   });
 });
 
+/**
+ * The month after the one showing, as a range token.
+ *
+ * The screen used to carry its own month arrows and now reads the shared time range, so a
+ * test that needs a different month asks for it the way the product does — through `?range`.
+ * The picker's own behaviour is covered exhaustively in range.spec.ts; what these two tests
+ * are about is a recurring row appearing in a month nobody wrote it into.
+ */
+function monthRange(offset: number): string {
+  const now = new Date();
+  const target = new Date(Date.UTC(now.getFullYear(), now.getMonth() + offset, 1));
+  const token = `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, '0')}`;
+  return `/finance?range=${token}..${token}`;
+}
+
 test.describe('recurring entries', () => {
   test('appear in a month they were never written to', async ({ page }) => {
     // The row exists once. Next month has to be computed from it, and the tile has to count
     // it — the whole design rests on that, and nothing else in the suite crosses a month
     // boundary on this screen.
-    await page.goto('/finance');
-    await page.getByRole('link', { name: 'Next month' }).click();
+    await page.goto(monthRange(1));
     const nextMonthExpensesBefore = await figure(page, 'Expenses');
 
-    await page.getByRole('link', { name: 'Previous month' }).click();
+    await page.goto(monthRange(0));
     const label = `${PREFIX} rent ${Date.now()}`;
     await addEntry(page, { type: 'expense', label, amount: 777, recurring: true });
     await expect(page.getByText('Recurring').first()).toBeVisible();
 
-    await page.getByRole('link', { name: 'Next month' }).click();
+    await page.goto(monthRange(1));
     await expect(page.getByText(label)).toBeVisible();
     expect(await figure(page, 'Expenses')).toBe(nextMonthExpensesBefore + 777);
   });
@@ -157,11 +171,11 @@ test.describe('recurring entries', () => {
      * exactly right for one entered by mistake. An earlier version offered only the first,
      * which left a mistyped recurring entry uncorrectable forever.
      */
-    await page.goto('/finance');
+    await page.goto(monthRange(0));
     const label = `${PREFIX} gym ${Date.now()}`;
     await addEntry(page, { type: 'expense', label, amount: 120, recurring: true });
 
-    await page.getByRole('link', { name: 'Next month' }).click();
+    await page.goto(monthRange(1));
     const generated = page
       .locator('div', { hasText: label })
       .filter({ has: page.getByRole('button', { name: 'End series' }) })
