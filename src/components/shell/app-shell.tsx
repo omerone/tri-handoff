@@ -98,33 +98,38 @@ export async function AppShell({
         Aligned to the inline end, which is the left corner in Hebrew and the right one in
         English — the same corner in both, the one furthest from where reading starts.
         It renders nothing on the screens where a period means nothing; see `isRangedPath`.
+
+        Beside `main` rather than inside it, sharing its width so the two line up. The picker
+        is the frame around the screen, not part of it, and the difference is load-bearing:
+        its summary spells out the same month names the screen below is titled with, so with
+        both under one element "the July card is on the page" cannot be asked of the DOM
+        without also matching the picker that says July is selected.
       */}
-      <main className="mx-auto max-w-6xl px-4 py-5">
-        <div className="mb-3 flex justify-end">
-    <RangePicker
-      fallback={range}
-      now={now}
-      locale={locale}
-      years={selectableYears(now)}
-      labels={{
-        title: t('range.title'),
-        presets: {
-          max: t('range.max'),
-          thisMonth: t('range.thisMonth'),
-          lastMonth: t('range.lastMonth'),
-        },
-        custom: t('range.custom'),
-        byMonths: t('range.byMonths'),
-        byDates: t('range.byDates'),
-        from: t('range.from'),
-        to: t('range.to'),
-        apply: t('range.apply'),
-        monthNames: monthNames(locale),
-      }}
-    />
-        </div>
-        {children}
-      </main>
+      <div className="mx-auto mb-3 flex max-w-6xl justify-end px-4 pt-5">
+        <RangePicker
+          fallback={range}
+          now={now}
+          locale={locale}
+          years={selectableYears(now)}
+          labels={{
+            title: t('range.title'),
+            presets: {
+              max: t('range.max'),
+              thisMonth: t('range.thisMonth'),
+              lastMonth: t('range.lastMonth'),
+            },
+            custom: t('range.custom'),
+            byMonths: t('range.byMonths'),
+            byDates: t('range.byDates'),
+            from: t('range.from'),
+            to: t('range.to'),
+            apply: t('range.apply'),
+            monthNames: monthNames(locale),
+          }}
+        />
+      </div>
+
+      <main className="mx-auto max-w-6xl px-4 pb-5">{children}</main>
 
       <footer className="text-dim mx-auto max-w-6xl px-4 pb-6 text-[11px]">
         {session.tenant.name} · {session.user.email}

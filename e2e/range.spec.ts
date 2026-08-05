@@ -128,10 +128,17 @@ test.describe('what the range does to a screen', () => {
     await page.goto('/calendar?range=2026-05..2026-07');
 
     // Newest first, and every month in the range. Scoped to `main`: the picker's own summary
-    // names the same months in the header, which is the point of it.
+    // names the same months, which is the point of it, and it sits outside `main` so that
+    // asking whether the calendar shows July does not also find the picker saying so.
     for (const month of ['July 2026', 'June 2026', 'May 2026']) {
       await expect(page.locator('main').getByText(new RegExp(month))).toBeVisible();
     }
+
+    // Arriving on a custom range opens the panel — see 'opens showing the bounds it is
+    // responsible for'. On a phone it is 290px of month fields laid over the first card, so
+    // it has to be dismissed before anything under it can be reached, which is what a person
+    // does. Escape rather than a click elsewhere: a click would land on a card.
+    await page.keyboard.press('Escape');
 
     // The arrows shift the window rather than escaping it. They used to be absent here, on
     // the reasoning that stepping out of the range would show a month the picker says is not

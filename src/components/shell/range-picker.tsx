@@ -155,13 +155,15 @@ export function RangePicker({
   return (
     /*
      * No bar of its own. This used to be a full-width strip under the nav — a third row in a
-     * sticky header, spending vertical space on every screen to hold four buttons. It now sits
-     * on the nav's row, at the opposite end: tabs where reading starts, dates where it ends.
+     * sticky header, spending vertical space on every screen to hold four buttons.
      *
-     * `flex-wrap` on the row above still gives it a line of its own on a narrow phone, where
-     * the tabs and these four buttons genuinely do not fit side by side.
+     * It wraps rather than holding its width. Four buttons and a summary come to 429px, and a
+     * phone is 412 with padding to spare on top of that: with `shrink-0` on this row the flex
+     * parent could not narrow it, so `flex-wrap` never had a constraint to wrap against and
+     * the whole group hung 33px off the side of every screen in the app. Wrapping costs one
+     * line on a phone and nothing at all above it, where the row has always fitted.
      */
-    <div className="flex shrink-0 flex-wrap items-center gap-2">
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
       <>
         {/* No label and no icon. The buttons say "maximum", "this month", "last month" and
             name the custom range outright, so a heading in front of them was restating what
