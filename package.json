@@ -26,6 +26,7 @@
     "db:seed": "NODE_OPTIONS=--conditions=react-server tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "mt5:verify": "NODE_OPTIONS=--conditions=react-server tsx scripts/verify-mt5.ts",
+    "myfxbook:verify": "NODE_OPTIONS=--conditions=react-server tsx scripts/verify-myfxbook.ts",
     "tenant:create": "NODE_OPTIONS=--conditions=react-server tsx scripts/create-tenant.ts",
     "admin:create": "NODE_OPTIONS=--conditions=react-server tsx scripts/create-super-admin.ts",
     "secrets:rotate": "NODE_OPTIONS=--conditions=react-server tsx scripts/rotate-secrets.ts",
