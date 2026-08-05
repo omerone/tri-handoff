@@ -169,6 +169,48 @@ describe('tenant isolation', () => {
   });
 });
 
+describe('backfilling a journal that already has rows', () => {
+  /**
+   * The production failure this exists to prevent.
+   *
+   * A journal holding a trade newer than anything the broker will return puts the
+   * incremental cursor past the end of the history. Every sync then asks for a window that
+   * cannot contain anything, imports nothing, and reports success — a green log that means
+   * "no new deals" and "the connection is broken" in exactly the same words. A backfill is
+   * the one instruction that has to escape the cursor, because it is the only way back.
+   */
+  it('reads the whole history even when the cursor sits past the end of it', async () => {
+    const dave = await createTenantFixture();
+    await connect(dave, '77776666');
+
+    // Every mock deal closes by 2026-07-31; this one closes after all of them.
+    await testDb.trade.create({
+      data: {
+        userId: dave.userId,
+        ticket: 'newer-than-the-broker-has',
+        symbol: 'EURUSD',
+        assetClass: 'forex',
+        direction: 'long',
+        style: 'day',
+        openAt: new Date('2026-08-04T09:00:00Z'),
+        closeAt: new Date('2026-08-04T17:00:00Z'),
+        volume: 1,
+        entryPrice: 1.085,
+        profit: 700,
+      },
+    });
+
+    const incremental = await syncMt5(dave.ctx, 'login');
+    expect(incremental.status === 'success' && incremental.imported).toBe(0);
+
+    // Every deal the broker has, cash flow included — not the window the cursor allowed.
+    const backfill = await syncMt5(dave.ctx, 'backfill');
+    expect(backfill.status === 'success' && backfill.imported).toBe(
+      generateMockDeals().deals.length,
+    );
+  });
+});
+
 describe('reconnecting a different account', () => {
   it("does not mix two brokers' books together", async () => {
     const carol = await createTenantFixture();

@@ -59,7 +59,9 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
     };
 
     const provider = mt5Provider();
-    const since = await incrementalCursor(ctx);
+    // A backfill means what it says: read the account from the beginning. Everything else
+    // resumes from where the journal ends.
+    const since = trigger === 'backfill' ? null : await incrementalCursor(ctx);
 
     const [account, deals] = await Promise.all([
       provider.fetchAccountState(credentials),
@@ -92,6 +94,12 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
  * Null on the first connect — the full historical backfill SPEC §3.6 depends on. MT5 keeps
  * the whole account history, so everything the trader had in their previous journal comes
  * back from the broker without needing to export anything from it.
+ *
+ * Only ever consulted for an incremental trigger. This used to run unconditionally, which
+ * quietly disarmed the one path that exists to repair a journal: connecting an account with
+ * any trades already stored asked the broker for "everything since the newest close", got
+ * nothing, and reported success. A wall of green syncs that imported zero rows is what that
+ * looks like from the outside, and it is indistinguishable from a broker with no new deals.
  */
 async function incrementalCursor(ctx: TenantContext): Promise<Date | null> {
   const newest = await newestCloseAt(ctx);
