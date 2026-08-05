@@ -2,6 +2,7 @@ import 'server-only';
 import type { Prisma } from '@prisma/client';
 import type { TenantContext } from '@/lib/tenant/context';
 import type { AssetClass, DealKind, Direction, TradeStyle } from '@/lib/mt5/types';
+import type { TpTiming } from '@/lib/review/types';
 import { assertContext } from './context';
 import { prisma } from './prisma';
 
@@ -330,6 +331,31 @@ export type TradeJournal = {
   mood: string | null;
   strategy: string | null;
 };
+
+/**
+ * The two review answers, written one trade at a time from the row they belong to.
+ *
+ * Separate from `updateTradeJournal` because they are set from a different place and at a
+ * different moment: the journal form saves every field it holds at once, so routing a single
+ * dropdown through it would blank whatever the trader had not retyped.
+ */
+export type TradeReview = {
+  tpTiming?: TpTiming | null;
+  tookOriginalTp?: boolean | null;
+};
+
+export async function updateTradeReview(
+  ctx: TenantContext,
+  id: string,
+  review: TradeReview,
+): Promise<boolean> {
+  assertContext(ctx);
+  const { count } = await prisma.trade.updateMany({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    data: review,
+  });
+  return count > 0;
+}
 
 export async function updateTradeJournal(
   ctx: TenantContext,
