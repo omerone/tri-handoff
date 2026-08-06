@@ -73,6 +73,7 @@ jobs:
           KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           HOST: ${{ secrets.DEPLOY_HOST }}
           USER: ${{ secrets.DEPLOY_USER }}
+          HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
         run: |
           if [ -z "$KEY" ] || [ -z "$HOST" ]; then
             echo "::error title=Deploy not configured::DEPLOY_SSH_KEY or DEPLOY_HOST is missing."
@@ -82,7 +83,23 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # The host key is pinned, not learned. `ssh-keyscan` on every run is
+          # trust-on-first-use with no first use: it accepts whatever answers on
+          # port 22 and writes it down as correct, which is the same as not
+          # checking. Anyone able to stand between the runner and the VPS gets a
+          # deploy pointed at their machine, and this job would report success.
+          #
+          # DEPLOY_HOST_KEY holds the server's ed25519 public key, read off the
+          # box. A keyscan fallback stays for a host that has not had one set
+          # yet, and says so loudly rather than quietly doing the old thing.
+          if [ -n "$HOST_KEY" ]; then
+            printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+          else
+            echo "::warning title=Host key not pinned::DEPLOY_HOST_KEY is unset; trusting whatever answers on port 22."
+            ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+          chmod 600 ~/.ssh/known_hosts
 
           # The key is installed on the server under a forced command, so whatever
           # is passed here is ignored and `tri-deploy` runs instead. It pulls this
@@ -91,6 +108,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
               -o IdentitiesOnly=yes \
               -o PasswordAuthentication=no \
+              -o StrictHostKeyChecking=yes \
               -o ConnectTimeout=30 \
               "$USER@$HOST" deploy
 

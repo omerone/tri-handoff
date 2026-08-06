@@ -3,6 +3,35 @@
 Host-level pieces of the VPS deployment. Nothing here is imported by the app; it
 is kept in the repo so a rebuilt server can be brought back to the same state.
 
+## sshd-hardening.conf
+
+Keys only, plus a firewall and fail2ban. The box was taking roughly 7,700
+password guesses against root a day, from 70 addresses, with password
+authentication on and nothing rate-limiting them. Root here is the trading book,
+the encrypted MT5 credentials, the `ENCRYPTION_KEY` that opens them in the same
+`.env`, and every nightly backup.
+
+Install, in this order — the firewall rule for 22 has to exist before the
+firewall does, or enabling it ends the session that is typing:
+
+    ufw default deny incoming && ufw default allow outgoing
+    ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp
+    ufw --force enable
+
+    apt-get install -y fail2ban        # jail.local: bantime 1h, maxretry 5
+    systemctl enable --now fail2ban
+
+    install -m 644 ops/sshd-hardening.conf /etc/ssh/sshd_config.d/99-tri-hardening.conf
+    sshd -t && systemctl reload ssh    # reload, not restart — it keeps you connected
+
+Then open a **new** connection before closing the old one. That is the whole
+safety net for this change.
+
+`ssh-keyscan` no longer runs in the deploy workflow either. It was trust on
+first use with no first use: it accepted whatever answered on port 22 and wrote
+it down as correct. The server's ed25519 public key is pinned in the
+`DEPLOY_HOST_KEY` repository secret.
+
 ## nginx-tri-app.conf
 
 The reverse proxy in front of the app, and the only thing between the public
