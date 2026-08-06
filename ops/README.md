@@ -3,6 +3,24 @@
 Host-level pieces of the VPS deployment. Nothing here is imported by the app; it
 is kept in the repo so a rebuilt server can be brought back to the same state.
 
+## nginx-tri-app.conf
+
+The reverse proxy in front of the app, and the only thing between the public
+internet and a container that trusts what it is told. It was configured on the
+box and not kept here, which is exactly how it came to disagree with
+`caddy/Caddyfile` — the same proxy for the compose stack — on three points that
+each decide something the app cannot check for itself: whose address goes in the
+audit trail, which tenant a request belongs to, and whether the on-demand TLS
+`ask` endpoint answers strangers. The file says which, and why, at each line.
+
+Two proxies for one app is a standing hazard. If you change one, read the other.
+
+Install:
+
+    install -m 644 ops/nginx-tri-app.conf /etc/nginx/sites-available/tri-app
+    ln -sf /etc/nginx/sites-available/tri-app /etc/nginx/sites-enabled/tri-app
+    nginx -t && systemctl reload nginx
+
 ## tri-disk-guard
 
 A disk watchdog. Repeated `docker compose build` runs left 19 GB of build cache
