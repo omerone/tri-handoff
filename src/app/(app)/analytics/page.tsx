@@ -1,5 +1,6 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { EmptyState, Num } from '@/components/ui/kpi';
 import { BreakdownChart, type BreakdownDatum } from '@/components/charts/breakdown-chart';
 import { requireSession } from '@/lib/auth/session';
@@ -344,7 +345,11 @@ export default async function AnalyticsPage({
 
   return (
     <div className="flex flex-col gap-3">
-      <Card title={t('analytics.insights')} info={t('analytics.info.insights')}>
+      <CollapsibleCard
+        defaultOpen={false}
+        title={t('analytics.insights')}
+        info={t('analytics.info.insights')}
+      >
         {insights.length === 0 ? (
           <EmptyState>{t('analytics.noData')}</EmptyState>
         ) : (
@@ -373,7 +378,7 @@ export default async function AnalyticsPage({
             <div className="text-dim mt-2 text-[11px]">{t('analytics.bestNote')}</div>
           </>
         )}
-      </Card>
+      </CollapsibleCard>
 
       {/*
         By-strategy is in this grid rather than in a full-width card of its own below it. A
@@ -394,9 +399,15 @@ export default async function AnalyticsPage({
       */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {charts.map((chart) => (
-          <Card key={chart.title} title={chart.title} info={chart.info} infoLabel={chart.title}>
+          <CollapsibleCard
+            defaultOpen={false}
+            key={chart.title}
+            title={chart.title}
+            info={chart.info}
+            infoLabel={chart.title}
+          >
             <BreakdownChart data={chart.data} rtl={rtl} display={display} />
-          </Card>
+          </CollapsibleCard>
         ))}
       </div>
 
@@ -407,7 +418,7 @@ export default async function AnalyticsPage({
         does my plan work" — the first is the one worth reading first.
       */}
       <div className="grid gap-3 lg:grid-cols-3">
-        <Card title={t('review.tpTiming')}>
+        <CollapsibleCard defaultOpen={false} title={t('review.tpTiming')}>
           <DonutChart
             data={timingSlices}
             total={formatNumber(timing.total, locale)}
@@ -417,9 +428,9 @@ export default async function AnalyticsPage({
           <p className="text-dim mt-3 text-[11px]">
             {t('review.reviewedOf', { answered: timing.total, total: book.trades.length })}
           </p>
-        </Card>
+        </CollapsibleCard>
 
-        <Card title={t('review.originalTp')}>
+        <CollapsibleCard defaultOpen={false} title={t('review.originalTp')}>
           <DonutChart
             data={originalSlices}
             total={formatNumber(original.total, locale)}
@@ -427,9 +438,9 @@ export default async function AnalyticsPage({
             emptyLabel={t('review.noneReviewed')}
           />
           <p className="text-dim mt-3 text-[11px]">{t('review.originalTpQuestion')}</p>
-        </Card>
+        </CollapsibleCard>
 
-        <Card title={t('learning.byTopic')}>
+        <CollapsibleCard defaultOpen={false} title={t('learning.byTopic')}>
           <DonutChart
             data={learningSlices}
             total={learningHours(learned.hours)}
@@ -439,7 +450,7 @@ export default async function AnalyticsPage({
           <p className="text-dim mt-3 text-[11px]">
             {t('learning.sessionsCount', { count: learned.sessions })}
           </p>
-        </Card>
+        </CollapsibleCard>
       </div>
 
       {/*
@@ -456,7 +467,11 @@ export default async function AnalyticsPage({
         stops a short card stretching but nothing fills the row it leaves behind. A void that
         size reads as something having failed to load.
       */}
-      <Card title={t('analytics.holdTimes')} info={t('analytics.info.holdTimes')}>
+      <CollapsibleCard
+        defaultOpen={false}
+        title={t('analytics.holdTimes')}
+        info={t('analytics.info.holdTimes')}
+      >
         <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
           <div>
             <div className="text-dim text-[11px] font-semibold">{t('analytics.holdWinners')}</div>
@@ -478,13 +493,17 @@ export default async function AnalyticsPage({
                 : t('analytics.holdRatioLong')}
           </p>
         </div>
-      </Card>
+      </CollapsibleCard>
 
       {/*
         What the book paid to exist. Both columns have been on every trade since the first
         sync and were readable one trade at a time; nothing added them up.
       */}
-      <Card title={t('analytics.costs')} info={t('analytics.info.costs')}>
+      <CollapsibleCard
+        defaultOpen={false}
+        title={t('analytics.costs')}
+        info={t('analytics.info.costs')}
+      >
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <KPI
             label={t('analytics.costsTotal')}
@@ -548,14 +567,18 @@ export default async function AnalyticsPage({
             </ul>
           </>
         ) : null}
-      </Card>
+      </CollapsibleCard>
 
       {/*
         Process rather than outcome. Every other figure on this page describes what happened;
         these four describe how it was done, and they are what separates an edge from a run
         of luck.
       */}
-      <Card title={t('analytics.consistency')} info={t('analytics.info.consistency')}>
+      <CollapsibleCard
+        defaultOpen={false}
+        title={t('analytics.consistency')}
+        info={t('analytics.info.consistency')}
+      >
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <KPI
             label={t('analytics.riskSpread')}
@@ -665,14 +688,19 @@ export default async function AnalyticsPage({
             />
           </div>
         ) : null}
-      </Card>
+      </CollapsibleCard>
 
       {/*
         The one screen that answers "am I getting better". Everything else here describes a
         single selected window; this one puts the windows side by side.
       */}
       {grid.length > 0 ? (
-        <Card title={t('analytics.byPeriod')} pad={false} info={t('analytics.info.byPeriod')}>
+        <CollapsibleCard
+          defaultOpen={false}
+          title={t('analytics.byPeriod')}
+          pad={false}
+          info={t('analytics.info.byPeriod')}
+        >
           <div className="px-4 pt-1 pb-4">
             <ReturnsGrid
               grid={grid}
@@ -699,10 +727,14 @@ export default async function AnalyticsPage({
                 : t('analytics.byPeriodNoBase')}
             </p>
           </div>
-        </Card>
+        </CollapsibleCard>
       ) : null}
 
-      <Card title={t('analytics.heatmap')} info={t('analytics.info.heatmap')}>
+      <CollapsibleCard
+        defaultOpen={false}
+        title={t('analytics.heatmap')}
+        info={t('analytics.info.heatmap')}
+      >
         <div className="overflow-x-auto">
           <div
             className="grid gap-1.5"
@@ -728,7 +760,7 @@ export default async function AnalyticsPage({
             ))}
           </div>
         </div>
-      </Card>
+      </CollapsibleCard>
     </div>
   );
 }

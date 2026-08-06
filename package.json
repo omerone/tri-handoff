@@ -39,7 +39,8 @@
     "waf:deploy:challenge": "NODE_OPTIONS=--conditions=react-server tsx scripts/deploy-waf.ts --provider cloudflare --environment challenge",
     "waf:deploy:block": "NODE_OPTIONS=--conditions=react-server tsx scripts/deploy-waf.ts --provider cloudflare --environment block",
     "waf:test": "vitest run tests/waf/",
-    "waf:dry-run": "NODE_OPTIONS=--conditions=react-server tsx scripts/deploy-waf.ts --provider cloudflare --environment log-only --dry-run"
+    "waf:dry-run": "NODE_OPTIONS=--conditions=react-server tsx scripts/deploy-waf.ts --provider cloudflare --environment log-only --dry-run",
+    "tenant:credentials": "NODE_OPTIONS=--conditions=react-server tsx scripts/set-credentials.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
