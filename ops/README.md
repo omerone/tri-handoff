@@ -92,7 +92,7 @@ exits non-zero so systemd records the failure. Old dumps are expired only after
 a good one lands, so a run of failures cannot empty the directory.
 
 `tri-backup verify-restore` is the drill, and it had never been run. Everything
-`run` checks is a check on the *file* — valid gzip, the right table definitions
+`run` checks is a check on the _file_ — valid gzip, the right table definitions
 present — which says nothing about whether Postgres will accept it or whether
 what comes back out is the book that went in. The drill restores the newest dump
 into a scratch database beside the live one and compares the two: row counts per
@@ -122,9 +122,6 @@ the open item, and they need somewhere to go.
 
 `tri-backup status` lists what is on disk. `tri-backup restore <file>` asks for
 confirmation and takes a snapshot of the current state before overwriting it.
-
-Backups sit on the same disk as the database, which covers a bad migration or a
-mistaken delete but not the loss of the server. Off-site copies are still to do.
 
 ## tri-deploy
 
