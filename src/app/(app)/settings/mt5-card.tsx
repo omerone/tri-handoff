@@ -1,7 +1,6 @@
 'use client';
 
-import { MAX_MT5_ACCOUNTS } from '@/lib/db/mt5-accounts';
-
+import { MAX_MT5_ACCOUNTS } from '@/lib/mt5/types';
 import { useTransition } from 'react';
 import { Landmark, Shield } from 'lucide-react';
 import { Num } from '@/components/ui/kpi';
@@ -63,17 +62,24 @@ export function Mt5Card({
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {slots.map((account, index) => (
+        /*
+          `min-w-0`, which a grid child needs and does not get.
+
+          A grid track sizes to `auto`, and `auto` will not go below its content's minimum —
+          so one unbreakable thing inside a slot (the wizard's progress bar, a server name
+          with no spaces) widened the column past the card, past `main`, and the settings page
+          scrolled sideways on a phone. The `mobile.spec` route check caught it; nothing on
+          screen looked wrong, because the overflow was off the edge.
+        */
         <section
           key={account?.id ?? `empty-${index}`}
-          className="border-line flex flex-col gap-3 rounded-[14px] border p-4"
+          className="border-line flex min-w-0 flex-col gap-3 rounded-[14px] border p-4"
         >
           <header className="flex items-baseline justify-between gap-2">
             <h3 className="text-xs font-semibold">
               {index === 0 ? labels.firstAccount : labels.secondAccount}
             </h3>
-            {account?.label ? (
-              <span className="text-dim text-[11px]">{account.label}</span>
-            ) : null}
+            {account?.label ? <span className="text-dim text-[11px]">{account.label}</span> : null}
           </header>
 
           {account ? (

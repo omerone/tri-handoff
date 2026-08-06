@@ -9,6 +9,24 @@
  * makes that a product decision, and it is why the investor (read-only) password is enough.
  */
 
+/**
+ * How many broker accounts one trader may connect.
+ *
+ * Two, because that is what the product offers and says on the screen: a day account and a
+ * swing account, kept as separate books. Enforced in `src/lib/db/mt5-accounts.ts` as well as
+ * drawn on the settings screen — a limit that only exists in the markup is a limit until the
+ * first person opens two tabs, and each account past the first is a real monthly charge on
+ * somebody's card.
+ *
+ * It lives here rather than beside the check, because the settings card draws one slot per
+ * account and that card is a client component. Importing the number from the repository
+ * pulled `server-only` into the browser bundle and the build refused it outright — correctly:
+ * a module that reaches Prisma has no business being resolvable from the client, and one
+ * shared constant is not a reason to make it so. This file is the vocabulary both sides
+ * already share and it has no server dependency of its own.
+ */
+export const MAX_MT5_ACCOUNTS = 2;
+
 export type AssetClass = 'forex' | 'crypto' | 'indices' | 'stocks' | 'commodities' | 'other';
 export type Direction = 'long' | 'short';
 export type TradeStyle = 'day' | 'swing';

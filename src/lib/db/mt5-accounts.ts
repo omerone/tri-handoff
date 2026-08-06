@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import type { Mt5Status } from '@prisma/client';
 import type { TenantContext } from '@/lib/tenant/context';
+import { MAX_MT5_ACCOUNTS } from '@/lib/mt5/types';
 import { assertContext } from './context';
 import { prisma } from './prisma';
 
@@ -20,15 +21,8 @@ import { prisma } from './prisma';
  * in — a page cannot accidentally serialise it into the HTML, because it never has it.
  */
 
-/**
- * How many broker accounts one trader may connect.
- *
- * Two, because that is what the product offers and says on the screen: a day account and a
- * swing account, kept as separate books. Enforced here as well as drawn there — a limit that
- * only exists in the markup is a limit until the first person opens two tabs, and each account
- * past the first is a real monthly charge on somebody's card.
- */
-export const MAX_MT5_ACCOUNTS = 2;
+/** The limit itself lives in the port's shared vocabulary; see the note there. */
+export { MAX_MT5_ACCOUNTS } from '@/lib/mt5/types';
 
 export type Mt5AccountView = {
   id: string;
@@ -96,17 +90,15 @@ function toView(row: {
  * React's `cache` gets the part that was actually worth having — one query per request no
  * matter how many components ask — and cannot go stale, because it dies with the request.
  */
-export const listMt5Accounts = cache(
-  async (ctx: TenantContext): Promise<Mt5AccountView[]> => {
-    assertContext(ctx);
-    const rows = await prisma.mt5Account.findMany({
-      where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
-      orderBy: { createdAt: 'asc' },
-      select: VIEW_FIELDS,
-    });
-    return rows.map(toView);
-  },
-);
+export const listMt5Accounts = cache(async (ctx: TenantContext): Promise<Mt5AccountView[]> => {
+  assertContext(ctx);
+  const rows = await prisma.mt5Account.findMany({
+    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    orderBy: { createdAt: 'asc' },
+    select: VIEW_FIELDS,
+  });
+  return rows.map(toView);
+});
 
 /**
  * The first connected account, for the screens that still speak of "the" account.
@@ -115,12 +107,10 @@ export const listMt5Accounts = cache(
  * so it is stable rather than whichever row the planner happened to return. Anything that
  * shows figures per account should use `listMt5Accounts` instead.
  */
-export const getMt5Account = cache(
-  async (ctx: TenantContext): Promise<Mt5AccountView | null> => {
-    const accounts = await listMt5Accounts(ctx);
-    return accounts[0] ?? null;
-  },
-);
+export const getMt5Account = cache(async (ctx: TenantContext): Promise<Mt5AccountView | null> => {
+  const accounts = await listMt5Accounts(ctx);
+  return accounts[0] ?? null;
+});
 
 /** Thrown rather than returned, so a caller cannot forget to check for it. */
 export class Mt5AccountLimitError extends Error {
