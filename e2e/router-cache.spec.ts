@@ -47,10 +47,11 @@ test('a tab left open cannot keep reading the book after another tab signs out',
 
   // Back in the first tab, which still believes it is signed in: a client-side navigation,
   // the kind the router cache exists to answer. Immediately, well inside the window.
-  await left.getByRole('link', { name: /עסקאות|Trades/ }).first().click();
+  await left
+    .getByRole('link', { name: /עסקאות|Trades/ })
+    .first()
+    .click();
   await left.waitForLoadState('networkidle');
 
-  expect(left.url(), 'a client-side click served an app screen with no session').toMatch(
-    /\/login/,
-  );
+  expect(left.url(), 'a client-side click served an app screen with no session').toMatch(/\/login/);
 });
