@@ -330,16 +330,24 @@ export class MetaApiProvider implements Mt5Provider {
    * cached on `mt5_accounts.provider_account_id` so this happens once per client; pass it back
    * in as `credentials.providerAccountId` and none of the provisioning below runs at all.
    */
+  /**
+   * The memo key, in one place because two copies of it would drift.
+   *
+   * Keyed on the owner as well as the account: `mt5Provider()` caches one instance for the
+   * whole process, so a key without the owner would let this memo answer one user's lookup
+   * with another user's resolution — the same hole `findAccount` closes on the wire.
+   */
+  private memoKey(credentials: Mt5Credentials): string {
+    return `${credentials.accountKey}\0${credentials.login}\0${credentials.server.toLowerCase()}`;
+  }
+
   private async resolveAccountId(credentials: Mt5Credentials): Promise<string> {
     // The fast path, and the reason the column exists: a known id is a straight answer with no
     // request at all. If the account has since been undeployed the client call fails and the
     // sync reports an error, which is the same outcome as any other broker-side problem.
     if (credentials.providerAccountId) return credentials.providerAccountId;
 
-    // Keyed on the owner as well as the account. `mt5Provider()` caches one instance for the
-    // whole process, so a key without the owner would let this memo answer one user's lookup
-    // with another user's resolution — the same hole `findAccount` closes on the wire.
-    const key = `${credentials.accountKey}\0${credentials.login}\0${credentials.server.toLowerCase()}`;
+    const key = this.memoKey(credentials);
     const pending = this.resolved.get(key);
     if (pending) return pending;
 
@@ -639,8 +647,20 @@ export class MetaApiProvider implements Mt5Provider {
   async release(credentials: Mt5Credentials): Promise<void> {
     if (this.keepDeployed) return;
 
+    /*
+     * Forget it before stopping it.
+     *
+     * `resolveAccountId` memoises the whole provisioning handshake, readiness wait included,
+     * so a second sync in the same process would take the remembered id and go straight to
+     * the client API — against a terminal this method had just undeployed, which answers 404
+     * and 504. The first sync worked, every one after it failed, and only a restart cleared
+     * it. Dropping the entry means the next sync provisions and waits again, which is exactly
+     * what an account that has been stopped needs.
+     */
+    this.resolved.delete(this.memoKey(credentials));
+
     try {
-      const accountId = await this.resolveAccountId(credentials);
+      const accountId = credentials.providerAccountId ?? (await this.resolveAccountId(credentials));
       await this.send(`${this.provisioningUrl}/users/current/accounts/${accountId}/undeploy`, {
         method: 'POST',
       });

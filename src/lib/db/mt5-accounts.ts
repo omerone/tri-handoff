@@ -97,7 +97,13 @@ function toView(row: {
 export const listMt5Accounts = cache(async (ctx: TenantContext): Promise<Mt5AccountView[]> => {
   assertContext(ctx);
   const rows = await prisma.mt5Account.findMany({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    // Disconnected rows survive to hold their trades' attribution; they are not connections,
+    // so nothing that draws connections should see them.
+    where: {
+      userId: ctx.userId,
+      user: { tenantId: ctx.tenantId },
+      investorPwEncrypted: { not: '' },
+    },
     orderBy: { createdAt: 'asc' },
     select: VIEW_FIELDS,
   });
@@ -203,7 +209,13 @@ export async function readCredentialCiphertexts(ctx: TenantContext): Promise<
 > {
   assertContext(ctx);
   return prisma.mt5Account.findMany({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    // A disconnected account keeps its row so its trades keep their attribution, but it has no
+    // password and nothing to say to a broker.
+    where: {
+      userId: ctx.userId,
+      user: { tenantId: ctx.tenantId },
+      investorPwEncrypted: { not: '' },
+    },
     orderBy: { createdAt: 'asc' },
     select: {
       id: true,
@@ -244,24 +256,45 @@ export async function recordSyncFailure(ctx: TenantContext, mt5AccountId: string
 }
 
 /**
- * Disconnects one account, named explicitly.
+ * Disconnects one account without losing what it was.
  *
- * Deletes rather than marking disconnected: keeping an encrypted password for an account the
- * user has walked away from serves nobody. The trades stay — they are the trader's journal,
- * not the broker's — and the foreign key is `ON DELETE SET NULL`, so they lose the link and
- * keep the history. Passing no id disconnects every account, which is what account deletion
- * and the tests want; the settings screen always names one.
+ * This used to delete the row. Two things followed, both silent and both bad.
+ *
+ * The foreign key is `ON DELETE SET NULL`, so every trade the account had imported was left
+ * with no account — and `upsertTrades` keys on `(user_id, mt5_account_id, ticket)`. Reconnect
+ * the same broker account and it got a *new* id, so the upsert matched nothing and inserted a
+ * second copy of the entire history: net P&L doubled, the trade count doubled, and the same
+ * trade appeared in both the Day and Swing tabs at once.
+ *
+ * Worse, that nulling can violate the unique index itself. It is `NULLS NOT DISTINCT`, so two
+ * accounts that both carried ticket `123` collide the moment the second one is disconnected
+ * and its rows are nulled onto the first's — and the delete aborts with a constraint error the
+ * trader sees as "something went wrong".
+ *
+ * So the row stays and the credential goes. The password is cleared, which is the part that
+ * actually matters — keeping an investor password for an account somebody walked away from
+ * serves nobody — and the trades keep pointing at a row that still describes the broker
+ * account they came from. Reconnecting finds it by `(userId, login, server)` and adopts its
+ * own history back.
+ *
+ * Passing no id disconnects every account, which is what account deletion wants.
  */
 export async function disconnectMt5Account(
   ctx: TenantContext,
   mt5AccountId?: string,
 ): Promise<void> {
   assertContext(ctx);
-  await prisma.mt5Account.deleteMany({
+  await prisma.mt5Account.updateMany({
     where: {
       userId: ctx.userId,
       user: { tenantId: ctx.tenantId },
       ...(mt5AccountId ? { id: mt5AccountId } : {}),
+    },
+    data: {
+      status: 'disconnected',
+      // Emptied, not kept. `readCredentialCiphertexts` skips a row with no ciphertext, so a
+      // disconnected account cannot be synced even though it is still here.
+      investorPwEncrypted: '',
     },
   });
 }

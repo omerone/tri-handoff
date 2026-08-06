@@ -1,6 +1,5 @@
 'use client';
 
-import { MAX_MT5_ACCOUNTS } from '@/lib/mt5/types';
 import { useTransition } from 'react';
 import { Landmark, Shield } from 'lucide-react';
 import { Num } from '@/components/ui/kpi';
@@ -29,6 +28,8 @@ export type ConnectedAccount = {
   server: string;
   /** What the trader calls it — "Day", "Swing". Null until they name it. */
   label: string | null;
+  /** What the account is for. Null for one connected before purposes existed. */
+  purpose: 'day' | 'swing' | null;
   status: string;
   lastSync: string | null;
   balance: string | null;
@@ -58,15 +59,23 @@ export function Mt5Card({
   // connected into, so the card a trader learned to read does not move when the other one is
   // disconnected. `listMt5Accounts` orders by creation for the same reason.
   /*
-   * Slot one is the swing book and slot two the day book.
+   * A slot is a purpose, and an account sits in the slot it is *for*.
    *
-   * Fixed rather than chosen, because the split is the reason there are two slots and a
-   * dropdown asking which is which would invite a trader to connect two swing accounts and
-   * then wonder why the day tab is empty. What each account is for decides the style of
-   * everything it imports — see `styleOf` in the sync.
+   * This used to place `accounts[index]` — creation order — beside a heading chosen by the
+   * same index, which is only ever right by luck. Connect the day account first and it
+   * becomes `accounts[0]`, is drawn under "Swing account", and the one empty slot left is
+   * slot 1 — so the actual swing account is connected as `day` too, every trade in the
+   * product is stamped `day`, and the Swing tab is permanently empty. Matching on the stored
+   * purpose means the heading, the wizard's submission and the database always agree.
    */
   const PURPOSES = ['swing', 'day'] as const;
-  const slots = Array.from({ length: MAX_MT5_ACCOUNTS }, (_, index) => accounts[index] ?? null);
+  // An account connected before purposes existed has none. It takes the first slot no
+  // account claims, so it is visible and disconnectable rather than hidden by its own age.
+  const unassigned = accounts.filter((account) => account.purpose === null);
+  const slots = PURPOSES.map(
+    (purpose) =>
+      accounts.find((account) => account.purpose === purpose) ?? unassigned.shift() ?? null,
+  );
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -86,7 +95,7 @@ export function Mt5Card({
         >
           <header className="flex items-baseline justify-between gap-2">
             <h3 className="text-xs font-semibold">
-              {index === 0 ? labels.swingAccount : labels.dayAccount}
+              {PURPOSES[index] === 'swing' ? labels.swingAccount : labels.dayAccount}
             </h3>
             {account?.label ? <span className="text-dim text-[11px]">{account.label}</span> : null}
           </header>

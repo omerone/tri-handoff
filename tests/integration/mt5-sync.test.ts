@@ -6,6 +6,9 @@ import {
   latestSyncLog,
   listCashFlow,
   listMt5Accounts,
+  deleteTradesForAccount,
+  disconnectMt5Account,
+  upsertTrades,
   Mt5AccountLimitError,
   listClosedTrades,
   readCredentialCiphertexts,
@@ -38,6 +41,32 @@ async function connect(fixture: Fixture, login = '50214437') {
     investorPwEncrypted: encryptSecret(INVESTOR_PASSWORD),
     accountCurrency: 'USD',
   });
+}
+
+/** A broker row, for the tests that write history directly rather than through the mock. */
+function synced(ticket: string) {
+  return {
+    ticket,
+    kind: 'trade' as const,
+    symbol: 'GBPUSD',
+    assetClass: 'forex' as const,
+    direction: 'long' as const,
+    style: 'day' as const,
+    openAt: new Date('2026-07-15T09:00:00.000Z'),
+    closeAt: new Date('2026-07-15T17:00:00.000Z'),
+    volume: 1,
+    entryPrice: 1.3,
+    exitPrice: 1.31,
+    stopLoss: 1.29,
+    takeProfit: null,
+    commission: -7,
+    swap: 0,
+    profit: 93,
+    risk: 100,
+    rr: 0.93,
+    mae: null,
+    mfe: null,
+  };
 }
 
 beforeAll(async () => {
@@ -418,5 +447,118 @@ describe('what an account is for', () => {
     // this column, so getting it right here is what makes all of them right at once.
     expect(trades.some((trade) => trade.style === 'swing')).toBe(true);
     expect(trades.some((trade) => trade.style === 'day')).toBe(true);
+  });
+});
+
+describe('the second slot', () => {
+  /**
+   * The worst thing the bug hunt found: connecting the second account destroyed the first
+   * account's book.
+   *
+   * `isDifferentAccount` compared the new login against the *first* account, so filling the
+   * empty day slot read as replacing the swing one. The wizard then offered two buttons —
+   * confirm, which deleted every synced trade and every balance snapshot the trader had, or
+   * cancel — and there was no third path. Re-syncing does not undo it: `TradeUpsert` excludes
+   * note, tags, rating, mood, strategy and both review answers on purpose.
+   */
+  it('does not touch the other slot when a different account replaces one', async () => {
+    const kelly = await createTenantFixture();
+    const swing = await testDb.mt5Account.create({
+      data: {
+        userId: kelly.userId,
+        login: '31311111',
+        server: 'MetaQuotes-Demo',
+        purpose: 'swing',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        status: 'connected',
+      },
+      select: { id: true },
+    });
+    const day = await testDb.mt5Account.create({
+      data: {
+        userId: kelly.userId,
+        login: '31322222',
+        server: 'MetaQuotes-Demo',
+        purpose: 'day',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        status: 'connected',
+      },
+      select: { id: true },
+    });
+
+    await upsertTrades(kelly.ctx, swing.id, [synced('9001'), synced('9002')]);
+    await upsertTrades(kelly.ctx, day.id, [synced('9003')]);
+
+    // Replacing the day account must take the day account's rows and nothing else.
+    const removed = await deleteTradesForAccount(kelly.ctx, day.id);
+
+    expect(removed).toBe(1);
+    const left = await listClosedTrades(kelly.ctx);
+    expect(left.map((trade) => trade.ticket).sort()).toEqual(['9001', '9002']);
+  });
+});
+
+describe('disconnecting and reconnecting the same account', () => {
+  /**
+   * Deleting the row orphaned its trades, and the reconnected account got a new id — so
+   * `upsertTrades`, keyed on `(user, account, ticket)`, matched nothing and inserted a second
+   * copy of the whole history. Net P&L doubled and the same trade appeared in both tabs.
+   */
+  it('adopts its own history back instead of importing it twice', async () => {
+    const liam = await createTenantFixture();
+    await connect(liam, '33330000');
+    await syncMt5(liam.ctx, 'backfill');
+    const before = await listClosedTrades(liam.ctx);
+    expect(before.length).toBeGreaterThan(0);
+
+    await disconnectMt5Account(liam.ctx);
+    // The row survives so the trades keep their attribution; the credential does not.
+    const kept = await testDb.mt5Account.findFirstOrThrow({ where: { userId: liam.userId } });
+    expect(kept.investorPwEncrypted).toBe('');
+    expect(await listMt5Accounts(liam.ctx)).toHaveLength(0);
+    // Closed positions only: the opening deposit is attributed to the account too, and
+    // `listClosedTrades` excludes it by design.
+    expect(
+      await testDb.trade.count({
+        where: { userId: liam.userId, mt5AccountId: kept.id, kind: 'trade' },
+      }),
+    ).toBe(before.length);
+
+    await connect(liam, '33330000');
+    await syncMt5(liam.ctx, 'backfill');
+
+    const after = await listClosedTrades(liam.ctx);
+    expect(after).toHaveLength(before.length);
+  });
+
+  it('does not abort when two accounts shared a ticket', async () => {
+    // The unique index is NULLS NOT DISTINCT, so nulling one account's rows onto another's
+    // used to collide and fail the delete with a constraint error.
+    const mia = await createTenantFixture();
+    const first = await testDb.mt5Account.create({
+      data: {
+        userId: mia.userId,
+        login: '34340000',
+        server: 'BrokerA-Live',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        status: 'connected',
+      },
+      select: { id: true },
+    });
+    const second = await testDb.mt5Account.create({
+      data: {
+        userId: mia.userId,
+        login: '34341111',
+        server: 'BrokerB-Live',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        status: 'connected',
+      },
+      select: { id: true },
+    });
+    await upsertTrades(mia.ctx, first.id, [synced('777')]);
+    await upsertTrades(mia.ctx, second.id, [synced('777')]);
+
+    await expect(disconnectMt5Account(mia.ctx, second.id)).resolves.toBeUndefined();
+    expect(await testDb.trade.count({ where: { userId: mia.userId } })).toBe(2);
   });
 });

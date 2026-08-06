@@ -24,6 +24,14 @@ import { prisma } from './prisma';
  * losing either their own notes or their broker's history.
  */
 
+/**
+ * Most rows a style tab will draw, and therefore most it will count.
+ *
+ * Matches the cap on `listClosedTrades`, so the two screens agree about how much of a very
+ * long book they are willing to hold in memory at once.
+ */
+export const BOOK_LIMIT = 5000;
+
 export const MANUAL_TICKET_PREFIX = 'manual:';
 
 export function isManualTicket(ticket: string): boolean {
@@ -341,7 +349,17 @@ export async function listTradesByStyle(
       style,
     },
     orderBy: [{ closeAt: 'desc' }, { createdAt: 'desc' }],
-    take: 2000,
+    /*
+     * The cap was 2000 while `countTradesByStyle` counted the style with no cap at all, so a
+     * book of 5,000 day trades showed "Day 5000" on the tab, listed the newest 2,000, and
+     * computed the KPIs above the list from those 2,000 — three different answers to the same
+     * question, with nothing on screen saying the table was truncated.
+     *
+     * Raised to the same ceiling the trades table uses. It is still a ceiling, which is why
+     * `countTradesByStyle` reads from the same predicate: whatever the limit is, the number on
+     * the tab is the number of rows the tab can show.
+     */
+    take: BOOK_LIMIT,
   });
 
   return rows.map(toManualRow);
@@ -409,7 +427,11 @@ function toManualRow(row: {
  * `deleteAllTrades` deliberately spares — so using it here would warn about losing trades
  * that survive, and a warning that overstates is one people learn to click through.
  */
-export async function countSyncedTrades(ctx: TenantContext): Promise<number> {
+export async function countSyncedTrades(
+  ctx: TenantContext,
+  /** One account, when the question is what replacing *that* slot would cost. */
+  mt5AccountId?: string,
+): Promise<number> {
   assertContext(ctx);
   return prisma.trade.count({
     where: {
@@ -417,6 +439,7 @@ export async function countSyncedTrades(ctx: TenantContext): Promise<number> {
       user: { tenantId: ctx.tenantId },
       kind: 'trade',
       closeAt: { not: null },
+      ...(mt5AccountId === undefined ? {} : { mt5AccountId }),
       ...SYNCED_ONLY,
     },
   });
@@ -429,12 +452,23 @@ export async function countTradesByStyle(
   assertContext(ctx);
   const grouped = await prisma.trade.groupBy({
     by: ['style'],
-    // No MANUAL_ONLY: the number on a tab has to be the number of rows under it.
+    // No MANUAL_ONLY: the number on a tab has to be the number of rows under it, and the tab
+    // lists the whole book for its style.
     where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, kind: 'trade' },
     _count: { _all: true },
   });
 
   const counts: Record<TradeStyle, number> = { day: 0, swing: 0 };
-  for (const group of grouped) counts[group.style] = group._count._all;
+  for (const group of grouped) {
+    /*
+     * Capped to what the list will draw.
+     *
+     * `listTradesByStyle` stops at `BOOK_LIMIT`, and a tab reading 8,000 above a table holding
+     * 5,000 — with KPIs computed from the 5,000 and presented as the book's totals — is three
+     * answers to one question. Reporting the number of rows the tab can show is the only one
+     * of the three that is true of what the trader is looking at.
+     */
+    counts[group.style] = Math.min(group._count._all, BOOK_LIMIT);
+  }
   return counts;
 }

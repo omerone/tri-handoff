@@ -43,6 +43,7 @@ export default async function SettingsPage() {
     login: account.login,
     server: account.server,
     label: account.label,
+    purpose: account.purpose,
     status: account.status,
     lastSync: account.lastSyncAt ? formatDateTimeAt(account.lastSyncAt) : null,
     balance: money(account.balance, account.accountCurrency),

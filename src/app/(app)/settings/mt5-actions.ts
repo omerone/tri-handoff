@@ -12,9 +12,9 @@ import {
   consumeRateLimit,
   countSyncedTrades,
   deleteAllSnapshots,
-  deleteAllTrades,
+  deleteTradesForAccount,
   disconnectMt5Account,
-  getMt5Account,
+  listMt5Accounts,
 } from '@/lib/db';
 import { mt5Provider } from '@/lib/mt5';
 import { syncMt5 } from '@/lib/mt5/sync';
@@ -123,8 +123,32 @@ export async function connectMt5Action(
     return { error: connectError(verified, t) };
   }
 
-  const existing = await getMt5Account(session.ctx);
-  const isDifferentAccount = existing !== null && existing.login !== credentials.login;
+  /*
+   * "Replacing" is a question about *this slot*, not about the trader's first account.
+   *
+   * This compared the new login against `getMt5Account` — `listMt5Accounts[0]`, ordered by
+   * creation — so filling the empty second slot was read as replacing the first. The wizard
+   * then offered two buttons: confirm, which deleted every synced trade and every balance
+   * snapshot the trader had, or cancel. There was no path through the interface that connected
+   * a second account without destroying the first one's book, which is the opposite of the
+   * feature. The journal columns are not recoverable by re-syncing: `TradeUpsert` deliberately
+   * excludes note, tags, rating, mood, strategy and both review answers.
+   *
+   * The slot is named by the purpose the wizard submitted. An account with no purpose — one
+   * connected before purposes existed — is the slot's occupant only when nothing else claims
+   * it, which mirrors how the card draws them.
+   */
+  const purpose = parsed.data.purpose ?? null;
+  const connected = await listMt5Accounts(session.ctx);
+  const inThisSlot =
+    (purpose === null
+      ? connected[0]
+      : (connected.find((account) => account.purpose === purpose) ??
+        connected.find((account) => account.purpose === null))) ?? null;
+
+  const isDifferentAccount =
+    inThisSlot !== null &&
+    (inThisSlot.login !== credentials.login || inThisSlot.server !== credentials.server);
 
   /*
    * Ask before discarding a book, and ask *here* — before `connectMt5Account` writes
@@ -139,13 +163,15 @@ export async function connectMt5Action(
   if (isDifferentAccount && formData.get('confirmReplace') !== 'yes') {
     // Synced only: `deleteAllTrades` spares the manual ones, so counting the whole book
     // would warn about losing trades that survive.
-    const trades = await countSyncedTrades(session.ctx);
+    // This account's trades, not the whole book: the other slot's history is not being
+    // replaced and warning about it would overstate what the trader is agreeing to lose.
+    const trades = await countSyncedTrades(session.ctx, inThisSlot.id);
     return {
       confirmReplace: {
         trades,
         body: t('replaceBody', {
           trades,
-          fromLogin: existing.login,
+          fromLogin: inThisSlot.login,
           toLogin: credentials.login,
         }),
       },
@@ -168,12 +194,19 @@ export async function connectMt5Action(
     throw error;
   }
 
-  // Confirmed above: a different account number means the stored history is another book's.
-  // The balance history goes with it — a chart that steps from one account's equity to
-  // another's would read as a deposit or a catastrophe, and it is neither.
-  if (isDifferentAccount) {
-    await deleteAllTrades(session.ctx);
-    await deleteAllSnapshots(session.ctx);
+  /*
+   * Confirmed above: this slot now points at a different broker account, so the history it
+   * held belongs to a book the trader is no longer reading.
+   *
+   * Scoped to that account. Deleting every synced trade would take the *other* slot's book
+   * with it, which is the bug this whole block used to be. Snapshots are only cleared when
+   * nothing else is connected: they carry no account column, so with a second account still
+   * syncing they are still partly its history, and a chart missing half its own past is worse
+   * than one that steps.
+   */
+  if (isDifferentAccount && inThisSlot) {
+    await deleteTradesForAccount(session.ctx, inThisSlot.id);
+    if (connected.length === 1) await deleteAllSnapshots(session.ctx);
   }
 
   const result = await syncMt5(session.ctx, 'backfill');

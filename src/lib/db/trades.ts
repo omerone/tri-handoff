@@ -440,6 +440,29 @@ export async function deleteAllTrades(ctx: TenantContext): Promise<number> {
   return count;
 }
 
+/**
+ * One broker account's synced history, and nothing else.
+ *
+ * `deleteAllTrades` takes every synced row the trader has, which was the whole book while a
+ * trader could only connect one account. With two, replacing the account in one slot must
+ * leave the other slot's history alone — and the manual rows, which belong to neither.
+ */
+export async function deleteTradesForAccount(
+  ctx: TenantContext,
+  mt5AccountId: string,
+): Promise<number> {
+  assertContext(ctx);
+  const { count } = await prisma.trade.deleteMany({
+    where: {
+      userId: ctx.userId,
+      user: { tenantId: ctx.tenantId },
+      mt5AccountId,
+      ...SYNCED_ONLY,
+    },
+  });
+  return count;
+}
+
 export async function getTrade(ctx: TenantContext, id: string): Promise<TradeRecord | null> {
   assertContext(ctx);
   const row = await prisma.trade.findFirst({
