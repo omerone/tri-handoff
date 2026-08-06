@@ -567,5 +567,31 @@
     "reviewedOf": "{answered} of {total} trades answered",
     "noneReviewed": "No trade has been reviewed yet",
     "ofTrades": "{count} trades"
+  },
+  "manual": {
+    "day": "Day",
+    "swing": "Swing",
+    "dayTitle": "Day trades — entered by hand",
+    "swingTitle": "Swing trades — entered by hand",
+    "daySubtitle": "Trades opened and closed on the same day. What you enter here joins the same book as anything that comes from the broker — it will show up in the trades table, on the calendar, in the equity curve and in every breakdown on the analytics screen.",
+    "swingSubtitle": "Trades held for more than a day. What you enter here joins the same book as anything that comes from the broker — it will show up in the trades table, on the calendar, in the equity curve and in every breakdown on the analytics screen.",
+    "add": "Add",
+    "symbolHint": "EURUSD",
+    "riskHint": "what you risked",
+    "more": "More details",
+    "moreHint": "All optional. Fill in an entry price, a stop loss and a volume and the risk and RR are computed with the same formula the broker sync uses, instead of the amount you typed.",
+    "count": "Trades",
+    "net": "Net P&L",
+    "winRate": "Win rate",
+    "wins": "{wins} of {total}",
+    "avgRr": "Avg RR",
+    "rrCoverage": "{percent}% of trades have a risk",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this trade? The journal note, the rating and the answers written about it go with it, and there is no broker to re-import it from.",
+    "empty": "No trades entered yet. Add the first one in the form above.",
+    "added": "Trade added.",
+    "invalid": "Something is missing or one of the fields is not valid.",
+    "invalidDate": "That date is not valid.",
+    "openAfterClose": "The open date is later than the close date."
   }
 }

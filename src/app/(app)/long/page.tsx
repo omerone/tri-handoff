@@ -2,7 +2,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { EmptyState, KPI } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
-import { listLongPositions, type StoredLongPosition } from '@/lib/db';
+import { countManualTrades, listLongPositions, type StoredLongPosition } from '@/lib/db';
 import {
   isStale,
   portfolioTotals,
@@ -21,6 +21,8 @@ import {
 import { getFxRate, hasRate } from '@/lib/money/fx';
 import { wallClock } from '@/lib/time/zone';
 import { AddPositionForm } from './add-form';
+import { BookTabs, isBookTab, type BookTab } from './book-tabs';
+import { ManualBook } from './manual-book';
 import { PositionRow } from './position-row';
 import { trackAllAction } from './actions';
 import { formatDateAt } from '@/lib/time/format';
@@ -34,15 +36,59 @@ import { formatDateAt } from '@/lib/time/format';
  * the position is actually denominated in — converting a per-share price would be actively
  * confusing when the user goes to compare it with their broker.
  */
-export default async function LongPositionsPage() {
+export default async function LongPositionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ book?: string }>;
+}) {
   const session = await requireSession();
   const t = await getTranslations('long');
+  const tManual = await getTranslations('manual');
   const locale = (await getLocale()) as Locale;
   const rtl = LOCALE_DIR[locale] === 'rtl';
 
-  const positions = await listLongPositions(session.ctx);
+  const params = await searchParams;
+  const book: BookTab = isBookTab(params.book) ? params.book : 'long';
+
   const now = new Date();
   const display = asCurrency(session.user.displayCurrency);
+
+  const [positions, manualCounts] = await Promise.all([
+    listLongPositions(session.ctx),
+    countManualTrades(session.ctx),
+  ]);
+
+  /*
+   * The three books this screen holds.
+   *
+   * Long is the holdings that live outside MT5 and are marked to market by hand. Day and
+   * Swing are ordinary trades that arrived by keyboard instead of from a broker — rows in the
+   * same table the sync writes to, so they reach the analytics, the calendar and the R-strip
+   * without any of those knowing where they came from. This screen is where they are entered
+   * and removed, which is the one thing the trades table deliberately cannot do: a synced
+   * trade must not be deletable by hand.
+   */
+  const tabs = (
+    <BookTabs
+      current={book}
+      labels={{ long: t('title'), day: tManual('day'), swing: tManual('swing') }}
+      counts={{
+        long: positions.filter((position) => position.closedAt === null).length,
+        day: manualCounts.day,
+        swing: manualCounts.swing,
+      }}
+    />
+  );
+
+  if (book !== 'long') {
+    return (
+      <div className="flex flex-col gap-4">
+        {tabs}
+        <ManualBook style={book} />
+      </div>
+    );
+  }
+
 
   // One rate per currency actually held, resolved in parallel.
   //
@@ -153,6 +199,8 @@ export default async function LongPositionsPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      {tabs}
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KPI
           label={t('cost')}

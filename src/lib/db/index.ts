@@ -23,6 +23,7 @@ export {
 } from './users';
 export * from './mt5-accounts';
 export * from './trades';
+export * from './manual-trades';
 export * from './sync-logs';
 export * from './snapshots';
 export * from './finance';

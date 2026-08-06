@@ -1,0 +1,284 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  countManualTrades,
+  countSyncedTrades,
+  createManualTrade,
+  deleteAllTrades,
+  deleteManualTrade,
+  isManualTicket,
+  isManualTrade,
+  listClosedTrades,
+  listManualTrades,
+  upsertTrades,
+  type ManualTradeInput,
+  type TradeUpsert,
+} from '@/lib/db';
+import { cleanup, createTenantFixture, testDb, type Fixture } from '../helpers/fixtures';
+
+/**
+ * The boundary between what the trader typed and what the broker sent.
+ *
+ * Both live in `trades`, which is the point — a hand-entered trade reaches the analytics, the
+ * calendar and the R-strip without any of them knowing where it came from. The price of that
+ * is a boundary that has to hold in four directions, and none of them are visible from the
+ * UI until the day somebody loses data:
+ *
+ *   - a sync must not overwrite a manual trade;
+ *   - a sync must not delete one either;
+ *   - connecting a different broker account wipes the synced book and must spare the manual
+ *     one, because those rows are not the old account's history;
+ *   - and the delete on the manual screen must not be able to remove a synced trade, whatever
+ *     id it is handed.
+ *
+ * Requires the development database: `docker compose up -d postgres && npm run db:migrate`.
+ */
+
+let alice: Fixture;
+let bob: Fixture;
+
+const JULY = new Date('2026-07-15T12:00:00.000Z');
+
+function manual(over: Partial<ManualTradeInput> = {}): ManualTradeInput {
+  return {
+    symbol: 'EURUSD',
+    assetClass: 'forex',
+    direction: 'long',
+    style: 'day',
+    openAt: JULY,
+    closeAt: JULY,
+    profit: 100,
+    risk: 50,
+    rr: 2,
+    volume: 1,
+    entryPrice: 1.1,
+    exitPrice: 1.12,
+    stopLoss: 1.09,
+    takeProfit: null,
+    commission: 0,
+    swap: 0,
+    ...over,
+  };
+}
+
+function synced(ticket: string, over: Partial<TradeUpsert> = {}): TradeUpsert {
+  return {
+    ticket,
+    kind: 'trade',
+    symbol: 'GBPUSD',
+    assetClass: 'forex',
+    direction: 'long',
+    style: 'day',
+    openAt: JULY,
+    closeAt: JULY,
+    volume: 1,
+    entryPrice: 1.3,
+    exitPrice: 1.31,
+    stopLoss: 1.29,
+    takeProfit: null,
+    commission: -7,
+    swap: 0,
+    profit: 93,
+    risk: 100,
+    rr: 0.93,
+    mae: null,
+    mfe: null,
+    ...over,
+  };
+}
+
+beforeAll(async () => {
+  alice = await createTenantFixture();
+  bob = await createTenantFixture();
+});
+
+afterAll(cleanup);
+
+describe('the ticket namespace', () => {
+  it('marks a manual trade with a prefix no MT5 position id can have', async () => {
+    const id = await createManualTrade(alice.ctx, manual());
+    const row = await testDb.trade.findUnique({ where: { id }, select: { ticket: true } });
+
+    expect(row).not.toBeNull();
+    expect(isManualTicket(row!.ticket)).toBe(true);
+    // MT5 position ids are numeric; the prefix puts these somewhere the broker cannot reach.
+    expect(row!.ticket).not.toMatch(/^\d+$/);
+  });
+
+  it('gives every manual trade its own ticket', async () => {
+    const ids = await Promise.all([
+      createManualTrade(alice.ctx, manual()),
+      createManualTrade(alice.ctx, manual()),
+      createManualTrade(alice.ctx, manual()),
+    ]);
+    const rows = await testDb.trade.findMany({
+      where: { id: { in: ids } },
+      select: { ticket: true },
+    });
+    // A collision would be a unique-constraint failure on (user_id, ticket) — or worse, an
+    // upsert that silently overwrote the previous entry.
+    expect(new Set(rows.map((row) => row.ticket)).size).toBe(3);
+  });
+
+  it('does not think a broker ticket is manual', () => {
+    for (const ticket of ['123456789', 'p1', '', 'MANUAL:x']) {
+      expect(isManualTicket(ticket)).toBe(false);
+    }
+  });
+});
+
+describe('a sync running over a book that has manual trades in it', () => {
+  it('leaves them alone', async () => {
+    const fixture = await createTenantFixture();
+    const id = await createManualTrade(fixture.ctx, manual({ profit: 500, symbol: 'XAUUSD' }));
+
+    await upsertTrades(fixture.ctx, [synced('1001'), synced('1002')]);
+
+    const still = await testDb.trade.findUnique({ where: { id } });
+    expect(still).not.toBeNull();
+    expect(Number(still!.profit)).toBe(500);
+    expect(still!.symbol).toBe('XAUUSD');
+  });
+
+  it('reports them as neither imported nor updated', async () => {
+    const fixture = await createTenantFixture();
+    await createManualTrade(fixture.ctx, manual());
+
+    const result = await upsertTrades(fixture.ctx, [synced('2001')]);
+    // The count the sync shows the user is about the broker's rows, not the whole table.
+    expect(result).toEqual({ imported: 1, updated: 0 });
+  });
+
+  it('puts both kinds in the same book, which is the point of the design', async () => {
+    const fixture = await createTenantFixture();
+    await createManualTrade(fixture.ctx, manual({ profit: 100 }));
+    await upsertTrades(fixture.ctx, [synced('3001', { profit: 40 })]);
+
+    const book = await listClosedTrades(fixture.ctx);
+    expect(book).toHaveLength(2);
+    expect(book.reduce((sum, trade) => sum + trade.profit, 0)).toBe(140);
+  });
+});
+
+describe('connecting a different broker account', () => {
+  it('wipes the synced book and spares what the trader typed', async () => {
+    /*
+     * The failure this prevents: someone journals by hand for a month while waiting for a
+     * MetaApi subscription, then connects their account — and the wipe that correctly removes
+     * the *previous account's* history takes their own notes with it. Those rows are not the
+     * old account's history, and nothing outside this test would have noticed.
+     */
+    const fixture = await createTenantFixture();
+    const manualId = await createManualTrade(fixture.ctx, manual({ profit: 250 }));
+    await upsertTrades(fixture.ctx, [synced('4001'), synced('4002'), synced('4003')]);
+
+    const removed = await deleteAllTrades(fixture.ctx);
+
+    expect(removed).toBe(3);
+    expect(await testDb.trade.findUnique({ where: { id: manualId } })).not.toBeNull();
+    const left = await listClosedTrades(fixture.ctx);
+    expect(left).toHaveLength(1);
+    expect(left[0]!.profit).toBe(250);
+  });
+
+  it('counts only what it is actually going to delete', async () => {
+    // The confirmation names this number and the trader agrees to lose it. Counting the whole
+    // book would warn about trades that survive, and a warning that overstates gets clicked
+    // through.
+    const fixture = await createTenantFixture();
+    await createManualTrade(fixture.ctx, manual());
+    await createManualTrade(fixture.ctx, manual());
+    await upsertTrades(fixture.ctx, [synced('5001'), synced('5002')]);
+
+    expect(await countSyncedTrades(fixture.ctx)).toBe(2);
+  });
+});
+
+describe('deleting', () => {
+  it('removes a manual trade', async () => {
+    const id = await createManualTrade(alice.ctx, manual());
+    expect(await deleteManualTrade(alice.ctx, id)).toBe(true);
+    expect(await testDb.trade.findUnique({ where: { id } })).toBeNull();
+  });
+
+  it('refuses a synced trade, whatever id it is handed', async () => {
+    const fixture = await createTenantFixture();
+    await upsertTrades(fixture.ctx, [synced('6001')]);
+    const row = await testDb.trade.findFirst({ where: { userId: fixture.userId } });
+
+    expect(await deleteManualTrade(fixture.ctx, row!.id)).toBe(false);
+    expect(await testDb.trade.findUnique({ where: { id: row!.id } })).not.toBeNull();
+  });
+
+  it('refuses another trader’s manual trade', async () => {
+    // The tenant boundary, the same one every other query draws.
+    const id = await createManualTrade(alice.ctx, manual());
+    expect(await deleteManualTrade(bob.ctx, id)).toBe(false);
+    expect(await testDb.trade.findUnique({ where: { id } })).not.toBeNull();
+  });
+
+  it('is false for an id that is already gone, rather than throwing', async () => {
+    const id = await createManualTrade(alice.ctx, manual());
+    expect(await deleteManualTrade(alice.ctx, id)).toBe(true);
+    expect(await deleteManualTrade(alice.ctx, id)).toBe(false);
+  });
+});
+
+describe('listing', () => {
+  it('separates the two styles, and shows nobody else’s', async () => {
+    const fixture = await createTenantFixture();
+    await createManualTrade(fixture.ctx, manual({ style: 'day', symbol: 'EURUSD' }));
+    await createManualTrade(fixture.ctx, manual({ style: 'day', symbol: 'USDJPY' }));
+    await createManualTrade(fixture.ctx, manual({ style: 'swing', symbol: 'GOLD' }));
+    await createManualTrade(alice.ctx, manual({ style: 'day', symbol: 'NOTYOURS' }));
+
+    const day = await listManualTrades(fixture.ctx, 'day');
+    const swing = await listManualTrades(fixture.ctx, 'swing');
+
+    expect(day.map((trade) => trade.symbol).sort()).toEqual(['EURUSD', 'USDJPY']);
+    expect(swing.map((trade) => trade.symbol)).toEqual(['GOLD']);
+  });
+
+  it('lists manual trades only, never a synced one', async () => {
+    const fixture = await createTenantFixture();
+    await createManualTrade(fixture.ctx, manual({ symbol: 'TYPED' }));
+    await upsertTrades(fixture.ctx, [synced('7001', { symbol: 'SYNCED' })]);
+
+    const listed = await listManualTrades(fixture.ctx, 'day');
+    expect(listed.map((trade) => trade.symbol)).toEqual(['TYPED']);
+  });
+
+  it('counts per style for the tabs', async () => {
+    const fixture = await createTenantFixture();
+    await createManualTrade(fixture.ctx, manual({ style: 'day' }));
+    await createManualTrade(fixture.ctx, manual({ style: 'swing' }));
+    await createManualTrade(fixture.ctx, manual({ style: 'swing' }));
+    await upsertTrades(fixture.ctx, [synced('8001')]);
+
+    expect(await countManualTrades(fixture.ctx)).toEqual({ day: 1, swing: 2 });
+  });
+
+  it('keeps the style the trader chose rather than deriving it from the dates', async () => {
+    // A swing opened and closed inside one session is still a swing to the person who took
+    // it. The sync has only the dates to go on; here the trader is telling us.
+    const fixture = await createTenantFixture();
+    await createManualTrade(fixture.ctx, manual({ style: 'swing', openAt: JULY, closeAt: JULY }));
+
+    expect(await listManualTrades(fixture.ctx, 'swing')).toHaveLength(1);
+    expect(await listManualTrades(fixture.ctx, 'day')).toHaveLength(0);
+  });
+});
+
+describe('isManualTrade', () => {
+  it('answers for the trader who owns it, and for nobody else', async () => {
+    const id = await createManualTrade(alice.ctx, manual());
+    expect(await isManualTrade(alice.ctx, id)).toBe(true);
+    expect(await isManualTrade(bob.ctx, id)).toBe(false);
+  });
+
+  it('is false for a synced trade', async () => {
+    const fixture = await createTenantFixture();
+    await upsertTrades(fixture.ctx, [synced('9001')]);
+    const row = await testDb.trade.findFirst({ where: { userId: fixture.userId } });
+    expect(await isManualTrade(fixture.ctx, row!.id)).toBe(false);
+  });
+});

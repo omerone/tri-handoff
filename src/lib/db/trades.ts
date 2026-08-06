@@ -4,6 +4,7 @@ import type { TenantContext } from '@/lib/tenant/context';
 import type { AssetClass, DealKind, Direction, TradeStyle } from '@/lib/mt5/types';
 import type { TpTiming } from '@/lib/review/types';
 import { assertContext } from './context';
+import { SYNCED_ONLY } from './manual-trades';
 import { prisma } from './prisma';
 
 /**
@@ -354,10 +355,20 @@ export async function listCashFlow(ctx: TenantContext): Promise<TradeRecord[]> {
 }
 
 /** Wipes the book — used when the user connects a different MT5 account. */
+/**
+ * Wipes the *synced* book. Called when a different broker account is connected, because the
+ * stored history belongs to the account being replaced.
+ *
+ * Manual trades survive, and that is the whole point of the exclusion. They are not the old
+ * account's history — they are what the trader typed themselves, often before any broker was
+ * connected at all, and the reasoning that makes deleting the synced rows correct ("this
+ * history is another book's") says the opposite about these. Deleting them here would mean
+ * connecting a broker silently destroyed the journal someone kept by hand while waiting to.
+ */
 export async function deleteAllTrades(ctx: TenantContext): Promise<number> {
   assertContext(ctx);
   const { count } = await prisma.trade.deleteMany({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, ...SYNCED_ONLY },
   });
   return count;
 }

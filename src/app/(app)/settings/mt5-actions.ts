@@ -9,7 +9,7 @@ import { encryptSecret } from '@/lib/crypto/secretbox';
 import {
   connectMt5Account,
   consumeRateLimit,
-  countTrades,
+  countSyncedTrades,
   deleteAllSnapshots,
   deleteAllTrades,
   disconnectMt5Account,
@@ -128,7 +128,9 @@ export async function connectMt5Action(
    * about.
    */
   if (isDifferentAccount && formData.get('confirmReplace') !== 'yes') {
-    const trades = await countTrades(session.ctx);
+    // Synced only: `deleteAllTrades` spares the manual ones, so counting the whole book
+    // would warn about losing trades that survive.
+    const trades = await countSyncedTrades(session.ctx);
     return {
       confirmReplace: {
         trades,
