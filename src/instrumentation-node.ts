@@ -1,5 +1,6 @@
 import { pruneExpiredAuditLogs, pruneExpiredRateLimits, pruneExpiredSessions } from '@/lib/db';
 import { initializeEnv } from '@/lib/env';
+import { verifyMailTransport } from '@/lib/mail/mailer';
 import { refreshDueQuotes } from '@/lib/quotes/refresh';
 import { runSecurityChecks } from '@/lib/security/security-alerts';
 
@@ -60,6 +61,10 @@ export async function startMaintenanceSweep(): Promise<void> {
   void sweep();
   startQuoteRefresh();
   startSecurityChecks();
+
+  // Once, not on a timer: it answers a question about configuration, and configuration does
+  // not change under a running process. A deploy is when someone is already looking.
+  void verifyMailTransport();
 }
 
 /**

@@ -5,7 +5,11 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 /** See `src/lib/secrets/manager.edge.ts` — the Edge build cannot compile the real one. */
-const EDGE_SECRETS_STUB = fileURLToPath(new URL('./src/lib/secrets/manager.edge.ts', import.meta.url));
+const EDGE_SECRETS_STUB = fileURLToPath(
+  new URL('./src/lib/secrets/manager.edge.ts', import.meta.url),
+);
+/** Likewise `src/lib/mail/mailer.edge.ts`: nodemailer's DKIM signer needs `path` and `fs`. */
+const EDGE_MAILER_STUB = fileURLToPath(new URL('./src/lib/mail/mailer.edge.ts', import.meta.url));
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -37,7 +41,12 @@ const nextConfig: NextConfig = {
   // `instrumentation.ts` pulls in — and Next compiles that file for the Edge runtime too,
   // where `require('path')` does not resolve. Left to the bundler it is a hard build error on
   // every page. These are Node-only by nature, so they are handed to the runtime, not bundled.
-  serverExternalPackages: ['@node-rs/argon2', 'nodemailer', 'dotenv', '@aws-sdk/client-secrets-manager'],
+  serverExternalPackages: [
+    '@node-rs/argon2',
+    'nodemailer',
+    'dotenv',
+    '@aws-sdk/client-secrets-manager',
+  ],
   /**
    * …and the same modules again, for the Edge build, which `serverExternalPackages` does not
    * cover: it applies to the Node server bundle only, so the Edge compilation of
@@ -53,6 +62,10 @@ const nextConfig: NextConfig = {
         new webpack.NormalModuleReplacementPlugin(
           /[\\/]lib[\\/]secrets[\\/]manager(\.ts)?$/,
           EDGE_SECRETS_STUB,
+        ),
+        new webpack.NormalModuleReplacementPlugin(
+          /[\\/]lib[\\/]mail[\\/]mailer(\.ts)?$/,
+          EDGE_MAILER_STUB,
         ),
       );
     }
