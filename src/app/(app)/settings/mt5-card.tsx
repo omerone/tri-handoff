@@ -11,6 +11,8 @@ import { disconnectMt5Action } from './mt5-actions';
 export type Mt5CardLabels = WizardLabels & {
   /** Opens the wizard again under a list that already has an account in it. */
   addAnother: string;
+  twoAccounts: string;
+  slotEmpty: string;
   disconnect: string;
   disconnectConfirm: string;
   investor: string;
@@ -33,12 +35,16 @@ export type ConnectedAccount = {
 };
 
 /**
- * Every connected broker account, and a way to add one more.
+ * Every connected broker account, and the way to add the other one.
  *
  * A trader can run a day account and a swing account, and the journal keeps them apart — so
- * this card lists them rather than describing "the" account. The wizard stays on screen under
- * the list instead of disappearing once one is connected, because the second account is
- * exactly as ordinary as the first and hiding the way to add it made it look unsupported.
+ * this card lists them rather than describing "the" account.
+ *
+ * Both slots are on screen from the start, and that is the point. The second one used to live
+ * behind a collapsed `<details>`, which is the same mistake as hiding it entirely: someone
+ * setting up their first account has no reason to open a disclosure to find out whether a
+ * feature exists, so as far as they know it does not. Saying "you can connect two" while the
+ * first is still being asked for costs one line and answers the question before it is asked.
  */
 export function Mt5Card({
   accounts,
@@ -47,21 +53,29 @@ export function Mt5Card({
   accounts: readonly ConnectedAccount[];
   labels: Mt5CardLabels;
 }) {
-  if (accounts.length === 0) return <Mt5ConnectWizard labels={labels} />;
+  if (accounts.length === 0) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Mt5ConnectWizard labels={labels} />
+        {/*
+          Said while the first account is still being asked for, not after. Whoever is looking
+          at this screen is deciding how to set the product up, and "there is room for the
+          swing account too" is part of that decision.
+        */}
+        <p className="text-dim text-xs leading-relaxed">{labels.twoAccounts}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
       {accounts.map((account) => (
         <Connected key={account.id} account={account} labels={labels} />
       ))}
-      <details className="border-line border-t pt-3">
-        <summary className="text-dim hover:text-fg cursor-pointer text-xs">
-          {labels.addAnother}
-        </summary>
-        <div className="pt-3">
-          <Mt5ConnectWizard labels={labels} />
-        </div>
-      </details>
+      <div className="border-line border-t pt-3">
+        <div className="text-dim mb-3 text-xs font-semibold">{labels.addAnother}</div>
+        <Mt5ConnectWizard labels={labels} />
+      </div>
     </div>
   );
 }

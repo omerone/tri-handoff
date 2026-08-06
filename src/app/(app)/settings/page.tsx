@@ -49,149 +49,175 @@ export default async function SettingsPage() {
   }));
 
   return (
-    <div className="flex max-w-xl flex-col gap-4">
-      {/* "Connected MT5 account" is a lie while the wizard is still asking for the details. */}
-      <Card title={connected.length > 0 ? t('mt5') : tWizard('title')}>
-        <Mt5Card
-          accounts={connected}
-          labels={{
-            login: t('login'),
-            server: t('server'),
-            connect: t('connect'),
-            disconnect: t('disconnect'),
-            addAnother: t('addAnother'),
-            disconnectConfirm: t('disconnectConfirm'),
-            investor: t('investor'),
-            investorWarning: t('investorWarning'),
-            replaceTitle: t('replaceTitle'),
-            replaceConfirm: t('replaceConfirm'),
-            replaceCancel: t('replaceCancel'),
-            lastSync: t('lastSync'),
-            balance: t('balance'),
-            equity: t('equity'),
-            never: tSync('never'),
-            wizard: {
-              step: tWizard('step'),
-              of: tWizard('of'),
-              back: tWizard('back'),
-              help: tWizard('help'),
-              welcome: {
-                title: tWizard('welcome.title'),
-                subtitle: tWizard('welcome.subtitle'),
-                hint: tWizard('welcome.hint'),
-                action: tWizard('welcome.action'),
+    /*
+     * Across the page rather than down it.
+     *
+     * Seven cards in one `max-w-xl` column meant most of a desktop screen was empty on the
+     * right while the settings ran off the bottom — the broker connection and the second
+     * factor are both tall, and the four preferences underneath are a control and a sentence
+     * each. Nothing here has to be read in order, which is what makes a column the wrong
+     * shape for it: a column is for a sequence, and this is a set.
+     *
+     * The two that decide who reaches the book stay together at the top and keep their width,
+     * because both hold a form. The four that decide how it looks go four across underneath,
+     * where a radio group and one line of explanation is all a card needs.
+     */
+    <div className="flex flex-col gap-3">
+      <div className="grid items-start gap-3 lg:grid-cols-2">
+        {/* "Connected MT5 account" is a lie while the wizard is still asking for the details. */}
+        <Card title={connected.length > 0 ? t('mt5') : tWizard('title')}>
+          <Mt5Card
+            accounts={connected}
+            labels={{
+              login: t('login'),
+              server: t('server'),
+              connect: t('connect'),
+              disconnect: t('disconnect'),
+              addAnother: t('addAnother'),
+              twoAccounts: t('twoAccounts'),
+              slotEmpty: t('slotEmpty'),
+              disconnectConfirm: t('disconnectConfirm'),
+              investor: t('investor'),
+              investorWarning: t('investorWarning'),
+              replaceTitle: t('replaceTitle'),
+              replaceConfirm: t('replaceConfirm'),
+              replaceCancel: t('replaceCancel'),
+              lastSync: t('lastSync'),
+              balance: t('balance'),
+              equity: t('equity'),
+              never: tSync('never'),
+              wizard: {
+                step: tWizard('step'),
+                of: tWizard('of'),
+                back: tWizard('back'),
+                help: tWizard('help'),
+                welcome: {
+                  title: tWizard('welcome.title'),
+                  subtitle: tWizard('welcome.subtitle'),
+                  hint: tWizard('welcome.hint'),
+                  action: tWizard('welcome.action'),
+                },
+                login: {
+                  title: tWizard('login.title'),
+                  label: tWizard('login.label'),
+                  hint: tWizard('login.hint'),
+                  help: tWizard('login.help'),
+                },
+                server: {
+                  title: tWizard('server.title'),
+                  label: tWizard('server.label'),
+                  hint: tWizard('server.hint'),
+                  placeholder: tWizard('server.placeholder'),
+                  help: tWizard('server.help'),
+                },
+                password: {
+                  title: tWizard('password.title'),
+                  label: tWizard('password.label'),
+                  hint: tWizard('password.hint'),
+                  help: tWizard('password.help'),
+                },
+                processing: {
+                  validating: tWizard('processing.validating'),
+                  syncing: tWizard('processing.syncing'),
+                },
+                success: {
+                  title: tWizard('success.title'),
+                  subtitle: tWizard('success.subtitle'),
+                  status: tWizard('success.status'),
+                  action: tWizard('success.action'),
+                },
               },
-              login: {
-                title: tWizard('login.title'),
-                label: tWizard('login.label'),
-                hint: tWizard('login.hint'),
-                help: tWizard('login.help'),
-              },
-              server: {
-                title: tWizard('server.title'),
-                label: tWizard('server.label'),
-                hint: tWizard('server.hint'),
-                placeholder: tWizard('server.placeholder'),
-                help: tWizard('server.help'),
-              },
-              password: {
-                title: tWizard('password.title'),
-                label: tWizard('password.label'),
-                hint: tWizard('password.hint'),
-                help: tWizard('password.help'),
-              },
-              processing: {
-                validating: tWizard('processing.validating'),
-                syncing: tWizard('processing.syncing'),
-              },
-              success: {
-                title: tWizard('success.title'),
-                subtitle: tWizard('success.subtitle'),
-                status: tWizard('success.status'),
-                action: tWizard('success.action'),
-              },
-            },
-          }}
-        />
-      </Card>
+            }}
+          />
+        </Card>
 
-      {/*
+        {/*
         Directly under the broker connection, and above the cosmetic settings, because it is
         the only other thing on this page that decides who can reach the book. Language, theme
         and currency change how it looks.
       */}
-      <Card title={tTwoFactor('title')}>
-        <TwoFactorCard
-          enabledAt={twoFactor?.confirmedAt ? formatDateTimeAt(twoFactor.confirmedAt) : null}
-          recoveryCodesLeft={twoFactor?.recoveryCodes.length ?? 0}
-          labels={{
-            offTitle: tTwoFactor('offTitle'),
-            offBody: tTwoFactor('offBody'),
-            enable: tTwoFactor('enable'),
-            password: tTwoFactor('password'),
-            scanTitle: tTwoFactor('scanTitle'),
-            scanBody: tTwoFactor('scanBody'),
-            manualKey: tTwoFactor('manualKey'),
-            code: tTwoFactor('code'),
-            confirm: tTwoFactor('confirm'),
-            cancel: tTwoFactor('cancel'),
-            qrAlt: tTwoFactor('qrAlt'),
-            onSince: tTwoFactor('onSince', {
-              date: twoFactor?.confirmedAt ? formatDateTimeAt(twoFactor.confirmedAt) : '',
-            }),
-            codesLeft: tTwoFactor('codesLeft', { count: twoFactor?.recoveryCodes.length ?? 0 }),
-            codesLow: tTwoFactor('codesLow', { count: twoFactor?.recoveryCodes.length ?? 0 }),
-            saveCodesTitle: tTwoFactor('saveCodesTitle'),
-            saveCodesBody: tTwoFactor('saveCodesBody'),
-            codesSaved: tTwoFactor('codesSaved'),
-            regenerate: tTwoFactor('regenerate'),
-            regenerateBody: tTwoFactor('regenerateBody'),
-            disable: tTwoFactor('disable'),
-            disableBody: tTwoFactor('disableBody'),
-          }}
-        />
-      </Card>
-
-      {/*
-        Directly under the broker card, because it is a fact about the broker connection and
-        about what it costs — not a display preference like the three below it.
-      */}
-      <Card title={t('autoSync')}>
-        <AutoSyncChoice
-          current={session.user.autoSyncOnLogin}
-          labels={{ on: t('autoSyncOn'), off: t('autoSyncOff') }}
-        />
-        <p className="text-dim mt-3 text-xs leading-relaxed">
-          {session.user.autoSyncOnLogin ? t('autoSyncOnNote') : t('autoSyncOffNote')}
-        </p>
-      </Card>
-
-      <Card title={t('language')}>
-        <LanguageChoice current={session.user.locale} />
-      </Card>
-
-      <Card title={t('theme')}>
-        <ThemeChoice
-          current={asTheme(session.user.theme)}
-          labels={{ dark: t('themeDark'), light: t('themeLight'), system: t('themeSystem') }}
-        />
-      </Card>
-
-      <Card title={t('currency')}>
-        <CurrencyChoice current={asCurrency(session.user.displayCurrency)} />
-        <p className="text-dim mt-3 text-xs">{t('fxNote')}</p>
-      </Card>
-
-      {/*
+        {/*
+          The right column: the second factor and the way out, stacked. Both are about the
+          account rather than about how it looks, and together they come closer to the height
+          the broker card sets — which is what stops the column beside it being mostly empty.
+        */}
+        <div className="flex flex-col gap-3">
+          <Card title={tTwoFactor('title')}>
+            <TwoFactorCard
+              enabledAt={twoFactor?.confirmedAt ? formatDateTimeAt(twoFactor.confirmedAt) : null}
+              recoveryCodesLeft={twoFactor?.recoveryCodes.length ?? 0}
+              labels={{
+                offTitle: tTwoFactor('offTitle'),
+                offBody: tTwoFactor('offBody'),
+                enable: tTwoFactor('enable'),
+                password: tTwoFactor('password'),
+                scanTitle: tTwoFactor('scanTitle'),
+                scanBody: tTwoFactor('scanBody'),
+                manualKey: tTwoFactor('manualKey'),
+                code: tTwoFactor('code'),
+                confirm: tTwoFactor('confirm'),
+                cancel: tTwoFactor('cancel'),
+                qrAlt: tTwoFactor('qrAlt'),
+                onSince: tTwoFactor('onSince', {
+                  date: twoFactor?.confirmedAt ? formatDateTimeAt(twoFactor.confirmedAt) : '',
+                }),
+                codesLeft: tTwoFactor('codesLeft', { count: twoFactor?.recoveryCodes.length ?? 0 }),
+                codesLow: tTwoFactor('codesLow', { count: twoFactor?.recoveryCodes.length ?? 0 }),
+                saveCodesTitle: tTwoFactor('saveCodesTitle'),
+                saveCodesBody: tTwoFactor('saveCodesBody'),
+                codesSaved: tTwoFactor('codesSaved'),
+                regenerate: tTwoFactor('regenerate'),
+                regenerateBody: tTwoFactor('regenerateBody'),
+                disable: tTwoFactor('disable'),
+                disableBody: tTwoFactor('disableBody'),
+              }}
+            />
+          </Card>
+          {/*
         Signing out lives here now rather than in the header. It was a one-tap icon beside
         the sync pill — next to the theme switch, a keystroke away from every screen — and
         the only destructive control in the frame. Behind a door, with its own card and the
         account it will sign out of named, it is where someone goes deliberately.
       */}
-      <Card title={tNav('signOut')}>
-        <p className="text-dim mb-3 text-xs">{session.user.email}</p>
-        <SignOutButton label={tNav('signOut')} withText />
-      </Card>
+          <Card title={tNav('signOut')}>
+            <p className="text-dim mb-3 text-xs">{session.user.email}</p>
+            <SignOutButton label={tNav('signOut')} withText />
+          </Card>
+        </div>
+      </div>
+
+      {/*
+        Auto-sync leads this row rather than sitting beside the broker card: it is a fact about
+        the broker connection and about what it costs, but it is still one switch and a
+        sentence, which is the same shape as the three beside it.
+      */}
+      <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card title={t('autoSync')}>
+          <AutoSyncChoice
+            current={session.user.autoSyncOnLogin}
+            labels={{ on: t('autoSyncOn'), off: t('autoSyncOff') }}
+          />
+          <p className="text-dim mt-3 text-xs leading-relaxed">
+            {session.user.autoSyncOnLogin ? t('autoSyncOnNote') : t('autoSyncOffNote')}
+          </p>
+        </Card>
+
+        <Card title={t('language')}>
+          <LanguageChoice current={session.user.locale} />
+        </Card>
+
+        <Card title={t('theme')}>
+          <ThemeChoice
+            current={asTheme(session.user.theme)}
+            labels={{ dark: t('themeDark'), light: t('themeLight'), system: t('themeSystem') }}
+          />
+        </Card>
+
+        <Card title={t('currency')}>
+          <CurrencyChoice current={asCurrency(session.user.displayCurrency)} />
+          <p className="text-dim mt-3 text-xs">{t('fxNote')}</p>
+        </Card>
+      </div>
     </div>
   );
 }
