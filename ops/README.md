@@ -91,6 +91,19 @@ that fails either check is deleted rather than left looking valid, and the run
 exits non-zero so systemd records the failure. Old dumps are expired only after
 a good one lands, so a run of failures cannot empty the directory.
 
+`tri-backup verify-restore` is the drill, and it had never been run. Everything
+`run` checks is a check on the *file* — valid gzip, the right table definitions
+present — which says nothing about whether Postgres will accept it or whether
+what comes back out is the book that went in. The drill restores the newest dump
+into a scratch database beside the live one and compares the two: row counts per
+table, a checksum over the row text of every trade, entry, position, lesson, user
+and tenant, and the foreign keys and indexes. First run passed on all three.
+
+It compares by `count(*)`, not by `pg_stat_user_tables`. Those are planner
+estimates, they are zero on a freshly restored database until something analyses
+it, and reading them is how this drill first appeared to report that every trade
+had been lost.
+
 Root-only, `umask 077` and a `0700` directory. A dump holds every password hash,
 the encrypted MT5 credentials, every session's token hash and the whole trading
 book — the database's contents with none of the database's access control in

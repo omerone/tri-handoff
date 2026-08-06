@@ -51,6 +51,8 @@ tri-backup — nightly database dumps
   tri-backup list                show what is on disk
   tri-backup status             last run, count, total size
   tri-backup restore <file>     restore a dump (asks first — destroys current data)
+  tri-backup verify-restore     restore the newest dump into a scratch database
+                                and compare it to the live one (touches neither)
 USAGE
 }
 
@@ -148,11 +150,97 @@ do_restore() {
   log "RESTORED from $(basename "$file")"
 }
 
+# A dump that was never restored is an assumption. `run` checks that the file is
+# valid gzip and mentions the right tables, which is a check on the *file* — it
+# says nothing about whether Postgres will accept it or whether what comes back
+# out is the book that went in. This restores it for real, into a scratch
+# database beside the live one, and compares the two.
+#
+# The comparison is by `count(*)` and by a checksum over the row text, not by
+# `pg_stat_user_tables`. Those are planner estimates and they are zero on a
+# freshly restored database until something analyses it — which reads as "every
+# trade is missing" and is the first thing this drill appeared to find.
+#
+# A fresh dump is taken first so the two describe the same moment. Comparing
+# against last night's would report every row written since as a restore
+# failure.
+do_verify_restore() {
+  local scratch=tri_restore_drill
+
+  log "verify-restore: taking a fresh dump so live and restored describe one moment"
+  do_run >/dev/null || { log "FAIL could not take a dump to verify"; exit 1; }
+  local file
+  file=$(ls -t "$BACKUP_DIR"/tri-*.sql.gz | head -1)
+
+  psql_in() { compose exec -T postgres psql -U "$DB_USER" -d "$1" -t -A "${@:2}"; }
+
+  psql_in postgres -q -c "DROP DATABASE IF EXISTS $scratch;" >/dev/null 2>&1 || true
+  psql_in postgres -q -c "CREATE DATABASE $scratch;" >/dev/null
+
+  if ! gunzip -c "$file" | compose exec -T postgres psql -U "$DB_USER" -d "$scratch" -q -v ON_ERROR_STOP=1 >/tmp/tri-verify-restore.log 2>&1; then
+    log "FAIL $(basename "$file") did not restore; see /tmp/tri-verify-restore.log"
+    psql_in postgres -q -c "DROP DATABASE IF EXISTS $scratch;" >/dev/null 2>&1 || true
+    exit 1
+  fi
+
+  local failures=0
+  local tables
+  tables=$(psql_in "$DB_NAME" -c "select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by table_name")
+  for table in $tables; do
+    local live restored
+    live=$(psql_in "$DB_NAME" -c "select count(*) from \"$table\"")
+    restored=$(psql_in "$scratch" -c "select count(*) from \"$table\"")
+    if [ "$live" != "$restored" ]; then
+      log "FAIL $table: $live rows live, $restored restored"
+      failures=$((failures + 1))
+    fi
+  done
+
+  # Counts can match while the values inside them do not — a Decimal that lost
+  # its scale, a timestamp that lost its zone. The checksum is over the whole
+  # row text of everything that is the client's own record.
+  local sum="select md5(string_agg(x, chr(10) order by x)) from (
+      select t::text as x from trades t
+      union all select f::text from finance_entries f
+      union all select p::text from long_positions p
+      union all select l::text from learning_entries l
+      union all select u.id||u.email||u.password_hash from users u
+      union all select tn::text from tenants tn) rows;"
+  local live_sum restored_sum
+  live_sum=$(psql_in "$DB_NAME" -c "$sum")
+  restored_sum=$(psql_in "$scratch" -c "$sum")
+  if [ "$live_sum" != "$restored_sum" ]; then
+    log "FAIL the restored book does not match: $live_sum live, $restored_sum restored"
+    failures=$((failures + 1))
+  fi
+
+  # A restore that returns the rows without the constraints is a degraded one:
+  # the data is there and nothing stops the next write from breaking it.
+  local live_fk restored_fk live_ix restored_ix
+  live_fk=$(psql_in "$DB_NAME" -c "select count(*) from information_schema.table_constraints where constraint_schema='public' and constraint_type='FOREIGN KEY'")
+  restored_fk=$(psql_in "$scratch" -c "select count(*) from information_schema.table_constraints where constraint_schema='public' and constraint_type='FOREIGN KEY'")
+  live_ix=$(psql_in "$DB_NAME" -c "select count(*) from pg_indexes where schemaname='public'")
+  restored_ix=$(psql_in "$scratch" -c "select count(*) from pg_indexes where schemaname='public'")
+  if [ "$live_fk" != "$restored_fk" ] || [ "$live_ix" != "$restored_ix" ]; then
+    log "FAIL structure differs: ${live_fk}fk/${live_ix}ix live, ${restored_fk}fk/${restored_ix}ix restored"
+    failures=$((failures + 1))
+  fi
+
+  psql_in postgres -q -c "DROP DATABASE $scratch;" >/dev/null
+
+  if [ "$failures" -gt 0 ]; then
+    log "FAIL verify-restore: $failures check(s) failed on $(basename "$file")"
+    exit 1
+  fi
+  log "OK verify-restore: $(basename "$file") restores to a database identical to the live one ($live_fk foreign keys, $live_ix indexes, book checksum $live_sum)"
+}
+
 case "${1:-status}" in
   run)     do_run ;;
   list)    do_list ;;
   status)  do_status ;;
   restore) shift; do_restore "$@" ;;
+  verify-restore) do_verify_restore ;;
   -h|--help|help) usage ;;
   *) usage; exit 2 ;;
 esac
