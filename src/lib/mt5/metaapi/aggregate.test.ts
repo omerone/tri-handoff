@@ -144,6 +144,70 @@ describe('aggregateDeals', () => {
     expect(deals.map((deal) => deal.ticket)).toEqual(['p1', 'p2']);
   });
 
+  describe('a position built in instalments', () => {
+    /**
+     * Scaling in was the half of this that was never folded.
+     *
+     * Exits were summed from the start; entries took the first fill's volume and price and
+     * discarded the rest. It is not a rounding error: `computeRisk` multiplies volume by the
+     * entry-to-stop distance, so a position built in three parts reported a third of the risk
+     * it actually carried and three times the R multiple it actually earned — and those feed
+     * the RR aggregates, the coverage figure and the risk-dispersion metric.
+     */
+    const scaledIn = () => [
+      entry({ id: 'e1', volume: 1, price: 1.1, time: '2026-07-01T10:00:00.000Z' }),
+      entry({ id: 'e2', volume: 1, price: 1.2, time: '2026-07-01T11:00:00.000Z' }),
+      entry({ id: 'e3', volume: 2, price: 1.3, time: '2026-07-01T12:00:00.000Z' }),
+      exit({ id: 'x1', volume: 4, price: 1.4, time: '2026-07-01T15:00:00.000Z', profit: 400 }),
+    ];
+
+    it('reports the whole size, not the first fill', () => {
+      const [deal] = aggregateDeals(scaledIn());
+      expect(deal!.volume).toBe(4);
+    });
+
+    it('averages the entry price by volume, as the terminal does', () => {
+      // (1×1.1 + 1×1.2 + 2×1.3) / 4 = 4.9 / 4 = 1.225. Weighting is the whole point: an
+      // unweighted mean of the three fills would say 1.2, and the last fill was the big one.
+      const [deal] = aggregateDeals(scaledIn());
+      expect(deal!.entryPrice).toBeCloseTo(1.225, 10);
+      expect(deal!.entryPrice).not.toBeCloseTo(1.2, 3);
+    });
+
+    it('opens at the first fill and closes at the last exit', () => {
+      const [deal] = aggregateDeals(scaledIn());
+      expect(deal!.openAt.toISOString()).toBe('2026-07-01T10:00:00.000Z');
+      expect(deal!.closeAt!.toISOString()).toBe('2026-07-01T15:00:00.000Z');
+    });
+
+    it('still charges commission on every fill', () => {
+      const [deal] = aggregateDeals(scaledIn());
+      // Four deals at -7 apiece.
+      expect(deal!.commission).toBe(-28);
+    });
+
+    it('is unchanged for the ordinary single-entry position', () => {
+      const [deal] = aggregateDeals([entry({ volume: 2, price: 1.15 }), exit()]);
+      expect(deal!.volume).toBe(2);
+      expect(deal!.entryPrice).toBe(1.15);
+    });
+
+    it('scales in and out at once', () => {
+      const deals = aggregateDeals([
+        entry({ id: 'e1', volume: 2, price: 1.0, time: '2026-07-01T10:00:00.000Z' }),
+        entry({ id: 'e2', volume: 2, price: 1.1, time: '2026-07-01T10:30:00.000Z' }),
+        exit({ id: 'x1', volume: 2, price: 1.2, time: '2026-07-01T14:00:00.000Z', profit: 300 }),
+        exit({ id: 'x2', volume: 2, price: 1.3, time: '2026-07-01T16:00:00.000Z', profit: 500 }),
+      ]);
+
+      expect(deals[0]!.volume).toBe(4);
+      expect(deals[0]!.entryPrice).toBeCloseTo(1.05, 10);
+      // The exit price is the last one out, and the money is the sum of both.
+      expect(deals[0]!.exitPrice).toBe(1.3);
+      expect(deals[0]!.profit).toBe(800);
+    });
+  });
+
   it('ignores a deal with no position and no balance type', () => {
     expect(aggregateDeals([{ id: 'x', type: 'DEAL_TYPE_UNKNOWN', time: '2026-07-01T10:00:00Z' }])).toEqual(
       [],

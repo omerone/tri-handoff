@@ -701,7 +701,8 @@ export function aggregateDeals(deals: MetaApiDeal[]): Mt5Deal[] {
     const ordered = [...group].sort(
       (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime(),
     );
-    const entry = ordered.find((d) => d.entryType === 'DEAL_ENTRY_IN') ?? ordered[0];
+    const entries = ordered.filter((d) => d.entryType === 'DEAL_ENTRY_IN');
+    const entry = entries[0] ?? ordered[0];
     const exits = ordered.filter((d) => d.entryType && d.entryType !== 'DEAL_ENTRY_IN');
     if (!entry || exits.length === 0) continue; // Still open — nothing to report yet.
 
@@ -709,16 +710,37 @@ export function aggregateDeals(deals: MetaApiDeal[]): Mt5Deal[] {
     const sum = (pick: (d: MetaApiDeal) => number | undefined) =>
       ordered.reduce((total, d) => total + (pick(d) ?? 0), 0);
 
+    /*
+     * Scaling *in* is folded the same way scaling out already was.
+     *
+     * This used to take `entry.volume` and `entry.price` from the first entry deal alone,
+     * which is right for the common case and silently wrong for a position built in
+     * instalments: three half-lot entries were reported as half a lot at the first fill's
+     * price. That is not only a cosmetic understatement of size — `computeRisk` multiplies
+     * volume by the entry-to-stop distance, so the trade's risk came out at a third of what
+     * was actually risked and its R multiple at three times what was actually earned. Both
+     * feed the analytics, the RR coverage and now the risk-dispersion figure.
+     *
+     * The average is volume-weighted, which is what an average entry price means and what the
+     * broker's own terminal shows. With one entry deal it is exactly the old behaviour.
+     */
+    const entryVolume = entries.reduce((total, d) => total + (d.volume ?? 0), 0) || entry.volume || 0;
+    const weightedEntry =
+      entryVolume > 0
+        ? entries.reduce((total, d) => total + (d.price ?? 0) * (d.volume ?? 0), 0) / entryVolume
+        : (entry.price ?? 0);
+
     result.push({
       ticket: positionId,
       kind: 'trade',
       symbol: normalizeSymbol(entry.symbol ?? ''),
       // An entry deal of type BUY is a long position; SELL is short.
       direction: entry.type === 'DEAL_TYPE_BUY' ? 'long' : 'short',
-      volume: entry.volume ?? 0,
+      volume: entryVolume,
       openAt: new Date(entry.time),
       closeAt: new Date(last.time),
-      entryPrice: entry.price ?? 0,
+      // Volume-weighted across every entry fill; `entries[0].price` when there was only one.
+      entryPrice: entries.length > 0 ? weightedEntry : (entry.price ?? 0),
       exitPrice: last.price ?? null,
       // A stop loss removed before the close leaves no trace in the history; such a trade
       // ends up with no RR, and is counted against RR coverage rather than guessed at.
