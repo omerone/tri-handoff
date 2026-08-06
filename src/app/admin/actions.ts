@@ -14,6 +14,7 @@ import {
 import { clientIp, limitKey, LIMITS } from '@/lib/auth/limits';
 import {
   hashPassword,
+  MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   verifyPassword,
   validatePasswordStrength,
@@ -102,7 +103,7 @@ const createSchema = z.object({
   name: z.string().trim().min(1),
   domain: z.string().trim().min(1),
   email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(MIN_PASSWORD_LENGTH),
+  password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
 });
 
 export async function createTenantAction(

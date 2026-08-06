@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth/admin-session';
-import { hashPassword, MIN_PASSWORD_LENGTH } from '@/lib/crypto/password';
+import { hashPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/lib/crypto/password';
 import { deleteTenant, getTenantDetail, setPasswordHash, updateTenant } from '@/lib/db/unscoped';
 import { SecurityLogger } from '@/lib/security/logger';
 
@@ -73,7 +73,7 @@ export async function updateTenantAction(
 
 const passwordSchema = z.object({
   tenantId: z.string().min(1),
-  password: z.string().min(MIN_PASSWORD_LENGTH),
+  password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
 });
 
 /**

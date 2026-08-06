@@ -8,6 +8,7 @@ import { clientIp, limitKey, LIMITS } from '@/lib/auth/limits';
 import { startSession } from '@/lib/auth/session';
 import {
   hashPassword,
+  MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   verifyPassword,
   validatePasswordStrength,
@@ -83,7 +84,11 @@ const emailField = z.string().trim().toLowerCase().email();
 
 const loginSchema = z.object({
   email: emailField,
-  password: z.string().min(1),
+  // Bounded here too, though nothing downstream is slowed by a long one: argon2 digests the
+  // password to a fixed size before the memory-hard work, so verifying a megabyte costs the
+  // same 17ms as verifying twelve characters. This refuses to carry a megabyte through the
+  // request for a value that cannot match a password no form would have accepted.
+  password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
 });
 
 export async function signInAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -375,8 +380,8 @@ export async function requestResetAction(_prev: FormState, formData: FormData): 
 const completeResetSchema = z
   .object({
     token: z.string().min(1),
-    password: z.string().min(MIN_PASSWORD_LENGTH),
-    confirm: z.string(),
+    password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
+    confirm: z.string().max(MAX_PASSWORD_LENGTH),
   })
   .refine((v) => v.password === v.confirm, { path: ['confirm'] });
 

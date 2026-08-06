@@ -30,6 +30,33 @@ const OPTIONS = {
 export const MIN_PASSWORD_LENGTH = 12; // Increased from 10 to 12 for strength validation
 export const MIN_PASSWORD_STRENGTH_SCORE = 3; // zxcvbn score: 3 = good, 4 = strong
 
+/**
+ * The ceiling, and it is a denial-of-service control rather than a policy.
+ *
+ * Argon2 does not care how long a password is — it digests it to a fixed size before the
+ * memory-hard work, and verifying a one-million-character string takes the same 17ms as
+ * verifying twelve. Measured, because the opposite is widely assumed.
+ *
+ * zxcvbn cares enormously. Its matchers walk every substring against several dictionaries,
+ * and the cost is superlinear. Measured on this machine, with the same call the reset flow
+ * makes:
+ *
+ *     12 chars        4 ms
+ *    100 chars       34 ms
+ *  1,000 chars    9,339 ms
+ *  5,000 chars    did not finish in nine minutes
+ *
+ * Node runs one thread. Nine seconds is not a slow request, it is the entire site frozen for
+ * nine seconds — every other user's page, the health check the deploy rolls back on, the
+ * maintenance sweep. A server action's body may be a megabyte by default, so the field this
+ * arrives in has room for a thousand times the input that already costs nine seconds.
+ *
+ * 128 is the usual answer and far past any real passphrase; nothing a person types is
+ * refused. The check lives in `analyzePasswordStrength` rather than only in the schemas
+ * above it, because a call site is a thing someone adds later without reading this.
+ */
+export const MAX_PASSWORD_LENGTH = 128;
+
 // No global configuration step: v4 takes the user's own words as the second argument to each
 // call, which is where they belong — the email to penalise differs per password checked.
 
@@ -82,7 +109,7 @@ export interface PasswordStrengthResult {
  */
 export function analyzePasswordStrength(
   password: string,
-  userInputs: string[] = []
+  userInputs: string[] = [],
 ): PasswordStrengthResult {
   // Quick check: minimum length
   if (password.length < MIN_PASSWORD_LENGTH) {
@@ -90,6 +117,20 @@ export function analyzePasswordStrength(
       score: 0,
       feedback: {
         warning: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+        suggestions: [],
+      },
+      isStrong: false,
+      guessesLog10: 0,
+    };
+  }
+
+  // Before zxcvbn, never after — see MAX_PASSWORD_LENGTH. Past this the analysis is the
+  // attack, and returning "too long" is both the honest answer and the cheap one.
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    return {
+      score: 0,
+      feedback: {
+        warning: `Password must be at most ${MAX_PASSWORD_LENGTH} characters`,
         suggestions: [],
       },
       isStrong: false,

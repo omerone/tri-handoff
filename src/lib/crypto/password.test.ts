@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   hashPassword,
+  MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   verifyPassword,
   analyzePasswordStrength,
@@ -93,7 +94,46 @@ describe('password strength validation', () => {
   it('considers user inputs when validating', () => {
     // A password that's just the email with numbers shouldn't be strong
     expect(() =>
-      validatePasswordStrength('testuser@example.com123456', ['testuser@example.com'])
+      validatePasswordStrength('testuser@example.com123456', ['testuser@example.com']),
     ).toThrow();
+  });
+});
+
+/**
+ * The ceiling, and why it is not a policy preference.
+ *
+ * zxcvbn's cost is superlinear in input length. Measured with the same call the reset flow
+ * makes: 12 characters in 4ms, 100 in 34ms, 1,000 in 9.3 *seconds*, and 5,000 did not finish
+ * in nine minutes. Node runs one thread, so nine seconds is not a slow request — it is the
+ * whole site stopped, including the health check the deploy rolls back on.
+ *
+ * The assertion is on wall-clock, which is usually a bad thing to assert. It is right here
+ * because the defect is wall-clock: a correctness-only test passes just as happily against
+ * the version that takes nine seconds to return the same answer.
+ */
+describe('the password length ceiling', () => {
+  it('refuses a long input instead of analysing it', () => {
+    const overlong = 'Tr4d!ngJournal'.repeat(200); // 2,800 characters
+    expect(overlong.length).toBeGreaterThan(MAX_PASSWORD_LENGTH);
+
+    const started = performance.now();
+    const result = analyzePasswordStrength(overlong, ['demo@tri.local']);
+    const elapsed = performance.now() - started;
+
+    expect(result.isStrong).toBe(false);
+    expect(result.feedback.warning).toMatch(/at most/);
+    // Unbounded, this input is minutes of blocked event loop. The budget is generous on
+    // purpose — the point is the difference between milliseconds and minutes, not a number.
+    expect(elapsed, 'the long password reached zxcvbn').toBeLessThan(250);
+  });
+
+  it('still analyses a real passphrase properly', () => {
+    // Long for a person, nowhere near the ceiling: this must go through zxcvbn, not around it.
+    const real = 'correct horse battery staple oxide';
+    expect(real.length).toBeLessThan(MAX_PASSWORD_LENGTH);
+
+    const result = analyzePasswordStrength(real, ['demo@tri.local']);
+    expect(result.score).toBeGreaterThanOrEqual(MIN_PASSWORD_STRENGTH_SCORE);
+    expect(result.isStrong).toBe(true);
   });
 });
