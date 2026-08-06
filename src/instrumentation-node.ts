@@ -1,17 +1,23 @@
-import { pruneExpiredRateLimits, pruneExpiredSessions } from '@/lib/db';
+import { pruneExpiredAuditLogs, pruneExpiredRateLimits, pruneExpiredSessions } from '@/lib/db';
 import { initializeEnv } from '@/lib/env';
 import { refreshDueQuotes } from '@/lib/quotes/refresh';
+import { runSecurityChecks } from '@/lib/security/security-alerts';
 
 /**
- * Hourly sweep of expired `sessions` and `rate_limits` rows.
+ * Hourly sweep of expired `sessions`, `rate_limits` and audit rows.
  *
- * Both tables are append-mostly: expired rows are filtered out of every query but nothing
- * deleted them, so both grew without bound. Rate-limit rows are the worse of the two — one
- * row per (bucket, subject) means anyone spraying an endpoint writes rows as fast as they
- * can send requests.
+ * All three are append-mostly: expired rows are filtered out of every query but nothing
+ * deleted them, so they grew without bound. Rate-limit rows are the worst of them — one row
+ * per (bucket, subject) means anyone spraying an endpoint writes rows as fast as they can
+ * send requests. The audit trail is the slowest and the least escapable: it takes a row for
+ * every mutation the product makes, and the disk guard is explicitly forbidden from touching
+ * the database volume, so nothing else on the box will ever reclaim it.
+ *
+ * `audit-retention.ts` was written for this and says so in its own header — "the hourly sweep
+ * drops rows past the retention window" — and no sweep ever called it. It does now.
  *
  * A timer inside the app rather than a cron container, because the deployment target is
- * `docker compose up` and a scheduler for two DELETEs would be disproportionate. The sweeps
+ * `docker compose up` and a scheduler for three DELETEs would be disproportionate. The sweeps
  * are idempotent, so several app instances running them at once is harmless.
  */
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
@@ -30,12 +36,16 @@ export async function startMaintenanceSweep(): Promise<void> {
 
   const sweep = async () => {
     try {
-      const [sessions, limits] = await Promise.all([
+      const [sessions, limits, auditRows] = await Promise.all([
         pruneExpiredSessions(),
         pruneExpiredRateLimits(),
+        pruneExpiredAuditLogs(),
       ]);
-      if (sessions > 0 || limits > 0) {
-        console.warn(`[maintenance] pruned ${sessions} sessions, ${limits} rate-limit rows`);
+      if (sessions > 0 || limits > 0 || auditRows > 0) {
+        console.warn(
+          `[maintenance] pruned ${sessions} sessions, ${limits} rate-limit rows, ` +
+            `${auditRows} audit rows`,
+        );
       }
     } catch (error) {
       // A failed sweep must never take the process down; the next one retries.
@@ -49,6 +59,47 @@ export async function startMaintenanceSweep(): Promise<void> {
 
   void sweep();
   startQuoteRefresh();
+  startSecurityChecks();
+}
+
+/**
+ * How often the alerting looks at what the trail has collected.
+ *
+ * Five minutes, which is the cadence `runSecurityChecks` was written for and documented with.
+ * Its windows are thirty and sixty minutes wide, so this is well inside them: a burst of
+ * failed logins is noticed while it is still happening rather than after it stopped.
+ *
+ * It is here because it was written and never called — not from a route, not from a timer,
+ * not from a script. Brute-force detection, oversized-export detection and the
+ * operator-activity threshold all existed, complete, reading tables that until this morning
+ * had nothing in them. The trail feeding them is a separate fix; a reader with no schedule
+ * and a schedule with no reader are the same amount of monitoring, which is none.
+ */
+const SECURITY_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+function startSecurityChecks(): void {
+  const check = async () => {
+    try {
+      await initializeEnv();
+      const alerts = await runSecurityChecks();
+      // Each alert has already announced itself — to Slack when a webhook is configured, and
+      // to stderr when there is none. This line is the count, so a quiet log is distinguishable
+      // from a sweep that never ran.
+      if (alerts.length > 0) {
+        console.error(`[security] ${alerts.length} alert(s) raised by the periodic check`);
+      }
+    } catch (error) {
+      // Same contract as the other timers: the process outlives a failed pass, and the next
+      // one is five minutes away. Monitoring that can take the app down is a liability, not a
+      // protection.
+      console.error('[security] check failed:', error instanceof Error ? error.message : error);
+    }
+  };
+
+  const timer = setInterval(check, SECURITY_CHECK_INTERVAL_MS);
+  timer.unref?.();
+
+  void check();
 }
 
 /**

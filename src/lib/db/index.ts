@@ -34,3 +34,4 @@ export * from './rate-limit';
 
 // Maintenance sweep, called from src/instrumentation.ts. Deletes only expired rows.
 export { pruneExpiredSessions } from './sessions';
+export { AUDIT_RETENTION_DAYS, pruneExpiredAuditLogs } from './audit-retention';

@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { connectMt5Account, createLongPosition, updateCurrentPrice } from '@/lib/db';
+import {
+  AUDIT_RETENTION_DAYS,
+  connectMt5Account,
+  createLongPosition,
+  pruneExpiredAuditLogs,
+  updateCurrentPrice,
+} from '@/lib/db';
 import { cleanup, createTenantFixture, testDb, type Fixture } from '../helpers/fixtures';
 
 /**
@@ -100,5 +106,85 @@ describe('database audit trail', () => {
     const values = JSON.stringify(row?.newValues ?? {});
     expect(values).toContain('[REDACTED]');
     expect(values).not.toContain('ciphertext-that-must-not-be-copied');
+  });
+});
+
+/**
+ * Retention.
+ *
+ * The trail takes a row for every mutation the product makes and nothing deleted them. The
+ * disk guard on the VPS is explicitly forbidden from touching the database volume — it is the
+ * only copy of the trading book — so an unbounded table there is not a tidiness problem, it
+ * is the disk filling up and Postgres refusing writes.
+ *
+ * `audit-retention.ts` was written for exactly this and its own header says "the hourly sweep
+ * drops rows past the retention window". No sweep called it. Both facts this pins down are
+ * about the boundary rather than about the delete: that a year-old row goes, that a recent one
+ * stays, and that removing audit rows does not itself write audit rows — which is what the
+ * unextended client in that module is for, and the one mistake here that would be self-feeding.
+ */
+describe('audit retention', () => {
+  const olderThanPolicy = new Date(Date.now() - (AUDIT_RETENTION_DAYS + 1) * 86_400_000);
+
+  it('drops rows past the window and leaves the rest', async () => {
+    // Written straight through the fixtures' unextended client: these are stand-ins for rows
+    // the trail wrote months ago, not mutations to be recorded now.
+    const stale = await testDb.databaseAuditLog.create({
+      data: {
+        tableName: 'LongPosition',
+        recordId: `retention-stale-${alice.userId}`,
+        operation: 'INSERT',
+        userId: alice.userId,
+        createdAt: olderThanPolicy,
+      },
+    });
+    const fresh = await testDb.databaseAuditLog.create({
+      data: {
+        tableName: 'LongPosition',
+        recordId: `retention-fresh-${alice.userId}`,
+        operation: 'INSERT',
+        userId: alice.userId,
+      },
+    });
+
+    const deleted = await pruneExpiredAuditLogs();
+    expect(deleted).toBeGreaterThanOrEqual(1);
+
+    expect(await testDb.databaseAuditLog.findUnique({ where: { id: stale.id } })).toBeNull();
+    expect(await testDb.databaseAuditLog.findUnique({ where: { id: fresh.id } })).not.toBeNull();
+
+    // A trail that audits its own pruning can never shrink: every delete writes rows, and the
+    // next sweep has more to do than the last. Asserted as "no row is *about* the audit table"
+    // rather than by comparing counts before and after — the trail is fire-and-forget and the
+    // rest of the suite is writing to it the whole time, so the total is not this test's to
+    // predict. The self-reference is, and it is the thing that would run away.
+    const selfReferential = await testDb.databaseAuditLog.count({
+      where: { tableName: 'DatabaseAuditLog' },
+    });
+    expect(selfReferential, 'pruning the audit trail wrote audit rows about the audit trail').toBe(
+      0,
+    );
+  });
+
+  it('keeps a row that is one day inside the window', async () => {
+    const justInside = await testDb.databaseAuditLog.create({
+      data: {
+        tableName: 'FinanceEntry',
+        recordId: `retention-edge-${alice.userId}`,
+        operation: 'UPDATE',
+        userId: alice.userId,
+        createdAt: new Date(Date.now() - (AUDIT_RETENTION_DAYS - 1) * 86_400_000),
+      },
+    });
+
+    await pruneExpiredAuditLogs();
+
+    // Twelve months is the documented total retention, not a number chosen in that file. A
+    // prune that crept inward would throw away history the policy promises to keep, and it
+    // would do it silently — there is nothing left to notice it with.
+    expect(
+      await testDb.databaseAuditLog.findUnique({ where: { id: justInside.id } }),
+    ).not.toBeNull();
+    await testDb.databaseAuditLog.delete({ where: { id: justInside.id } });
   });
 });

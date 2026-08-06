@@ -216,9 +216,19 @@ export async function sendSlackAlert(alert: SecurityAlert): Promise<boolean> {
   const webhookUrl = process.env.SECURITY_ALERTS_SLACK_WEBHOOK;
 
   if (!webhookUrl) {
-    console.warn('[SECURITY] Alert detected but SECURITY_ALERTS_SLACK_WEBHOOK not configured:', {
+    // `error`, not `warn`, and with the finding in it rather than just its title. No webhook
+    // is configured on this deployment, so this line *is* the alert — it is what a human
+    // reads in `docker logs` after something has already gone wrong, and a severity that
+    // sorts below the ordinary noise plus a headline with no numbers in it is an alert that
+    // was raised and never delivered. Routing it somewhere a person watches is still the
+    // open item; being legible in the one place it does land is the floor under that.
+    console.error('[SECURITY] Alert raised with nowhere to send it:', {
       type: alert.type,
+      severity: alert.severity,
       title: alert.title,
+      description: alert.description,
+      affectedUsers: alert.affectedUsers.length,
+      at: alert.timestamp.toISOString(),
     });
     return false;
   }
@@ -304,23 +314,19 @@ export async function runSecurityChecks(): Promise<SecurityAlert[]> {
 
   try {
     // Run all alert checks in parallel
-    const [
-      failedLoginAlerts,
-      dataExportAlerts,
-      adminActivityAlerts,
-      passwordResetAlerts,
-    ] = await Promise.all([
-      checkFailedLogins(),
-      checkMassDataExport(),
-      checkAdminActivity(),
-      checkPasswordResetAttempts(),
-    ]);
+    const [failedLoginAlerts, dataExportAlerts, adminActivityAlerts, passwordResetAlerts] =
+      await Promise.all([
+        checkFailedLogins(),
+        checkMassDataExport(),
+        checkAdminActivity(),
+        checkPasswordResetAttempts(),
+      ]);
 
     allAlerts.push(
       ...failedLoginAlerts,
       ...dataExportAlerts,
       ...adminActivityAlerts,
-      ...passwordResetAlerts
+      ...passwordResetAlerts,
     );
 
     // Send alerts if any found
