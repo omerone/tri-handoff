@@ -38,6 +38,9 @@ let bob: Fixture;
 
 const JULY = new Date('2026-07-15T12:00:00.000Z');
 
+/** `countManualTrades` answers per style; most assertions here only care about the total. */
+const totalManual = (counts: { day: number; swing: number }) => counts.day + counts.swing;
+
 function manual(over: Partial<ManualTradeInput> = {}): ManualTradeInput {
   return {
     symbol: 'EURUSD',
@@ -105,11 +108,12 @@ describe('the ticket namespace', () => {
   });
 
   it('gives every manual trade its own ticket', async () => {
-    const ids = await Promise.all([
-      createManualTrade(alice.ctx, manual()),
-      createManualTrade(alice.ctx, manual()),
-      createManualTrade(alice.ctx, manual()),
-    ]);
+    // Distinct trades, not three copies of one: identical submissions are meant to collapse
+    // onto a single ticket now, and that is asserted in "submitting the same trade twice".
+    const ids = [];
+    for (const profit of [10, 20, 30]) {
+      ids.push(await createManualTrade(alice.ctx, manual({ profit })));
+    }
     const rows = await testDb.trade.findMany({
       where: { id: { in: ids } },
       select: { ticket: true },
@@ -249,9 +253,12 @@ describe('listing', () => {
 
   it('counts per style for the tabs', async () => {
     const fixture = await createTenantFixture();
-    await createManualTrade(fixture.ctx, manual({ style: 'day' }));
-    await createManualTrade(fixture.ctx, manual({ style: 'swing' }));
-    await createManualTrade(fixture.ctx, manual({ style: 'swing' }));
+    // Distinct in profit as well as style: `style` is deliberately *not* part of a manual
+    // trade's fingerprint, because re-entering the same trade with the style corrected is a
+    // correction and should update the row rather than add a second one.
+    await createManualTrade(fixture.ctx, manual({ style: 'day', profit: 11 }));
+    await createManualTrade(fixture.ctx, manual({ style: 'swing', profit: 22 }));
+    await createManualTrade(fixture.ctx, manual({ style: 'swing', profit: 33 }));
     await upsertTrades(fixture.ctx, [synced('8001')]);
 
     expect(await countManualTrades(fixture.ctx)).toEqual({ day: 1, swing: 2 });
@@ -280,5 +287,75 @@ describe('isManualTrade', () => {
     await upsertTrades(fixture.ctx, [synced('9001')]);
     const row = await testDb.trade.findFirst({ where: { userId: fixture.userId } });
     expect(await isManualTrade(fixture.ctx, row!.id)).toBe(false);
+  });
+});
+
+describe('submitting the same trade twice', () => {
+  /**
+   * A double-click, a retried request, a browser replaying a POST.
+   *
+   * The ticket used to be a fresh UUID, so every submission was unique by construction and
+   * therefore never a duplicate of anything — including of itself. Two copies of one trade is
+   * not a visible error: it is a P&L out by exactly one trade and a win rate pulled toward
+   * that outcome, on a screen where everything still looks fine.
+   */
+  it('writes one trade, not two', async () => {
+    const carol = await createTenantFixture();
+    const input = manual({ symbol: 'GBPUSD', profit: 250 });
+
+    const first = await createManualTrade(carol.ctx, input);
+    const second = await createManualTrade(carol.ctx, input);
+
+    expect(second).toBe(first);
+    expect(totalManual(await countManualTrades(carol.ctx))).toBe(1);
+    const trades = await listClosedTrades(carol.ctx);
+    expect(trades.filter((t) => t.symbol === 'GBPUSD')).toHaveLength(1);
+  });
+
+  it('corrects the first rather than adding a second when a figure changed', async () => {
+    // Same trade, retyped with the profit fixed: the fingerprint includes profit, so this is
+    // a different trade by the rule — which is the conservative direction to be wrong in.
+    const dave = await createTenantFixture();
+    await createManualTrade(dave.ctx, manual({ symbol: 'USDJPY', profit: 100 }));
+    await createManualTrade(dave.ctx, manual({ symbol: 'USDJPY', profit: 120 }));
+
+    expect(totalManual(await countManualTrades(dave.ctx))).toBe(2);
+  });
+
+  it('keeps two trades apart when only the clock separates them', async () => {
+    const erin = await createTenantFixture();
+    const base = manual({ symbol: 'XAUUSD' });
+    await createManualTrade(erin.ctx, base);
+    await createManualTrade(erin.ctx, {
+      ...base,
+      closeAt: new Date(base.closeAt.getTime() + 1000),
+    });
+
+    expect(totalManual(await countManualTrades(erin.ctx))).toBe(2);
+  });
+
+  it('does not let one trader collapse another trader\'s identical trade', async () => {
+    // The key is (user_id, ticket), so the same fingerprint under two users is two rows.
+    const frank = await createTenantFixture();
+    const grace = await createTenantFixture();
+    const input = manual({ symbol: 'NAS100', profit: 42 });
+
+    await createManualTrade(frank.ctx, input);
+    await createManualTrade(grace.ctx, input);
+
+    expect(totalManual(await countManualTrades(frank.ctx))).toBe(1);
+    expect(totalManual(await countManualTrades(grace.ctx))).toBe(1);
+  });
+
+  it('leaves the note on the row it already wrote', async () => {
+    const heidi = await createTenantFixture();
+    const input = manual({ symbol: 'US500', profit: 75 });
+    const id = await createManualTrade(heidi.ctx, input);
+    await testDb.trade.update({ where: { id }, data: { note: 'held through the news' } });
+
+    await createManualTrade(heidi.ctx, input);
+
+    const row = await testDb.trade.findUniqueOrThrow({ where: { id } });
+    expect(row.note).toBe('held through the news');
   });
 });

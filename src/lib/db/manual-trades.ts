@@ -1,6 +1,7 @@
 import 'server-only';
 import type { Prisma } from '@prisma/client';
 import type { AssetClass, Direction, TradeStyle } from '@/lib/mt5/types';
+import { stableHash } from '@/lib/import/delimited';
 import type { TenantContext } from '@/lib/tenant/context';
 import { assertContext } from './context';
 import { prisma } from './prisma';
@@ -66,12 +67,53 @@ export type ManualTradeInput = {
 };
 
 /**
+ * The ticket a manual trade gets, derived from the trade itself.
+ *
+ * This used to be `manual:` plus a fresh `randomUUID()`, which meant the row was unique by
+ * construction and therefore never a duplicate of anything — including of itself. Submitting
+ * the form twice, a double-click, a retried request on a flaky connection, or the browser
+ * replaying a POST all wrote a second identical trade, and two copies of one trade are not a
+ * visible error: they are a P&L that is out by exactly one trade, a win rate pulled toward
+ * that outcome, and a costs card that agrees with neither.
+ *
+ * Deriving the ticket from the trade's own identifying facts makes `(user_id, ticket)` do the
+ * work it already does for the sync: the same trade submitted twice lands on the same key and
+ * the second write updates the first. It is the same idea as the FTMO importer's ticket, and
+ * deliberately the same helper, so the two cannot drift.
+ *
+ * **What it cannot tell apart.** Two genuinely separate trades identical in symbol, side,
+ * volume, both prices *and* both timestamps to the second would collapse into one. On a real
+ * book that does not happen — two fills that close in the same second at the same price are
+ * one trade by any reading — but it is the honest limit of this approach, and it is the
+ * reason the timestamps are in the fingerprint rather than just the prices.
+ */
+function manualTicket(input: ManualTradeInput): string {
+  return (
+    MANUAL_TICKET_PREFIX +
+    stableHash([
+      input.symbol,
+      input.direction,
+      String(input.volume),
+      input.openAt.toISOString(),
+      input.closeAt.toISOString(),
+      String(input.entryPrice),
+      String(input.exitPrice ?? ''),
+      String(input.profit),
+    ])
+  );
+}
+
+/**
  * Writes one, with a ticket the sync can never produce.
  *
  * `style` is stored as the trader chose it rather than derived from the dates the way the
  * sync derives it. On the sync the dates are the only evidence there is; here the person who
  * took the trade is telling us, and a swing they opened and closed inside one session is
  * still a swing to them. Their answer wins.
+ *
+ * Idempotent on the trade's own content — see `manualTicket`. The journal columns are left
+ * out of the update for the same reason `upsertTrades` leaves them out: re-submitting a trade
+ * must not erase the note someone wrote against it.
  */
 export async function createManualTrade(
   ctx: TenantContext,
@@ -79,30 +121,31 @@ export async function createManualTrade(
 ): Promise<string> {
   assertContext(ctx);
 
-  const row = await prisma.trade.create({
-    data: {
-      userId: ctx.userId,
-      // `cuid()` on the column would be a different value from the one in the ticket, and the
-      // ticket is the thing that has to be unique per user — so it carries its own randomness.
-      ticket: `${MANUAL_TICKET_PREFIX}${crypto.randomUUID()}`,
-      kind: 'trade',
-      symbol: input.symbol,
-      assetClass: input.assetClass,
-      direction: input.direction,
-      style: input.style,
-      openAt: input.openAt,
-      closeAt: input.closeAt,
-      volume: input.volume,
-      entryPrice: input.entryPrice,
-      exitPrice: input.exitPrice,
-      sl: input.stopLoss,
-      tp: input.takeProfit,
-      commission: input.commission,
-      swap: input.swap,
-      profit: input.profit,
-      risk: input.risk,
-      rr: input.rr,
-    },
+  const ticket = manualTicket(input);
+  const fields = {
+    kind: 'trade',
+    symbol: input.symbol,
+    assetClass: input.assetClass,
+    direction: input.direction,
+    style: input.style,
+    openAt: input.openAt,
+    closeAt: input.closeAt,
+    volume: input.volume,
+    entryPrice: input.entryPrice,
+    exitPrice: input.exitPrice,
+    sl: input.stopLoss,
+    tp: input.takeProfit,
+    commission: input.commission,
+    swap: input.swap,
+    profit: input.profit,
+    risk: input.risk,
+    rr: input.rr,
+  } as const;
+
+  const row = await prisma.trade.upsert({
+    where: { userId_ticket: { userId: ctx.userId, ticket } },
+    create: { userId: ctx.userId, ticket, ...fields },
+    update: fields,
     select: { id: true },
   });
 
