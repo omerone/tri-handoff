@@ -112,6 +112,11 @@ describe('nothing formats a date on its own', () => {
     // panel `2026-08-02`. Three orders for one instant, and two of them are unreadable
     // without knowing which locale produced them. `Intl.DateTimeFormat` is still correct for
     // *words* — month and weekday names — so those are allowed and everything else is not.
+    //
+    // `month: 'short'` is on the allowed side for the same reason `'long'` is: "Aug" and
+    // "אוג" are the word abbreviated, not a date in an ambiguous order. The returns grid's
+    // twelve column headings are exactly that, and putting twenty-four month names into the
+    // message files instead would be twenty-four keys whose only failure mode is a typo.
     const offenders: string[] = [];
     for (const file of SOURCES) {
       const source = readFileSync(file, 'utf8');
@@ -120,7 +125,7 @@ describe('nothing formats a date on its own', () => {
           /toLocaleDateString|toLocaleString\(/.test(line) ||
           /toISOString\(\)\.slice/.test(line) ||
           (/DateTimeFormat/.test(line) &&
-            !/month: 'long'|weekday:|formatToParts|Intl\.DateTimeFormatPartTypes|Map<string/.test(
+            !/month: '(long|short)'|weekday:|formatToParts|Intl\.DateTimeFormatPartTypes|Map<string/.test(
               source.slice(source.indexOf(line), source.indexOf(line) + 260),
             ));
         if (formatsDate) offenders.push(`${file}:${index + 1}`);

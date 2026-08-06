@@ -20,6 +20,20 @@ export type AnalyticsTrade = {
   closeAt: Date;
   /** Net of commission and swap. */
   profit: number;
+  /**
+   * The broker's own signed figures, carried through so the costs view can take them apart
+   * again. Negative is money out — a commission is charged, a swap is usually charged and
+   * occasionally paid — which is the sign convention MT5 uses and the one `netProfit` adds.
+   *
+   * Both columns have existed since the first sync and were readable on exactly one screen,
+   * the single-trade page. Nothing aggregated them, so a trader could not answer "what did
+   * this book pay to exist" — which for an active account is regularly the difference between
+   * a profitable year and a flat one.
+   */
+  commission: number;
+  swap: number;
+  /** Lots. Position sizing over time is a risk-management question, not a P&L one. */
+  volume: number;
   risk: number | null;
   /** Null when the trade had no stop loss — excluded from RR aggregates, see risk.ts. */
   rr: number | null;

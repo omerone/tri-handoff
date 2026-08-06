@@ -15,6 +15,10 @@ const trade = (profit: number, heldMinutes = 60): AnalyticsTrade => {
     openAt,
     closeAt: new Date(openAt.getTime() + heldMinutes * 60_000),
     profit,
+    // Costs and size are not what these tests are about; the engine needs them present.
+    commission: 0,
+    swap: 0,
+    volume: 1,
     risk: null,
     rr: null,
     strategy: null,

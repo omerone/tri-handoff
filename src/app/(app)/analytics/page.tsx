@@ -29,6 +29,21 @@ import { listLearningEntries } from '@/lib/db';
 import { hoursDecimals, learningTotals } from '@/lib/learning/types';
 import { originalTpBreakdown, tpTimingBreakdown } from '@/lib/review/stats';
 import { ORIGINAL_TP_COLOR, TIMING_COLOR, TOPIC_COLOR } from '@/lib/review/colors';
+import { computeCosts, costsBySymbol } from '@/lib/analytics/costs';
+import { concentration, dayLoads, riskConsistency, underwater } from '@/lib/analytics/consistency';
+import { equityCurve } from '@/lib/analytics/metrics';
+import { monthGrid, monthlyReturns } from '@/lib/analytics/periods';
+import { KPI } from '@/components/ui/kpi';
+import { ReturnsGrid } from './returns-grid';
+
+/**
+ * Instruments named in the costs breakdown.
+ *
+ * Costs concentrate: a handful of symbols account for nearly all of them, and the tail is a
+ * long list of single trades that pushes the interesting rows off the screen. Five is enough
+ * to see where the money goes.
+ */
+const COST_SYMBOLS = 5;
 
 /**
  * "Where am I most profitable" — SPEC §3.5, and the reason the product exists beyond a
@@ -69,6 +84,24 @@ export default async function AnalyticsPage({
   const hold = holdTimes(book.trades);
   const ratingBuckets = byRating(book.trades);
   const moodBuckets = byMood(book.trades);
+
+  /*
+   * The process figures, all four computed from the same in-memory book as everything else —
+   * so "the parts sum to the whole" survives them, and narrowing the range narrows them too.
+   *
+   * The equity curve is rebuilt here rather than shared with the dashboard, because this page
+   * has its own window and `loadBook` is request-cached per filter: the two would be the same
+   * object only when both happened to be looking at the same range.
+   */
+  const costs = computeCosts(book.trades);
+  const costsBySymbolBuckets = costsBySymbol(book.trades).slice(0, COST_SYMBOLS);
+  const risk = riskConsistency(book.trades);
+  const spread = concentration(book.trades);
+  const curve = equityCurve(book.trades, book.openingBalance);
+  const spell = underwater(curve, book.openingBalance);
+  const loads = dayLoads(book.trades);
+  const months = monthlyReturns(book.trades, book.openingBalance);
+  const grid = monthGrid(months);
 
   const timing = tpTimingBreakdown(book.trades);
   const original = originalTpBreakdown(book.trades);
@@ -138,6 +171,21 @@ export default async function AnalyticsPage({
   // 2026-02-01 was a Sunday, so index 0..6 maps straight onto Sunday..Saturday.
   const weekdayNames = Array.from({ length: 7 }, (_, index) =>
     weekdayFormat.format(new Date(Date.UTC(2026, 1, 1 + index))),
+  );
+
+  /*
+   * Short month names for the returns grid, from Intl rather than from the message files.
+   *
+   * Twelve names per locale is twenty-four strings that already exist in every browser and
+   * every Node build, correctly abbreviated for each language — and `messages.test.ts` would
+   * be policing twenty-four keys whose only failure mode is a typo in a month name.
+   */
+  const monthFormat = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
+    month: 'short',
+    timeZone: 'UTC',
+  });
+  const monthNames = Array.from({ length: 12 }, (_, index) =>
+    monthFormat.format(new Date(Date.UTC(2026, index, 1))),
   );
 
   const caption = (metrics: Metrics): string =>
@@ -377,6 +425,170 @@ export default async function AnalyticsPage({
           </p>
         </div>
       </Card>
+
+      {/*
+        What the book paid to exist. Both columns have been on every trade since the first
+        sync and were readable one trade at a time; nothing added them up.
+      */}
+      <Card title={t('analytics.costs')}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <KPI
+            label={t('analytics.costsTotal')}
+            value={money(costs.total)}
+            tone={costs.total > 0 ? 'neg' : 'neutral'}
+            sub={t('analytics.costsPerTrade', { amount: money(costs.perTrade) })}
+          />
+          <KPI
+            label={t('analytics.costsCommission')}
+            value={money(costs.commission)}
+            sub={t('analytics.costsSwap', { amount: money(costs.swap) })}
+          />
+          <KPI
+            label={t('analytics.costsShare')}
+            value={
+              costs.shareOfGross === null ? '—' : `${formatNumber(costs.shareOfGross, locale, 1)}%`
+            }
+            sub={t('analytics.costsGross', { amount: money(costs.gross) })}
+            title={costs.shareOfGross === null ? t('analytics.costsNoShare') : undefined}
+          />
+          <KPI
+            label={t('analytics.costsTurned')}
+            value={formatNumber(costs.turnedLosing, locale)}
+            tone={costs.turnedLosing > 0 ? 'neg' : 'neutral'}
+            sub={t('analytics.costsTurnedNote')}
+          />
+        </div>
+
+        {/*
+          The percentage on each row is that instrument's *own* cost-to-gross ratio, not its
+          share of the total bill — "GOLD ate a third of what GOLD made" rather than "GOLD is
+          a third of what I paid". It is the more useful of the two and the easier to misread,
+          so the heading says which it is.
+        */}
+        {costsBySymbolBuckets.length > 0 ? (
+          <>
+            <div className="text-dim mt-4 mb-2 text-[11px] font-semibold">
+              {t('analytics.costsBySymbol')}
+            </div>
+            <ul className="flex flex-col gap-1.5">
+              {costsBySymbolBuckets.map((bucket) => (
+                <li key={bucket.key} className="flex items-baseline justify-between gap-3 text-xs">
+                  <span dir="ltr" className="truncate font-bold">
+                    {bucket.key}
+                  </span>
+                  <span className="text-dim shrink-0">
+                    <Num>{money(bucket.costs.total)}</Num>
+                    {bucket.costs.shareOfGross === null ? null : (
+                      <>
+                        {' · '}
+                        <Num>{formatNumber(bucket.costs.shareOfGross, locale, 0)}%</Num>
+                      </>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+      </Card>
+
+      {/*
+        Process rather than outcome. Every other figure on this page describes what happened;
+        these four describe how it was done, and they are what separates an edge from a run
+        of luck.
+      */}
+      <Card title={t('analytics.consistency')}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <KPI
+            label={t('analytics.riskSpread')}
+            value={risk.variation === null ? '—' : formatNumber(risk.variation, locale, 2)}
+            tone={risk.variation === null ? 'neutral' : risk.variation <= 0.25 ? 'pos' : 'neg'}
+            sub={t('analytics.riskInBand', {
+              percent: formatNumber(risk.withinBand, locale, 0),
+            })}
+            title={t('analytics.riskSpreadHint')}
+          />
+          <KPI
+            label={t('analytics.riskTypical')}
+            value={risk.covered === 0 ? '—' : money(risk.median)}
+            sub={
+              risk.covered === 0
+                ? t('analytics.riskNoStops')
+                : t('analytics.riskRange', { min: money(risk.min), max: money(risk.max) })
+            }
+          />
+          <KPI
+            label={t('analytics.topShare')}
+            value={spread.topShare === null ? '—' : `${formatNumber(spread.topShare, locale, 0)}%`}
+            tone={spread.restsOnOneTrade ? 'neg' : 'neutral'}
+            sub={
+              spread.restsOnOneTrade
+                ? t('analytics.restsOnOne')
+                : t('analytics.withoutBest', { amount: money(spread.netWithoutBest, { signed: true }) })
+            }
+            title={t('analytics.topShareHint', { count: spread.topCount })}
+          />
+          <KPI
+            label={t('analytics.underwater')}
+            value={t('analytics.days', { count: spell.longestDays })}
+            tone={spell.ongoing ? 'neg' : 'neutral'}
+            sub={spell.ongoing ? t('analytics.underwaterNow') : t('analytics.underwaterPast')}
+            title={t('analytics.underwaterHint')}
+          />
+        </div>
+
+        {/*
+          The overtrading question. Almost every discretionary trader has a load beyond which
+          the day turns negative, and a per-trade average can never show it — the good trades
+          and the bad ones are averaged together.
+        */}
+        {loads.length > 1 ? (
+          <div className="mt-4">
+            <div className="text-dim mb-2 text-[11px] font-semibold">
+              {t('analytics.byDayLoad')}
+            </div>
+            <BreakdownChart
+              data={loads.map((load) => ({
+                key: String(load.trades),
+                label: t('analytics.tradesPerDay', { count: load.trades }),
+                net: load.avgNet,
+                caption: `${t('analytics.daysCount', { count: load.days })} · ${formatNumber(load.winRate, locale, 0)}%`,
+              }))}
+              rtl={rtl}
+              display={display}
+            />
+          </div>
+        ) : null}
+      </Card>
+
+      {/*
+        The one screen that answers "am I getting better". Everything else here describes a
+        single selected window; this one puts the windows side by side.
+      */}
+      {grid.length > 0 ? (
+        <Card title={t('analytics.byPeriod')} pad={false}>
+          <div className="px-4 pt-1 pb-4">
+            <ReturnsGrid
+              grid={grid}
+              rtl={rtl}
+              money={money}
+              formatPercent={(value) =>
+                `${value > 0 ? '+' : ''}${formatNumber(value, locale, 1)}%`
+              }
+              labels={{
+                months: monthNames,
+                year: t('analytics.year'),
+                total: t('analytics.yearTotal'),
+                cellTitle: (period) =>
+                  `${t('kpi.tradesCount', { count: period.trades })} · ${formatNumber(period.winRate, locale, 0)}%`,
+              }}
+            />
+            <p className="text-dim mt-3 text-[11px] leading-relaxed">
+              {t('analytics.byPeriodNote')}
+            </p>
+          </div>
+        </Card>
+      ) : null}
 
       <Card title={t('analytics.heatmap')}>
         <div className="overflow-x-auto">

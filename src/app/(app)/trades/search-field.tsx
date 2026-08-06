@@ -85,12 +85,15 @@ export function TradeSearch({ label, placeholder, clear }: {
           onChange={(event) => setValue(event.target.value)}
           placeholder={placeholder}
           aria-label={label}
-          className="border-line bg-raised text-text placeholder:text-dim/60 min-h-9 w-full rounded-[10px] border px-2.5 py-1.5 text-xs ps-7 pe-7"
+          /*
+            The `::-webkit-search-cancel-button` rule is load-bearing. `type="search"` earns
+            the semantics and the on-screen keyboard, and it also makes Chrome and Safari draw
+            their own clear button — which sat next to ours, so the field showed two × icons.
+            Firefox draws none, which is why ours has to exist at all.
+          */
+          className="border-line bg-raised text-text placeholder:text-dim/60 min-h-9 w-full rounded-[10px] border px-2.5 py-1.5 text-xs ps-7 pe-7 [&::-webkit-search-cancel-button]:appearance-none"
         />
-        {/*
-          `type="search"` gives WebKit its own clear button and gives Firefox nothing, so the
-          control that empties the field has to be ours or it exists on one browser only.
-        */}
+        {/* Ours, so the control exists on every browser rather than on two of them. */}
         {value ? (
           <button
             type="button"

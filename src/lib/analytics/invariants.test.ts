@@ -19,6 +19,9 @@ import {
   heatmap,
   maxDrawdown,
 } from './index';
+import { computeCosts, costsBySymbol } from './costs';
+import { concentration, dayLoads, riskConsistency, underwater } from './consistency';
+import { monthGrid, monthlyReturns } from './periods';
 import type { AnalyticsTrade } from './types';
 
 /**
@@ -53,6 +56,12 @@ const FIXTURE: AnalyticsTrade[] = generateMockDeals()
       openAt: deal.openAt,
       closeAt: deal.closeAt!,
       profit: deal.profit + deal.commission + deal.swap,
+      // The broker's own signed figures, carried through exactly as `sync.ts` stores them —
+      // so the costs invariants below are checked against real fixture money rather than
+      // against zeroes.
+      commission: deal.commission,
+      swap: deal.swap,
+      volume: deal.volume,
       risk,
       rr,
       // The mock book is un-journalled, which is the honest default: a freshly synced
@@ -435,6 +444,78 @@ describe('expectancy', () => {
   });
 });
 
+describe('INVARIANT: costs reconcile with the net every other screen shows', () => {
+  const costs = computeCosts(FIXTURE);
+
+  it('gross minus costs is net, on the real fixture book', () => {
+    const net = FIXTURE.reduce((sum, trade) => sum + trade.profit, 0);
+    expect(near(costs.net, net, 1e-9)).toBe(true);
+    expect(near(costs.gross - costs.total, costs.net, 1e-9)).toBe(true);
+  });
+
+  it('the fixture actually charges commission, so this is not testing zeroes', () => {
+    expect(costs.total).toBeGreaterThan(0);
+  });
+
+  it('the per-symbol split sums to the whole', () => {
+    const parts = costsBySymbol(FIXTURE);
+    expect(near(parts.reduce((sum, b) => sum + b.costs.total, 0), costs.total, 1e-9)).toBe(true);
+    expect(near(parts.reduce((sum, b) => sum + b.costs.net, 0), costs.net, 1e-9)).toBe(true);
+  });
+});
+
+describe('INVARIANT: the process figures agree with the book they describe', () => {
+  it('risk dispersion covers exactly the trades that carry a stop', () => {
+    const spread = riskConsistency(FIXTURE);
+    const withStop = FIXTURE.filter((t) => t.risk !== null && t.risk > 0).length;
+    expect(spread.covered).toBe(withStop);
+    expect(spread.total).toBe(FIXTURE.length);
+    // The same population the RR aggregates run over — see the RR invariant above.
+    expect(spread.covered).toBe(computeMetrics(FIXTURE).rrCoverage.withRr);
+  });
+
+  it('concentration reports the same net as the metrics do', () => {
+    const spread = concentration(FIXTURE);
+    expect(near(spread.net, computeMetrics(FIXTURE).net, 1e-9)).toBe(true);
+    expect(near(spread.grossWin, computeMetrics(FIXTURE).grossWin, 1e-9)).toBe(true);
+  });
+
+  it('the day loads account for every trade in the book', () => {
+    const loads = dayLoads(FIXTURE);
+    const counted = loads.reduce((sum, load) => sum + load.trades * load.days, 0);
+    expect(counted).toBe(FIXTURE.length);
+    expect(near(loads.reduce((sum, load) => sum + load.net, 0), computeMetrics(FIXTURE).net, 1e-9)).toBe(true);
+  });
+
+  it('the months partition the book and sum to its net', () => {
+    const months = monthlyReturns(FIXTURE, 10_000);
+    expect(months.reduce((sum, m) => sum + m.trades, 0)).toBe(FIXTURE.length);
+    expect(near(months.reduce((sum, m) => sum + m.net, 0), computeMetrics(FIXTURE).net, 1e-9)).toBe(
+      true,
+    );
+  });
+
+  it('a year row equals its own twelve cells', () => {
+    // The discrepancy nobody notices until a client does: a total computed from the trades
+    // while the cells are computed from the months.
+    for (const row of monthGrid(monthlyReturns(FIXTURE, 10_000))) {
+      const cells = row.months.filter((m): m is NonNullable<typeof m> => m !== null);
+      expect(near(cells.reduce((sum, m) => sum + m.net, 0), row.total.net, 1e-9)).toBe(true);
+      expect(cells.reduce((sum, m) => sum + m.trades, 0)).toBe(row.total.trades);
+    }
+  });
+
+  it('time under water never exceeds the span of the book', () => {
+    const curve = equityCurve(FIXTURE, 10_000);
+    const spell = underwater(curve, 10_000);
+    const spanDays =
+      (FIXTURE[FIXTURE.length - 1]!.closeAt.getTime() - FIXTURE[0]!.closeAt.getTime()) /
+      (24 * 60 * 60 * 1000);
+    expect(spell.longestDays).toBeGreaterThanOrEqual(0);
+    expect(spell.longestDays).toBeLessThanOrEqual(Math.ceil(spanDays));
+  });
+});
+
 // --- helpers ----------------------------------------------------------------
 
 let counter = 0;
@@ -451,6 +532,10 @@ function trade(overrides: Partial<AnalyticsTrade> = {}): AnalyticsTrade {
     openAt,
     closeAt: overrides.closeAt ?? new Date(openAt.getTime() + 3_600_000),
     profit: 0,
+    // Costs and size are not what these invariants are about; the engine needs them present.
+    commission: 0,
+    swap: 0,
+    volume: 1,
     risk: 100,
     rr: 0,
     strategy: null,

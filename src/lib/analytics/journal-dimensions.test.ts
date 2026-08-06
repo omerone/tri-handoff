@@ -15,6 +15,10 @@ const trade = (over: Partial<AnalyticsTrade> = {}): AnalyticsTrade => {
     openAt,
     closeAt: new Date(openAt.getTime() + 3_600_000),
     profit: 0,
+    // Costs and size are not what these tests are about; the engine needs them present.
+    commission: 0,
+    swap: 0,
+    volume: 1,
     risk: null,
     rr: null,
     strategy: null,
