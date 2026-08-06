@@ -470,7 +470,8 @@
     "autoSyncOffNote": "Only the refresh button in the header pulls from the broker. Nothing else costs anything. Once the last sync is more than 12 hours old, the button reports how long ago it was instead of the time of day.",
     "addAnother": "Connect another account",
     "twoAccounts": "You can connect two accounts — a day account and a swing account, say. Their books stay apart.",
-    "slotEmpty": "Second account"
+    "slotEmpty": "Second account",
+    "preferences": "Preferences"
   },
   "calendar": {
     "weekdays": [

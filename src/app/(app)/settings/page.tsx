@@ -1,5 +1,6 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
+import { SettingRow } from '@/components/ui/setting-row';
 import { AutoSyncChoice, CurrencyChoice, LanguageChoice, ThemeChoice } from './choices';
 import { SignOutButton } from '@/components/shell/sign-out-button';
 import { asTheme } from '@/lib/theme';
@@ -174,6 +175,44 @@ export default async function SettingsPage() {
             />
           </Card>
           {/*
+          One card, four rows, a hairline between them — not four cards.
+
+          Each of these was its own panel with its own border, title and padding, all the same
+          size whatever they held: a two-option toggle got the frame a paragraph of explanation
+          got. It read as a scatter of tiles rather than as a list of decisions. What this
+          removes is chrome, not explanation — every sentence that was under a control is still
+          under it, and two of these choices cost money or change what a number means.
+        */}
+          <Card title={t('preferences')}>
+            <SettingRow label={t('language')}>
+              <LanguageChoice current={session.user.locale} />
+            </SettingRow>
+
+            <SettingRow label={t('theme')}>
+              <ThemeChoice
+                current={asTheme(session.user.theme)}
+                labels={{ dark: t('themeDark'), light: t('themeLight'), system: t('themeSystem') }}
+              />
+            </SettingRow>
+
+            <SettingRow label={t('currency')} description={t('fxNote')}>
+              <CurrencyChoice current={asCurrency(session.user.displayCurrency)} />
+            </SettingRow>
+
+            <SettingRow
+              label={t('autoSync')}
+              description={
+                session.user.autoSyncOnLogin ? t('autoSyncOnNote') : t('autoSyncOffNote')
+              }
+            >
+              <AutoSyncChoice
+                current={session.user.autoSyncOnLogin}
+                labels={{ on: t('autoSyncOn'), off: t('autoSyncOff') }}
+              />
+            </SettingRow>
+          </Card>
+
+          {/*
         Signing out lives here now rather than in the header. It was a one-tap icon beside
         the sync pill — next to the theme switch, a keystroke away from every screen — and
         the only destructive control in the frame. Behind a door, with its own card and the
@@ -191,33 +230,6 @@ export default async function SettingsPage() {
         the broker connection and about what it costs, but it is still one switch and a
         sentence, which is the same shape as the three beside it.
       */}
-      <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Card title={t('autoSync')}>
-          <AutoSyncChoice
-            current={session.user.autoSyncOnLogin}
-            labels={{ on: t('autoSyncOn'), off: t('autoSyncOff') }}
-          />
-          <p className="text-dim mt-3 text-xs leading-relaxed">
-            {session.user.autoSyncOnLogin ? t('autoSyncOnNote') : t('autoSyncOffNote')}
-          </p>
-        </Card>
-
-        <Card title={t('language')}>
-          <LanguageChoice current={session.user.locale} />
-        </Card>
-
-        <Card title={t('theme')}>
-          <ThemeChoice
-            current={asTheme(session.user.theme)}
-            labels={{ dark: t('themeDark'), light: t('themeLight'), system: t('themeSystem') }}
-          />
-        </Card>
-
-        <Card title={t('currency')}>
-          <CurrencyChoice current={asCurrency(session.user.displayCurrency)} />
-          <p className="text-dim mt-3 text-xs">{t('fxNote')}</p>
-        </Card>
-      </div>
     </div>
   );
 }
