@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { clientIpForRecord } from './limits';
 import { generateToken, hashToken } from '@/lib/crypto/tokens';
 import { registerAuditIdentity } from './audit-identity';
 import {
@@ -87,8 +88,9 @@ export async function startSession(userId: string): Promise<void> {
     userId,
     tokenHash: hashToken(token),
     expiresAt: new Date(Date.now() + SESSION_TTL_MS),
-    // Behind Caddy the client address is in X-Forwarded-For; take the first hop.
-    ip: headerStore.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+    // The socket peer as the proxy saw it, never the first hop of X-Forwarded-For: that list
+    // is one a caller may prepend to, and this address is what an investigation would trust.
+    ip: await clientIpForRecord(),
     userAgent: headerStore.get('user-agent')?.slice(0, 300) ?? null,
   });
 

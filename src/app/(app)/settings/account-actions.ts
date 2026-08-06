@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
-import { limitKey, LIMITS } from '@/lib/auth/limits';
+import { clientIpForRecord, limitKey, LIMITS } from '@/lib/auth/limits';
 import { requireSession } from '@/lib/auth/session';
 import { consumeRateLimit } from '@/lib/db';
 import { deleteUserDataGDPR, validateDeletionRequest } from '@/lib/db/gdpr';
@@ -38,7 +38,7 @@ const deleteAccountSchema = z.object({
  */
 export async function deleteUserAccount(
   formState: AccountFormState,
-  formData: FormData
+  formData: FormData,
 ): Promise<AccountFormState> {
   const session = await requireSession();
   const t = await getTranslations('settings.account');
@@ -53,7 +53,9 @@ export async function deleteUserAccount(
   );
   if (!verdict.allowed) {
     const tAuth = await getTranslations('auth');
-    return { error: tAuth('tooManyAttempts', { minutes: Math.ceil(verdict.retryAfterMs / 60_000) }) };
+    return {
+      error: tAuth('tooManyAttempts', { minutes: Math.ceil(verdict.retryAfterMs / 60_000) }),
+    };
   }
 
   try {
@@ -73,7 +75,7 @@ export async function deleteUserAccount(
     const validationResult = await validateDeletionRequest(
       session.user.id,
       passwordHash,
-      parsed.password
+      parsed.password,
     );
 
     if (!validationResult.valid) {
@@ -101,11 +103,15 @@ export async function deleteUserAccount(
 
     // Get client IP and user agent for audit log
     const headersList = await headers();
-    const ipAddress = headersList.get('x-forwarded-for') || null;
+    const ipAddress = await clientIpForRecord();
     const userAgent = headersList.get('user-agent') || null;
 
     // Perform deletion (cascades through database)
-    const auditLog = await deleteUserDataGDPR(session.user.id, ipAddress || undefined, userAgent || undefined);
+    const auditLog = await deleteUserDataGDPR(
+      session.user.id,
+      ipAddress || undefined,
+      userAgent || undefined,
+    );
 
     // Log successful deletion
     console.error('[GDPR] Account deletion completed', {

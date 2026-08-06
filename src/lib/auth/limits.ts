@@ -47,6 +47,19 @@ export async function clientIp(): Promise<string> {
   return store.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }
 
+/**
+ * The same address, for a column rather than a bucket.
+ *
+ * `clientIp` answers `'unknown'` when there is no address to be had, which is the right answer
+ * for a rate limiter — every anonymous caller shares one bucket. It is the wrong thing to
+ * write into an audit row, where it reads as an address someone actually came from. The
+ * columns are nullable for exactly this case.
+ */
+export async function clientIpForRecord(): Promise<string | null> {
+  const ip = await clientIp();
+  return ip === 'unknown' ? null : ip;
+}
+
 export function limitKey(bucket: string, ...parts: string[]): string {
   return `${bucket}:${parts.join('|')}`;
 }

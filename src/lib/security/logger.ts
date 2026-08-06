@@ -6,6 +6,7 @@ import {
   recordDataAccess,
 } from '@/lib/db/security-events';
 import { headers } from 'next/headers';
+import { clientIpForRecord } from '@/lib/auth/limits';
 
 /**
  * Security Event Logger
@@ -102,9 +103,7 @@ class SecurityLogger {
       // Alert on large exports (data exfiltration detection)
       if (opts.dataSizeBytes && opts.dataSizeBytes > 10_000_000) {
         // 10 MB
-        console.warn(
-          `Large data export: user ${opts.userId} exported ${opts.dataSizeBytes} bytes`
-        );
+        console.warn(`Large data export: user ${opts.userId} exported ${opts.dataSizeBytes} bytes`);
       }
     } catch (err) {
       console.error('Failed to log data access event:', err);
@@ -163,7 +162,7 @@ class SecurityLogger {
 
       if (failedCount >= 5) {
         console.error(
-          `SECURITY ALERT: User ${userId} has ${failedCount} failed logins in 30 minutes`
+          `SECURITY ALERT: User ${userId} has ${failedCount} failed logins in 30 minutes`,
         );
         // TODO: Send alert email, page on-call team, disable account
       }
@@ -174,13 +173,19 @@ class SecurityLogger {
 }
 
 /**
- * Helper function to extract IP from request headers
- * Used internally by SecurityLogger
+ * Who the request came from, for the row this logger is about to write.
+ *
+ * Through `clientIpForRecord`, not by reading `X-Forwarded-For` here. That header is a list
+ * the caller may prepend to, so its first entry is whatever an attacker typed — and a
+ * security log that can be told what to say about who did something is worse than one with no
+ * address at all, because it will be believed. `audit-middleware.ts` had already worked this
+ * out and fixed it in its own copy; this file, `startSession` and the deletion path each kept
+ * a private one. There is one now.
  */
 async function getContext(): Promise<LoggerContext> {
   const headerStore = await headers();
   return {
-    ipAddress: headerStore.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+    ipAddress: await clientIpForRecord(),
     userAgent: headerStore.get('user-agent')?.slice(0, 300) ?? null,
   };
 }

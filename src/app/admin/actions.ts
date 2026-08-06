@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { SecurityLogger } from '@/lib/security/logger';
 import { burnPasswordVerification } from '@/lib/auth/anti-timing';
 import {
   assertAdminHost,
@@ -49,19 +50,42 @@ export async function adminSignInAction(
     LIMITS.adminLoginPerAccount.windowMs,
   );
   if (!perIp.allowed || !perAccount.allowed) {
+    await SecurityLogger.logAdminAction({
+      actionType: 'admin_login_blocked',
+      description: 'Operator sign-in refused by the rate limiter',
+    });
     return { error: 'Too many attempts. Try again later.' };
   }
 
   const admin = await findSuperAdminByEmail(email);
   if (!admin) {
     await burnPasswordVerification(password);
+    // No `adminId`: the column is nullable for this, and the address that was tried is the
+    // caller's input rather than a fact about anyone. That there was an attempt at all, from
+    // this address, is the whole signal — nobody stumbles onto the operator console.
+    await SecurityLogger.logAdminAction({
+      actionType: 'admin_login_failed',
+      description: 'Operator sign-in attempted against an unknown address',
+    });
     return { error: 'Wrong email or password' };
   }
   if (!(await verifyPassword(admin.passwordHash, password))) {
+    await SecurityLogger.logAdminAction({
+      adminId: admin.id,
+      actionType: 'admin_login_failed',
+      description: 'Operator sign-in failed on the password',
+    });
     return { error: 'Wrong email or password' };
   }
 
   await startAdminSession(admin.id);
+  // The account that can read every client's book, and there is no self-service reset behind
+  // it. Every one of these should be Omer, at an hour and from an address he recognises.
+  await SecurityLogger.logAdminAction({
+    adminId: admin.id,
+    actionType: 'admin_login_success',
+    description: 'Operator signed in',
+  });
   redirect('/admin');
 }
 
@@ -85,7 +109,7 @@ export async function createTenantAction(
   _prev: AdminFormState,
   formData: FormData,
 ): Promise<AdminFormState> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const parsed = createSchema.safeParse({
     name: formData.get('name'),
@@ -130,17 +154,34 @@ export async function createTenantAction(
     return { error: reasons[result.reason] };
   }
 
+  await SecurityLogger.logAdminAction({
+    adminId: admin.adminId,
+    tenantId: result.tenantId,
+    actionType: 'create_tenant',
+    description: `Created client ${parsed.data.name} on ${result.domain}`,
+  });
+
   revalidatePath('/admin');
-  return { notice: `Created ${result.domain}. Point its DNS at this server and it will get a certificate on first request.` };
+  return {
+    notice: `Created ${result.domain}. Point its DNS at this server and it will get a certificate on first request.`,
+  };
 }
 
 export async function setTenantStatusAction(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const tenantId = String(formData.get('tenantId') ?? '');
   const status = String(formData.get('status') ?? '');
   if (!tenantId || (status !== 'active' && status !== 'suspended')) return;
 
   await setTenantStatus(tenantId, status);
+  // Suspending is what a client experiences as the product going down, and reversing it is one
+  // click. Without a record, "when did we suspend them, and who decided to" has no answer.
+  await SecurityLogger.logAdminAction({
+    adminId: admin.adminId,
+    tenantId,
+    actionType: status === 'suspended' ? 'suspend_tenant' : 'reactivate_tenant',
+    description: `Set client status to ${status}`,
+  });
   revalidatePath('/admin');
 }

@@ -24,11 +24,25 @@ import {
 } from '@/lib/db/unscoped';
 import { sendPasswordResetEmail } from '@/lib/mail/password-reset';
 import { setLocaleCookie, setThemeCookie } from '@/lib/preferences/cookies';
+import { SecurityLogger } from '@/lib/security/logger';
 import { resolveTenant } from '@/lib/tenant/resolve';
 
 export type FormState = { error?: string; notice?: string };
 
 const RESET_TTL_MINUTES = 30;
+
+/**
+ * The subject of an event about someone who is not a user here.
+ *
+ * `auth_events.user_id` is required and carries no foreign key, so a sign-in attempt against
+ * an address that does not exist still has somewhere to go — and it has to, or the one thing
+ * the trail cannot show is someone working through a list of addresses. It is keyed to the
+ * tenant rather than to the address that was tried: the address is the attacker's input, it
+ * may well be a real person's, and for a product with one user per tenant, filing it would
+ * turn the trail into a record of who was guessed at. The count is the signal; the guess is
+ * not evidence of anything.
+ */
+const unknownSubject = (tenantId: string) => `unknown:${tenantId}`;
 
 /**
  * Minimum wall-clock time for a password-reset request, whatever happens inside it.
@@ -83,21 +97,51 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
   );
   if (!perAccount.allowed || !perIp.allowed) {
     const waitMs = Math.max(perAccount.retryAfterMs, perIp.retryAfterMs);
+    // Recorded against the tenant, because refusing without looking anyone up is the point of
+    // getting here — a lookup to name the subject would spend the query the limit just saved.
+    await SecurityLogger.logAuthEvent({
+      userId: unknownSubject(tenant.id),
+      eventType: 'login_blocked',
+      description: 'Sign-in refused by the rate limiter',
+      result: 'blocked',
+      failureReason: 'rate_limited',
+    });
     return { error: t('tooManyAttempts', { minutes: Math.max(1, Math.ceil(waitMs / 60_000)) }) };
   }
 
   const user = await findUserForLogin(tenant.id, email);
   if (!user) {
     await burnPasswordVerification(password);
+    await SecurityLogger.logAuthEvent({
+      userId: unknownSubject(tenant.id),
+      eventType: 'login_failed',
+      description: 'Sign-in attempted against an address with no account here',
+      result: 'failure',
+      failureReason: 'unknown_account',
+    });
     return { error: t('invalidCredentials') };
   }
 
   if (!(await verifyPassword(user.passwordHash, password))) {
+    // The one event the alerting actually reads: `checkFailedLoginThreshold` counts these per
+    // user, so a real account being ground at is what raises the alarm rather than volume.
+    await SecurityLogger.logAuthEvent({
+      userId: user.id,
+      eventType: 'login_failed',
+      description: 'Sign-in failed on the password',
+      result: 'failure',
+      failureReason: 'wrong_password',
+    });
     return { error: t('invalidCredentials') };
   }
 
   await resetRateLimit(limitKey('login', tenant.id, email));
   await startSession(user.id);
+  await SecurityLogger.logAuthEvent({
+    userId: user.id,
+    eventType: 'login_success',
+    description: 'Signed in',
+  });
   await touchLastLogin(makeTenantContext(user.tenantId, user.id));
 
   // Bring the cookie copies back in line with the account being signed in to. Without this a
@@ -115,10 +159,7 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
 
 const requestResetSchema = z.object({ email: emailField });
 
-export async function requestResetAction(
-  _prev: FormState,
-  formData: FormData,
-): Promise<FormState> {
+export async function requestResetAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const startedAt = Date.now();
   const t = await getTranslations('auth');
 
@@ -154,6 +195,12 @@ export async function requestResetAction(
 
   const user = await findUserByEmailForReset(tenant.id, email);
   if (!user) return uniformReply();
+
+  // Nothing is logged on this path, deliberately. Every branch above returns the same words
+  // after the same 400ms precisely so the form cannot be used to ask whether an address is a
+  // client here, and a write that only happens once the lookup hits is that question answered
+  // in the database instead of on the screen. The reset that gets *completed* is logged, and
+  // that one is an event about a user who exists.
 
   const token = generateToken();
   await createResetToken({
@@ -230,6 +277,14 @@ export async function completeResetAction(
     passwordHash: await hashPassword(password),
   });
   if (!redeemed) return { error: t('resetLinkInvalid') };
+
+  // Every session was revoked in the same transaction, so this is also the record of everyone
+  // who was signed out and why.
+  await SecurityLogger.logAuthEvent({
+    userId: record.userId,
+    eventType: 'password_changed',
+    description: 'Password set through a reset link; all sessions revoked',
+  });
 
   redirect('/login?reset=done');
 }
