@@ -145,6 +145,20 @@ export interface Mt5Provider {
   fetchSymbolSpecs?(credentials: Mt5Credentials, symbols: string[]): Promise<SymbolSpecOverride[]>;
 
   /**
+   * Stop paying for a terminal nobody is reading.
+   *
+   * A metered provider charges by the hour the account is *running*, not by the request. TRi
+   * reads a broker on login and on a button press and then does nothing for days, so leaving
+   * the terminal up is renting a machine to sit idle: on MetaApi's own rates that is $0.0126
+   * an hour against $0.00105 for a stopped account — $9.20 a month rather than $0.77.
+   *
+   * Optional, because it only means anything to a provider that bills this way. The mock has
+   * nothing to release and does not implement it. Called after a sync finishes and never
+   * allowed to fail one: releasing is an economy, and a failed economy is not a failed sync.
+   */
+  release?(credentials: Mt5Credentials): Promise<void>;
+
+  /**
    * Rates needed to express risk in the account currency when a symbol is quoted in a third
    * currency (GER40 in euros on a dollar account). Keyed `"<quote><account>"`.
    */

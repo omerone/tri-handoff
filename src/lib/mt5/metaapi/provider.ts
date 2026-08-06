@@ -240,6 +240,14 @@ type MetaApiAccount = {
 export type MetaApiProviderOptions = {
   /** Overall bound on waiting for an account to come up. A sync must not hang forever. */
   readyTimeoutMs?: number;
+  /**
+   * Leave the terminal running between syncs.
+   *
+   * Costs $9.20 a month rather than $0.77 and saves the minute a cold start spends connecting
+   * to the broker. Worth it above roughly four syncs a day, where the per-deployment fee
+   * overtakes the idle hours it avoids.
+   */
+  keepDeployed?: boolean;
   pollIntervalMs?: number;
   /** Test seam, so the readiness wait can be exercised without real time passing. */
   sleep?: (ms: number) => Promise<void>;
@@ -249,6 +257,7 @@ export class MetaApiProvider implements Mt5Provider {
   readonly name = 'metaapi' as const;
 
   private readonly readyTimeoutMs: number;
+  private readonly keepDeployed: boolean;
   private readonly pollIntervalMs: number;
   private readonly sleep: (ms: number) => Promise<void>;
 
@@ -274,6 +283,7 @@ export class MetaApiProvider implements Mt5Provider {
     options: MetaApiProviderOptions = {},
   ) {
     this.readyTimeoutMs = options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS;
+    this.keepDeployed = options.keepDeployed ?? false;
     this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
@@ -603,6 +613,43 @@ export class MetaApiProvider implements Mt5Provider {
       `MetaApi returned more than ${DEALS_PAGE_LIMIT * DEALS_PAGE_SIZE} deals for this account; ` +
         'refusing to keep paging. Sync the account over a shorter period.',
     );
+  }
+
+  /**
+   * Stops the terminal, so the meter drops to the idle rate.
+   *
+   * MetaApi bills $0.0126 an hour for a deployed account and $0.00105 for an undeployed one —
+   * $9.20 a month against $0.77 — plus $0.0756 each time one is started. TRi reads a broker on
+   * a button press and then does nothing for days, so the account is stopped when the sync is
+   * done and started again by `waitUntilReady` on the next one.
+   *
+   * The break-even is arithmetic rather than opinion: a deployment costs the same as six hours
+   * of running, so releasing wins below roughly four syncs a day and loses above it. That is
+   * why `METAAPI_KEEP_DEPLOYED` exists — a desk that refreshes all day should keep the
+   * terminal up, and the default suits a trader who looks in weekly.
+   *
+   * The waking cost is paid in seconds, not money: a freshly started terminal answers
+   * "not connected to broker yet" for a minute or so, which is exactly what `waitUntilReady`
+   * is there to sit through.
+   *
+   * Never throws. The account id is resolved from the cache when it is already known and this
+   * is skipped entirely when it is not — a release is worth one request, and never worth
+   * making the sync that just succeeded look like it failed.
+   */
+  async release(credentials: Mt5Credentials): Promise<void> {
+    if (this.keepDeployed) return;
+
+    try {
+      const accountId = await this.resolveAccountId(credentials);
+      await this.send(`${this.provisioningUrl}/users/current/accounts/${accountId}/undeploy`, {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.warn(
+        '[mt5] could not release the account; it stays deployed and billable:',
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   async fetchSymbolSpecs(

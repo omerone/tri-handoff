@@ -92,6 +92,12 @@ async function main() {
       : `  ✗ off by ${money(drift, account.currency)} — open positions, or the aggregation needs work.`,
   );
 
+  // Hand the terminal back, exactly as a real sync does — and prove it went down.
+  if (provider.release) {
+    console.log('\nReleasing the terminal…');
+    await provider.release(credentials);
+  }
+
   if (trades.length > 0) {
     console.log('\nFive most recent closed positions:');
     for (const deal of trades.slice(-5)) {

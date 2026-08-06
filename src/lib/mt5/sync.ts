@@ -114,7 +114,7 @@ async function syncOneAccount(
     providerAccountId: string | null;
   },
 ): Promise<{ imported: number; updated: number; currency: string }> {
-  {
+  try {
     const credentials: Mt5Credentials = {
       login: stored.login,
       server: stored.server,
@@ -162,6 +162,29 @@ async function syncOneAccount(
       currency: account.currency,
     });
     return { imported, updated, currency: account.currency };
+  } finally {
+    /*
+     * Hand the terminal back, whether the sync worked or not.
+     *
+     * A metered provider charges for the hours the account is *running*, and TRi reads a
+     * broker on a button press and then does nothing for days — so a terminal left up is rent
+     * on a machine nobody is reading. In `finally` rather than after the return, because the
+     * expensive thing to leak is the one a *failed* sync leaves behind: an account that threw
+     * on its first read is exactly the account nobody will think to stop.
+     *
+     * `release` swallows its own failures; this awaits it only so the request is actually
+     * issued before the process moves on.
+     */
+    const provider = mt5Provider();
+    if (provider.release) {
+      await provider.release({
+        login: stored.login,
+        server: stored.server,
+        investorPassword: decryptSecret(stored.investorPwEncrypted),
+        accountKey: ctx.userId,
+        ...(stored.providerAccountId ? { providerAccountId: stored.providerAccountId } : {}),
+      });
+    }
   }
 }
 

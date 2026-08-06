@@ -23,7 +23,9 @@ export function mt5Provider(): Mt5Provider {
   const config = env();
   cached =
     config.MT5_PROVIDER === 'metaapi'
-      ? new MetaApiProvider(config.METAAPI_TOKEN, config.METAAPI_REGION)
+      ? new MetaApiProvider(config.METAAPI_TOKEN, config.METAAPI_REGION, {
+          keepDeployed: config.METAAPI_KEEP_DEPLOYED,
+        })
       : new MockMt5Provider();
 
   return cached;

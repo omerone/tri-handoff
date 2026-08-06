@@ -44,6 +44,20 @@ const schema = z.object({
   MT5_PROVIDER: z.enum(['mock', 'metaapi']).default('mock'),
   METAAPI_TOKEN: z.string().optional().default(''),
   METAAPI_REGION: z.string().optional().default('new-york'),
+  /**
+   * Leave the broker terminal running between syncs.
+   *
+   * MetaApi bills by the hour an account is deployed: $9.20 a month running against $0.77
+   * stopped, plus $0.0756 to start one. Off by default, because TRi reads a broker on a button
+   * press and then does nothing for days, and a terminal nobody is reading is rent. Turn it on
+   * for a desk that refreshes more than about four times a day, where the per-start fee
+   * overtakes the idle hours it saves.
+   */
+  METAAPI_KEEP_DEPLOYED: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false')
+    .transform((value) => value === 'true'),
 
   SMTP_HOST: z.string().optional().default(''),
   SMTP_PORT: z.coerce.number().int().positive().default(587),

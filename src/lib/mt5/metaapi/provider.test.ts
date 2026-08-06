@@ -474,3 +474,94 @@ describe('the other refusals', () => {
     expect(JSON.stringify(result)).not.toContain(credentials.investorPassword);
   });
 });
+
+describe('handing the terminal back', () => {
+  /**
+   * The bill this exists to stop.
+   *
+   * MetaApi charges $0.0126 an hour for a running account and $0.00105 for a stopped one —
+   * $9.20 a month against $0.77 — and TRi reads a broker on a button press and then does
+   * nothing for days. Leaving the terminal up is renting a machine to sit idle.
+   */
+  it('stops the account when the sync is done', async () => {
+    const calls = mockFetch((call) => {
+      if (call.url.includes('?query=')) {
+        return {
+          body: [
+            {
+              _id: 'acc-1',
+              name: accountName(credentials),
+              login: '541171171',
+              server: 'FTMO-Server-4',
+            },
+          ],
+        };
+      }
+      if (call.url.includes('account-information')) return { body: ACCOUNT_INFO };
+      return { body: READY };
+    });
+
+    const subject = provider();
+    await subject.fetchAccountState(credentials);
+    await subject.release!(credentials);
+
+    const undeploy = calls.find((call) => call.url.endsWith('/undeploy'));
+    expect(undeploy?.method).toBe('POST');
+    expect(undeploy?.url).toContain('acc-1');
+  });
+
+  it('leaves it running when the deployment is meant to stay up', async () => {
+    // Above roughly four syncs a day the per-deployment fee overtakes the idle hours, so a
+    // desk that refreshes all day is better off paying for the terminal.
+    const calls = mockFetch((call) => {
+      if (call.url.includes('?query=')) return { body: [] };
+      if (call.method === 'POST') return { status: 201, body: { id: 'acc-1' } };
+      if (call.url.includes('account-information')) return { body: ACCOUNT_INFO };
+      return { body: READY };
+    });
+
+    const subject = new MetaApiProvider('token', 'new-york', {
+      readyTimeoutMs: 400,
+      pollIntervalMs: 5,
+      keepDeployed: true,
+    });
+    await subject.fetchAccountState(credentials);
+    await subject.release!(credentials);
+
+    expect(calls.some((call) => call.url.endsWith('/undeploy'))).toBe(false);
+  });
+
+  it('does not turn a failed release into a failed sync', async () => {
+    // A release is an economy. An economy that fails is not a sync that failed, and throwing
+    // here would put a billing error in front of a trader whose trades imported fine.
+    mockFetch((call) => {
+      if (call.url.endsWith('/undeploy')) return { status: 500, body: { message: 'nope' } };
+      if (call.url.includes('?query=')) {
+        return {
+          body: [
+            {
+              _id: 'acc-1',
+              name: accountName(credentials),
+              login: '541171171',
+              server: 'FTMO-Server-4',
+            },
+          ],
+        };
+      }
+      return { body: READY };
+    });
+
+    await expect(provider().release!(credentials)).resolves.toBeUndefined();
+  });
+
+  it('spends one request when the account id is already known', async () => {
+    // The stored provider account id is the whole point of the column: a release should be a
+    // single POST, not a listing followed by a readiness poll.
+    const calls = mockFetch(() => ({ status: 204 }));
+
+    await provider().release!({ ...credentials, providerAccountId: 'acc-stored' });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toContain('acc-stored/undeploy');
+  });
+});
