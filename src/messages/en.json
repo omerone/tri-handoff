@@ -354,7 +354,11 @@
       "deleteFailedSystem": "The account could not be deleted. Nothing was removed — try again, and contact support if it keeps failing."
     },
     "connectUnknownServer": "Your broker does not publish a server by that name. Check the spelling in MetaTrader.",
-    "connectUnknownServerDidYouMean": "Your broker does not publish a server by that name. Did you mean {names}?"
+    "connectUnknownServerDidYouMean": "Your broker does not publish a server by that name. Did you mean {names}?",
+    "replaceTitle": "This will delete the trade book",
+    "replaceBody": "Account {toLogin} is not the connected one ({fromLogin}). The stored history belongs to the previous account, so {trades} trades will be deleted. There is no way to restore them from here.",
+    "replaceConfirm": "I understand — delete and connect",
+    "replaceCancel": "Cancel"
   },
   "calendar": {
     "weekdays": [

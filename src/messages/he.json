@@ -354,7 +354,11 @@
       "deleteFailedSystem": "לא הצלחנו למחוק את החשבון. שום דבר לא נמחק — נסה שוב, ואם זה חוזר פנה לתמיכה."
     },
     "connectUnknownServer": "הברוקר לא מכיר שרת בשם הזה. בדוק את הכתיב ב-MetaTrader.",
-    "connectUnknownServerDidYouMean": "הברוקר לא מכיר שרת בשם הזה. האם התכוונת ל-{names}?"
+    "connectUnknownServerDidYouMean": "הברוקר לא מכיר שרת בשם הזה. האם התכוונת ל-{names}?",
+    "replaceTitle": "החיבור הזה ימחק את ספר העסקאות",
+    "replaceBody": "חשבון {toLogin} אינו החשבון המחובר ({fromLogin}). ההיסטוריה השמורה שייכת לחשבון הקודם, ולכן {trades} עסקאות יימחקו. אין דרך לשחזר אותן מכאן.",
+    "replaceConfirm": "הבנתי, מחק והתחבר",
+    "replaceCancel": "ביטול"
   },
   "calendar": {
     "weekdays": [

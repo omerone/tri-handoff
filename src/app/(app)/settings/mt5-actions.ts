@@ -9,6 +9,7 @@ import { encryptSecret } from '@/lib/crypto/secretbox';
 import {
   connectMt5Account,
   consumeRateLimit,
+  countTrades,
   deleteAllTrades,
   disconnectMt5Account,
   getMt5Account,
@@ -16,7 +17,25 @@ import {
 import { mt5Provider } from '@/lib/mt5';
 import { syncMt5 } from '@/lib/mt5/sync';
 
-export type Mt5FormState = { error?: string; notice?: string };
+export type Mt5FormState = {
+  error?: string;
+  notice?: string;
+  /**
+   * Set instead of connecting when the new account number is not the stored one.
+   *
+   * Connecting a different account discards the imported book, because that history belongs
+   * to somebody else's account. That is the right behaviour and the wrong thing to do
+   * silently: the button says "connect", the confirmation on *disconnect* promises in as many
+   * words that imported trades survive, and the delete arrives with no count and no undo. It
+   * emptied this deployment's book three times in one day.
+   */
+  confirmReplace?: {
+    /** Already formatted here: only this side knows the counts, and only next-intl should
+        be interpolating a message that has placeholders in it. */
+    body: string;
+    trades: number;
+  };
+};
 
 const connectSchema = z.object({
   login: z.string().trim().min(1).max(40),
@@ -97,6 +116,30 @@ export async function connectMt5Action(
   const existing = await getMt5Account(session.ctx);
   const isDifferentAccount = existing !== null && existing.login !== credentials.login;
 
+  /*
+   * Ask before discarding a book, and ask *here* — before `connectMt5Account` writes
+   * anything. Bailing out after the account row is replaced would leave the credentials
+   * pointing at the new account and the trades still belonging to the old one, which is a
+   * worse state than either answer to the question.
+   *
+   * The count comes from the database rather than from the caller: it is the number the
+   * person is being asked to agree to lose, and it must not be something the form can lie
+   * about.
+   */
+  if (isDifferentAccount && formData.get('confirmReplace') !== 'yes') {
+    const trades = await countTrades(session.ctx);
+    return {
+      confirmReplace: {
+        trades,
+        body: t('replaceBody', {
+          trades,
+          fromLogin: existing.login,
+          toLogin: credentials.login,
+        }),
+      },
+    };
+  }
+
   await connectMt5Account(session.ctx, {
     login: credentials.login,
     server: credentials.server,
@@ -104,7 +147,7 @@ export async function connectMt5Action(
     accountCurrency: verified.account.currency,
   });
 
-  // A different account number means the stored history belongs to somebody else's book.
+  // Confirmed above: a different account number means the stored history is another book's.
   if (isDifferentAccount) await deleteAllTrades(session.ctx);
 
   const result = await syncMt5(session.ctx, 'backfill');

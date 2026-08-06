@@ -31,6 +31,10 @@ export interface WizardLabels {
   server: string;
   connect: string;
   investorWarning: string;
+  /** Shown only when connecting a different account would discard the stored book. */
+  replaceTitle: string;
+  replaceConfirm: string;
+  replaceCancel: string;
   wizard: {
     step: string;
     of: string;
@@ -125,8 +129,23 @@ export function Mt5ConnectWizard({
 
       const result = await connectMt5Action({}, formDataObj);
       setState(result);
-      setStep(result.error ? 'password' : 'success');
+      // A replace confirmation is neither success nor a bad password — it is a question, and
+      // the answer needs the credentials still on screen to resubmit with.
+      setStep(result.confirmReplace ? 'password' : result.error ? 'password' : 'success');
     }
+  };
+
+  const confirmReplace = async () => {
+    setStep('processing');
+    const body = new FormData();
+    body.append('login', formData.login || '');
+    body.append('server', formData.server || '');
+    body.append('investorPassword', formData.investorPassword || '');
+    body.append('confirmReplace', 'yes');
+
+    const result = await connectMt5Action({}, body);
+    setState(result);
+    setStep(result.error ? 'password' : 'success');
   };
 
   const handleBack = () => {
@@ -183,6 +202,7 @@ export function Mt5ConnectWizard({
             showHelp={showHelp === 'password'}
             onToggleHelp={() => setShowHelp(showHelp === 'password' ? null : 'password')}
             state={state}
+            onConfirmReplace={confirmReplace}
           />
         )}
 
@@ -459,8 +479,10 @@ function PasswordStep({
   showHelp,
   onToggleHelp,
   state,
+  onConfirmReplace,
 }: {
   labels: WizardLabels;
+  onConfirmReplace: () => void;
   value: string;
   onChange: (v: string) => void;
   onNext: () => void;
@@ -482,6 +504,42 @@ function PasswordStep({
       </div>
 
       <FormMessage error={state.error} />
+
+      {/*
+        The one destructive answer this form can produce, made explicit before it happens.
+        Rendered here rather than as a browser confirm() so the trade count is on screen next
+        to the two account numbers — "93 trades" is the fact someone needs to weigh, and a
+        modal that says "are you sure?" gives them nothing to weigh it against.
+      */}
+      {state.confirmReplace ? (
+        <div className="border-neg/40 bg-neg/10 flex flex-col gap-2.5 rounded-[10px] border px-3 py-3">
+          <div className="flex gap-2">
+            <AlertCircle size={15} className="text-neg mt-px shrink-0" />
+            <div>
+              <p className="text-text text-xs font-bold">{labels.replaceTitle}</p>
+              <p className="text-text/90 mt-1 text-xs leading-relaxed">
+                {state.confirmReplace.body}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onConfirmReplace}
+              className="bg-neg rounded-[10px] px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              {labels.replaceConfirm}
+            </button>
+            <button
+              type="button"
+              onClick={onBack}
+              className="border-line text-dim hover:text-text rounded-[10px] border px-3 py-1.5 text-xs"
+            >
+              {labels.replaceCancel}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div>
         <label htmlFor="password-field" className="flex flex-col gap-1.5">
