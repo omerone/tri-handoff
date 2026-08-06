@@ -4,7 +4,13 @@ import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth/session';
-import { createManualTrade, deleteManualTrade, getMt5Account } from '@/lib/db';
+import {
+  createManualTrade,
+  deleteManualTrade,
+  getMt5Account,
+  updateManualTrade,
+  type ManualTradeInput,
+} from '@/lib/db';
 import { computeRisk } from '@/lib/mt5/risk';
 import { classifySymbol, normalizeSymbol } from '@/lib/mt5/symbols';
 import type { Direction } from '@/lib/mt5/types';
@@ -111,24 +117,31 @@ function riskOf(
   return input.risk !== null && input.risk > 0 ? input.risk : null;
 }
 
-export async function createManualTradeAction(
-  _prev: ManualTradeFormState,
-  formData: FormData,
-): Promise<ManualTradeFormState> {
-  const session = await requireSession();
+/**
+ * Everything between "a submitted form" and "a row's worth of facts".
+ *
+ * Shared by create and edit, because the two differ in exactly one thing — whether the result
+ * is written as a new row or over an existing one — and every rule before that point is the
+ * same. Two copies would drift, and the copy that drifted would be the edit path: the one
+ * nobody exercises until they have already mistyped something.
+ */
+type Parsed = { ok: true; input: ManualTradeInput } | { ok: false; error: string };
+
+async function parseTrade(formData: FormData): Promise<Parsed> {
   const t = await getTranslations('manual');
+  const session = await requireSession();
 
   const parsed = schema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: t('invalid') };
+  if (!parsed.success) return { ok: false, error: t('invalid') };
   const input = parsed.data;
 
   const closeAt = instantFor(input.closeDate);
-  if (!closeAt) return { error: t('invalidDate') };
-  // An open date is optional and defaults to the close date — which is exactly right for a
-  // day trade and merely unknown for a swing, where it makes the hold time zero rather than
-  // wrong in some more interesting direction.
+  if (!closeAt) return { ok: false, error: t('invalidDate') };
+  // An open date is optional and defaults to the close date — right for a day trade, and
+  // merely unknown for a swing, where it makes the hold time zero rather than wrong in some
+  // more interesting direction.
   const openAt = instantFor(input.openDate ?? '', input.closeDate) ?? closeAt;
-  if (openAt > closeAt) return { error: t('openAfterClose') };
+  if (openAt > closeAt) return { ok: false, error: t('openAfterClose') };
 
   const symbol = normalizeSymbol(input.symbol);
   const account = await getMt5Account(session.ctx);
@@ -158,28 +171,75 @@ export async function createManualTradeAction(
    */
   const profit = input.profit;
 
-  await createManualTrade(session.ctx, {
-    symbol,
-    assetClass: classifySymbol(symbol),
-    direction: input.direction,
-    style: input.style,
-    openAt,
-    closeAt,
-    profit,
-    risk,
-    rr: risk !== null && risk > 0 ? profit / risk : null,
-    volume: input.volume ?? 0,
-    entryPrice: input.entryPrice ?? 0,
-    exitPrice: input.exitPrice,
-    stopLoss: input.stopLoss,
-    takeProfit: input.takeProfit,
-    commission: input.commission ?? 0,
-    swap: input.swap ?? 0,
-  });
+  return {
+    ok: true,
+    input: {
+      symbol,
+      assetClass: classifySymbol(symbol),
+      direction: input.direction,
+      style: input.style,
+      openAt,
+      closeAt,
+      profit,
+      risk,
+      rr: risk !== null && risk > 0 ? profit / risk : null,
+      volume: input.volume ?? 0,
+      entryPrice: input.entryPrice ?? 0,
+      exitPrice: input.exitPrice,
+      stopLoss: input.stopLoss,
+      takeProfit: input.takeProfit,
+      commission: input.commission ?? 0,
+      swap: input.swap ?? 0,
+    },
+  };
+}
+
+export async function createManualTradeAction(
+  _prev: ManualTradeFormState,
+  formData: FormData,
+): Promise<ManualTradeFormState> {
+  const session = await requireSession();
+  const t = await getTranslations('manual');
+
+  const parsed = await parseTrade(formData);
+  if (!parsed.ok) return { error: parsed.error };
+
+  await createManualTrade(session.ctx, parsed.input);
 
   // Every screen reads the same table, so all of them are now out of date.
   revalidatePath('/', 'layout');
   return { notice: t('added') };
+}
+
+/**
+ * Corrects a trade that was typed in.
+ *
+ * Risk and the R multiple are recomputed from whatever the form now says rather than carried
+ * over: correcting an entry price without recomputing the R derived from it would leave the
+ * row internally inconsistent, and an R that no longer follows from the numbers beside it is
+ * worse than no R at all.
+ *
+ * A synced trade's id gets the same answer as somebody else's — `updateManualTrade` puts the
+ * ticket predicate in its `where`, so neither matches and neither is told which it was.
+ */
+export async function updateManualTradeAction(
+  _prev: ManualTradeFormState,
+  formData: FormData,
+): Promise<ManualTradeFormState> {
+  const session = await requireSession();
+  const t = await getTranslations('manual');
+
+  const id = String(formData.get('id') ?? '');
+  if (!id) return { error: t('invalid') };
+
+  const parsed = await parseTrade(formData);
+  if (!parsed.ok) return { error: parsed.error };
+
+  const saved = await updateManualTrade(session.ctx, id, parsed.input);
+  if (!saved) return { error: t('editGone') };
+
+  revalidatePath('/', 'layout');
+  return { notice: t('saved') };
 }
 
 export async function deleteManualTradeAction(formData: FormData): Promise<void> {

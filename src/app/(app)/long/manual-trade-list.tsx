@@ -1,29 +1,13 @@
-import Link from 'next/link';
-import { ArrowDownRight, ArrowUpRight, NotebookPen } from 'lucide-react';
-import { Chip, EmptyState, Num } from '@/components/ui/kpi';
-import { DeleteTradeButton } from './delete-trade-button';
+import { EmptyState } from '@/components/ui/kpi';
+import { ManualTradeRow, type ManualTradeRowLabels, type ManualTradeView } from './manual-trade-row';
 
-export type ManualTradeView = {
-  id: string;
-  symbol: string;
-  assetClassLabel: string;
-  direction: 'long' | 'short';
-  directionLabel: string;
-  closedAt: string;
-  profit: string;
-  profitPositive: boolean;
-  risk: string | null;
-  rr: string | null;
-  rrPositive: boolean;
-  journalled: boolean;
-};
+export type { ManualTradeView };
 
 export type ManualTradeListLabels = {
   columns: { symbol: string; direction: string; date: string; risk: string; rr: string; pnl: string };
-  journal: string;
-  delete: string;
-  deleteConfirm: string;
   empty: string;
+  /** Passed straight through to each row — see `ManualTradeRow`. */
+  row: ManualTradeRowLabels;
 };
 
 /**
@@ -77,68 +61,7 @@ export function ManualTradeList({
         </thead>
         <tbody>
           {trades.map((trade) => (
-            <tr key={trade.id} className="border-line border-b last:border-b-0">
-              <td className="text-dim px-3 py-2.5 text-xs whitespace-nowrap">
-                <Num>{trade.closedAt}</Num>
-              </td>
-              <td className="px-3 py-2.5 font-bold" dir="ltr">
-                {trade.symbol}
-              </td>
-              <td className="px-3 py-2.5">
-                <Chip>{trade.assetClassLabel}</Chip>
-              </td>
-              <td className="px-3 py-2.5">
-                <span
-                  className={`inline-flex items-center gap-1 text-xs ${
-                    trade.direction === 'long' ? 'text-pos' : 'text-neg'
-                  }`}
-                >
-                  {trade.direction === 'long' ? (
-                    <ArrowUpRight size={13} aria-hidden />
-                  ) : (
-                    <ArrowDownRight size={13} aria-hidden />
-                  )}
-                  {trade.directionLabel}
-                </span>
-              </td>
-              <td className="px-3 py-2.5 text-xs">
-                <Num>{trade.risk ?? '—'}</Num>
-              </td>
-              <td className="px-3 py-2.5">
-                {/* No stop given, so no R — shown as absent rather than as 0R, which would
-                    read as a break-even trade. The same rule the trades table follows. */}
-                {trade.rr === null ? (
-                  <Chip tone="dim">—</Chip>
-                ) : (
-                  <Chip tone={trade.rrPositive ? 'pos' : 'neg'}>
-                    <Num>{trade.rr}</Num>
-                  </Chip>
-                )}
-              </td>
-              <td
-                className={`px-3 py-2.5 font-bold ${trade.profitPositive ? 'text-pos' : 'text-neg'}`}
-              >
-                <Num>{trade.profit}</Num>
-              </td>
-              <td className="px-3 py-2.5 text-end">
-                <span className="inline-flex items-center gap-2">
-                  <Link
-                    href={`/trades/${trade.id}`}
-                    aria-label={labels.journal}
-                    data-tip={labels.journal}
-                    className={`inline-flex ${trade.journalled ? 'text-brand' : 'text-dim/50 hover:text-text'}`}
-                  >
-                    <NotebookPen size={14} aria-hidden />
-                  </Link>
-
-                  <DeleteTradeButton
-                    id={trade.id}
-                    label={labels.delete}
-                    confirm={labels.deleteConfirm}
-                  />
-                </span>
-              </td>
-            </tr>
+            <ManualTradeRow key={trade.id} trade={trade} labels={labels.row} />
           ))}
         </tbody>
       </table>

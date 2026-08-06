@@ -7,6 +7,7 @@ import {
   listJournalVocabulary,
   listLongPositions,
   updateCurrentPrice,
+  updateLongPosition,
   updateLongPositionJournal,
 } from '@/lib/db';
 import { portfolioTotals, realizedPnlOnClose, valuePosition } from '@/lib/positions/valuation';
@@ -356,5 +357,130 @@ describe('the journal on a long position', () => {
     const vocabulary = await listJournalVocabulary(alice.ctx);
     expect(vocabulary.strategies).not.toContain('Bobs only strategy');
     expect(vocabulary.tags).not.toContain('bobs-only-tag');
+  });
+});
+
+describe('correcting a holding', () => {
+  const edit = (over: Record<string, unknown> = {}) => ({
+    symbol: 'AAPL',
+    qty: 25,
+    buyPrice: 182.4,
+    buyDate,
+    fees: 0,
+    currency: 'USD',
+    currentPrice: 182.4,
+    realizedPnl: null,
+    closedAt: null,
+    ...over,
+  });
+
+  it('rewrites every figure the trader typed', async () => {
+    const position = await seedPosition(alice);
+    const saved = await updateLongPosition(alice.ctx, position.id, edit({
+      symbol: 'MSFT',
+      qty: 10,
+      buyPrice: 400,
+      fees: 12,
+      currency: 'EUR',
+      currentPrice: 380,
+    }));
+
+    expect(saved).toBe(true);
+    const after = await getLongPosition(alice.ctx, position.id);
+    expect(after).toMatchObject({
+      symbol: 'MSFT',
+      qty: 10,
+      buyPrice: 400,
+      fees: 12,
+      currency: 'EUR',
+      currentPrice: 380,
+    });
+  });
+
+  it('leaves the journal alone', async () => {
+    // Same rule as the trades table: a correction to a price must not erase what someone
+    // wrote about why they bought.
+    const position = await seedPosition(alice);
+    await updateLongPositionJournal(alice.ctx, position.id, {
+      note: 'the thesis',
+      tags: ['core'],
+      rating: 5,
+      mood: 'patient',
+      strategy: 'Buy and hold',
+    });
+
+    await updateLongPosition(alice.ctx, position.id, edit({ qty: 99 }));
+
+    const after = await getLongPosition(alice.ctx, position.id);
+    expect(after?.journal).toEqual({
+      note: 'the thesis',
+      tags: ['core'],
+      rating: 5,
+      mood: 'patient',
+      strategy: 'Buy and hold',
+    });
+    expect(after?.qty).toBe(99);
+  });
+
+  it('stamps the price date only when the price actually moved', async () => {
+    /*
+     * `valueUpdatedAt` answers "how old is this number", and the screen calls a stale price
+     * out. An edit that changed only the quantity must not make a three-week-old price look
+     * like it was checked today — that would silence the warning the trader needs.
+     */
+    const position = await seedPosition(alice, { currentPrice: 182.4 });
+    const before = (await getLongPosition(alice.ctx, position.id))!.valueUpdatedAt;
+
+    await updateLongPosition(alice.ctx, position.id, edit({ qty: 30, currentPrice: 182.4 }));
+    expect((await getLongPosition(alice.ctx, position.id))!.valueUpdatedAt).toEqual(before);
+
+    await updateLongPosition(alice.ctx, position.id, edit({ qty: 30, currentPrice: 200 }));
+    expect(
+      (await getLongPosition(alice.ctx, position.id))!.valueUpdatedAt.getTime(),
+    ).toBeGreaterThan(before.getTime());
+  });
+
+  it('takes a tracked holding off the feed when its price is corrected by hand', async () => {
+    // The same rule `updateCurrentPrice` follows: a trader correcting a number and the feed
+    // overwriting it a minute later is the one outcome nobody wants.
+    const position = await seedPosition(alice, { priceSource: 'auto' });
+    await updateLongPosition(alice.ctx, position.id, edit({ currentPrice: 999 }));
+    expect((await getLongPosition(alice.ctx, position.id))?.priceSource).toBe('manual');
+  });
+
+  it('leaves a tracked holding on the feed when the price was not touched', async () => {
+    const position = await seedPosition(alice, { priceSource: 'auto', currentPrice: 182.4 });
+    await updateLongPosition(alice.ctx, position.id, edit({ qty: 40, currentPrice: 182.4 }));
+    expect((await getLongPosition(alice.ctx, position.id))?.priceSource).toBe('auto');
+  });
+
+  it('closes a position, and reopens one', async () => {
+    const position = await seedPosition(alice);
+    const closedAt = new Date(Date.UTC(2026, 5, 1));
+
+    await updateLongPosition(alice.ctx, position.id, edit({ closedAt, realizedPnl: 1234 }));
+    expect(await getLongPosition(alice.ctx, position.id)).toMatchObject({
+      closedAt,
+      realizedPnl: 1234,
+    });
+
+    // The way back from a mis-clicked "close".
+    await updateLongPosition(alice.ctx, position.id, edit({ closedAt: null, realizedPnl: null }));
+    expect(await getLongPosition(alice.ctx, position.id)).toMatchObject({
+      closedAt: null,
+      realizedPnl: null,
+    });
+  });
+
+  it("cannot touch another trader's holding", async () => {
+    const position = await seedPosition(alice, { symbol: 'MINE' });
+    expect(await updateLongPosition(bob.ctx, position.id, edit({ symbol: 'THEIRS' }))).toBe(false);
+    expect((await getLongPosition(alice.ctx, position.id))?.symbol).toBe('MINE');
+  });
+
+  it('is false for a holding that no longer exists', async () => {
+    const position = await seedPosition(alice);
+    await deleteLongPosition(alice.ctx, position.id);
+    expect(await updateLongPosition(alice.ctx, position.id, edit())).toBe(false);
   });
 });

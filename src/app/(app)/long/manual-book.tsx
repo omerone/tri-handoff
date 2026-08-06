@@ -9,7 +9,7 @@ import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { formatDateAt } from '@/lib/time/format';
 import { wallClock } from '@/lib/time/zone';
-import { ManualTradeForm } from './manual-trade-form';
+import { ManualTradeForm, type ManualTradeLabels } from './manual-trade-form';
 import { ManualTradeList, type ManualTradeView } from './manual-trade-list';
 
 /**
@@ -83,6 +83,42 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
   const today = wallClock(new Date());
   const defaultDate = `${today.year}-${String(today.month).padStart(2, '0')}-${String(today.day).padStart(2, '0')}`;
 
+  /** `YYYY-MM-DD` in the analytics zone — what a date input accepts, unlike `formatDateAt`. */
+  const dateValue = (at: Date | null) => {
+    if (at === null) return '';
+    const { year, month, day } = wallClock(at);
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+  /** Empty rather than "0" for an absent optional, so the field looks unset because it is. */
+  const numValue = (value: number | null) => (value === null ? '' : String(value));
+
+  /*
+   * One set of field labels for the add form and for every row's editor. They are the same
+   * fields, so two lists would be two chances for "P&L" in one place and "Profit" in the other.
+   */
+  const formLabels: ManualTradeLabels = {
+    symbol: tTable('symbol'),
+    symbolHint: t('symbolHint'),
+    direction: tTable('direction'),
+    long: tEnum('direction.long'),
+    short: tEnum('direction.short'),
+    date: tTable('closed'),
+    profit: tTable('pnl'),
+    risk: tTable('risk'),
+    riskHint: t('riskHint'),
+    add: t('add'),
+    more: t('more'),
+    moreHint: t('moreHint'),
+    openDate: tTable('opened'),
+    volume: tTable('volume'),
+    entryPrice: tJournal('entry'),
+    exitPrice: tJournal('exit'),
+    stopLoss: tJournal('stopLoss'),
+    takeProfit: tJournal('takeProfit'),
+    commission: tJournal('commission'),
+    swap: tJournal('swap'),
+  };
+
   const rows: ManualTradeView[] = trades.map((trade) => ({
     id: trade.id,
     symbol: trade.symbol,
@@ -99,6 +135,27 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
         : `${trade.rr >= 0 ? '+' : ''}${formatNumber(trade.rr, locale, 2)}R`,
     rrPositive: (trade.rr ?? 0) >= 0,
     journalled: trade.journalled,
+    style: trade.style,
+    edit: {
+      symbol: trade.symbol,
+      direction: trade.direction,
+      closeDate: dateValue(trade.closeAt),
+      openDate: dateValue(trade.openAt),
+      /*
+       * The stored figures, not the displayed ones. The table renders money converted into the
+       * reader's display currency; the form has to round-trip what is actually in the row, or
+       * saving an untouched edit would silently rewrite the trade in shekels.
+       */
+      profit: String(trade.profit),
+      risk: numValue(trade.risk),
+      volume: trade.volume === 0 ? '' : String(trade.volume),
+      entryPrice: trade.entryPrice === 0 ? '' : String(trade.entryPrice),
+      exitPrice: numValue(trade.exitPrice),
+      stopLoss: numValue(trade.stopLoss),
+      takeProfit: numValue(trade.takeProfit),
+      commission: trade.commission === 0 ? '' : String(trade.commission),
+      swap: trade.swap === 0 ? '' : String(trade.swap),
+    },
   }));
 
   return (
@@ -131,28 +188,7 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
           <ManualTradeForm
             style={style}
             defaultDate={defaultDate}
-            labels={{
-              symbol: tTable('symbol'),
-              symbolHint: t('symbolHint'),
-              direction: tTable('direction'),
-              long: tEnum('direction.long'),
-              short: tEnum('direction.short'),
-              date: tTable('closed'),
-              profit: tTable('pnl'),
-              risk: tTable('risk'),
-              riskHint: t('riskHint'),
-              add: t('add'),
-              more: t('more'),
-              moreHint: t('moreHint'),
-              openDate: tTable('opened'),
-              volume: tTable('volume'),
-              entryPrice: tJournal('entry'),
-              exitPrice: tJournal('exit'),
-              stopLoss: tJournal('stopLoss'),
-              takeProfit: tJournal('takeProfit'),
-              commission: tJournal('commission'),
-              swap: tJournal('swap'),
-            }}
+            labels={formLabels}
           />
         </div>
 
@@ -168,10 +204,16 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
               rr: tTable('rr'),
               pnl: tTable('pnl'),
             },
-            journal: tJournal('title'),
-            delete: t('delete'),
-            deleteConfirm: t('deleteConfirm'),
             empty: t('empty'),
+            row: {
+              journal: tJournal('title'),
+              edit: t('edit'),
+              cancel: t('cancel'),
+              save: t('save'),
+              delete: t('delete'),
+              deleteConfirm: t('deleteConfirm'),
+              fields: formLabels,
+            },
           }}
         />
       </Card>

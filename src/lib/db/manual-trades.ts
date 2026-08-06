@@ -191,6 +191,70 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
+ * Corrects one, and only if it was typed rather than synced.
+ *
+ * Everything a synced trade gets from the broker, a manual trade gets from the person who
+ * typed it — so all of it is theirs to fix. A mistyped volume, a symbol entered before they
+ * checked the ticker, a P&L read off the wrong line: none of those are recoverable by
+ * deleting and retyping without also losing the journal written against the row.
+ *
+ * **The ticket does not move.** It was derived from the trade's content when the row was
+ * created, which is what makes a double-submitted form idempotent — but re-deriving it here
+ * would change the row's identity every time a figure is corrected, and an edit that happened
+ * to make one trade look like another would collide instead of saving. The ticket is the
+ * row's name, not a checksum of its current state, and once a row exists its name is settled.
+ *
+ * **The journal is not touched.** `note`, `tags`, `rating`, `mood` and `strategy` are absent
+ * from the write for exactly the reason `upsertTrades` omits them: they are the trader's words
+ * about the trade rather than facts of it, and a correction to a price must not silently erase
+ * a paragraph. The same omission at the type level, via `ManualTradeInput`, so it cannot
+ * drift.
+ *
+ * Returns false when nothing matched — not yours, not manual, or already gone.
+ */
+export async function updateManualTrade(
+  ctx: TenantContext,
+  id: string,
+  input: ManualTradeInput,
+): Promise<boolean> {
+  assertContext(ctx);
+  const { count } = await prisma.trade.updateMany({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId }, ...MANUAL_ONLY },
+    data: {
+      symbol: input.symbol,
+      assetClass: input.assetClass,
+      direction: input.direction,
+      style: input.style,
+      openAt: input.openAt,
+      closeAt: input.closeAt,
+      volume: input.volume,
+      entryPrice: input.entryPrice,
+      exitPrice: input.exitPrice,
+      sl: input.stopLoss,
+      tp: input.takeProfit,
+      commission: input.commission,
+      swap: input.swap,
+      profit: input.profit,
+      risk: input.risk,
+      rr: input.rr,
+    },
+  });
+  return count > 0;
+}
+
+/** One manual trade, for filling the edit form. Null when it is not the caller's, or not manual. */
+export async function getManualTrade(
+  ctx: TenantContext,
+  id: string,
+): Promise<ManualTradeRow | null> {
+  assertContext(ctx);
+  const row = await prisma.trade.findFirst({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId }, ...MANUAL_ONLY },
+  });
+  return row === null ? null : toManualRow(row);
+}
+
+/**
  * Deletes one, and only if it was typed rather than synced.
  *
  * The ticket predicate is in the `where`, not checked beforehand: a read-then-delete would be
@@ -260,7 +324,38 @@ export async function listManualTrades(
     take: 2000,
   });
 
-  return rows.map((row) => ({
+  return rows.map(toManualRow);
+}
+
+/**
+ * One row, shaped for the screen. Shared by the list and by the single-row read the edit form
+ * fills from, so the two cannot disagree about what a manual trade looks like.
+ */
+function toManualRow(row: {
+  id: string;
+  symbol: string;
+  assetClass: AssetClass;
+  direction: Direction;
+  style: TradeStyle;
+  openAt: Date;
+  closeAt: Date | null;
+  profit: Prisma.Decimal;
+  risk: Prisma.Decimal | null;
+  rr: Prisma.Decimal | null;
+  volume: Prisma.Decimal;
+  entryPrice: Prisma.Decimal;
+  exitPrice: Prisma.Decimal | null;
+  sl: Prisma.Decimal | null;
+  tp: Prisma.Decimal | null;
+  commission: Prisma.Decimal;
+  swap: Prisma.Decimal;
+  note: string | null;
+  tags: string[];
+  rating: number | null;
+  mood: string | null;
+  strategy: string | null;
+}): ManualTradeRow {
+  return {
     id: row.id,
     symbol: row.symbol,
     assetClass: row.assetClass,
@@ -281,7 +376,7 @@ export async function listManualTrades(
     journalled: Boolean(
       row.note || row.tags.length > 0 || row.rating || row.mood || row.strategy,
     ),
-  }));
+  };
 }
 
 /**

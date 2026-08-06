@@ -154,6 +154,29 @@ export default async function LongPositionsPage({
           ? null
           : money(position.realizedPnl, currency, { signed: true }),
       realizedPositive: (position.realizedPnl ?? 0) >= 0,
+      edit: {
+        symbol: position.symbol,
+        qty: String(position.qty),
+        buyPrice: String(position.buyPrice),
+        buyDate: dayValue(position.buyDate),
+        fees: String(position.fees),
+        currency,
+        currentPrice: String(position.currentPrice),
+        /*
+         * The sell price is not stored — only the realised result is — so it is reconstructed
+         * from the arithmetic that produced it: realised = sell×qty − (buy×qty + fees). A
+         * holding closed with no quantity has nothing to recover it from, and the field opens
+         * empty rather than showing a division by zero.
+         */
+        sellPrice:
+          position.realizedPnl === null || position.qty === 0
+            ? ''
+            : String(
+                (position.realizedPnl + position.buyPrice * position.qty + position.fees) /
+                  position.qty,
+              ),
+        closeDate: position.closedAt ? dayValue(position.closedAt) : '',
+      },
       journalled: Boolean(
         position.journal.note ||
           position.journal.strategy ||
@@ -188,7 +211,29 @@ export default async function LongPositionsPage({
     autoOn: t('autoOn'),
     autoOff: t('autoOff'),
     journal: tJournal('title'),
+    edit: t('edit'),
+    currencies: SUPPORTED_CURRENCIES,
+    editFields: {
+      symbol: t('symbol'),
+      qty: t('qty'),
+      buyPrice: t('buyPrice'),
+      buyDate: t('buyDate'),
+      fees: t('fees'),
+      currency: t('currency'),
+      currentPrice: t('currentPriceField'),
+      sellPrice: t('sellPrice'),
+      closeDate: t('closeTitle'),
+      closeHint: t('closeSection'),
+      save: t('editSave'),
+      cancel: t('editCancel'),
+    },
   };
+
+  /** `YYYY-MM-DD` in the analytics zone — what a date input accepts, unlike `formatDateAt`. */
+  function dayValue(at: Date): string {
+    const { year, month, day } = wallClock(at);
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
 
   // Offered only while there is something to switch — once the book is on the feed the
   // button is an invitation to do nothing.

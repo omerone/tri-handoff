@@ -12,6 +12,7 @@ import {
   setPriceSource,
   trackAllOpenPositions,
   updateCurrentPrice,
+  updateLongPosition,
 } from '@/lib/db';
 import { realizedPnlOnClose } from '@/lib/positions/valuation';
 import { SUPPORTED_CURRENCIES } from '@/lib/money/currency';
@@ -178,4 +179,87 @@ export async function deletePositionAction(formData: FormData): Promise<void> {
   revalidatePath('/long');
   // The finance page's total wealth is computed from these positions, so it goes stale too.
   revalidatePath('/finance');
+}
+
+// ---------------------------------------------------------------------------
+// Correcting a holding
+// ---------------------------------------------------------------------------
+
+const editSchema = createSchema.omit({ micCode: true, priceSource: true }).extend({
+  id: z.string().min(1),
+  /** Per unit, as stored. Editing it is how an untracked holding gets marked by hand. */
+  currentPrice: z.coerce.number().positive().finite().max(MAX_DECIMAL),
+  /**
+   * The close, both halves or neither.
+   *
+   * An empty string is what an untouched date input submits, so it has to mean "open" rather
+   * than fail parsing — and a position with a sell price but no date, or a date but no price,
+   * is a half-closed row the valuation has no reading for.
+   */
+  sellPrice: z.coerce.number().positive().finite().max(MAX_DECIMAL).optional(),
+  closeDate: z.coerce.date().refine((date) => isPlausibleDate(date)).optional(),
+});
+
+/**
+ * Corrects a holding the trader entered.
+ *
+ * A holding has no broker behind it, so every figure on it is the trader's to fix — including
+ * the close, which is the only way back from a mis-clicked "close" button.
+ *
+ * **Realised P&L is derived, never typed.** `realizedPnlOnClose` is the same function the
+ * close button uses, so a corrected sell price produces exactly the figure closing at that
+ * price would have. Letting it be typed would allow a realised number that does not follow
+ * from the prices printed beside it, and the portfolio total is summed from these — a row
+ * disagreeing with itself would be unfindable.
+ */
+export async function updatePositionAction(
+  _prev: PositionFormState,
+  formData: FormData,
+): Promise<PositionFormState> {
+  const session = await requireSession();
+  const t = await getTranslations('long');
+
+  const raw = Object.fromEntries(formData);
+  // An untouched date or price input submits an empty string, which `coerce` would turn into
+  // epoch or zero rather than "absent". Dropped before parsing so `.optional()` sees nothing.
+  for (const key of ['sellPrice', 'closeDate']) {
+    if (raw[key] === '') delete raw[key];
+  }
+
+  const parsed = editSchema.safeParse(raw);
+  if (!parsed.success) return { error: t('invalid') };
+  const input = parsed.data;
+
+  const position = await getLongPosition(session.ctx, input.id);
+  if (!position) return { error: t('invalid') };
+
+  const closing = input.closeDate !== undefined;
+  if (closing !== (input.sellPrice !== undefined)) return { error: t('closeNeedsBoth') };
+  if (input.closeDate && input.closeDate < input.buyDate) return { error: t('closeBeforeBuy') };
+
+  const saved = await updateLongPosition(session.ctx, input.id, {
+    symbol: input.symbol,
+    qty: input.qty,
+    buyPrice: input.buyPrice,
+    buyDate: input.buyDate,
+    fees: input.fees,
+    currency: input.currency,
+    currentPrice: input.currentPrice,
+    closedAt: input.closeDate ?? null,
+    realizedPnl:
+      input.closeDate === undefined || input.sellPrice === undefined
+        ? null
+        : // Against the *edited* figures, not the stored ones: a correction to the buy price
+          // has to move the realised result with it.
+          realizedPnlOnClose(
+            { ...position, buyPrice: input.buyPrice, qty: input.qty, fees: input.fees },
+            input.sellPrice,
+          ),
+  });
+  if (!saved) return { error: t('invalid') };
+
+  revalidatePath('/long');
+  // The finance page's total wealth is computed from these positions, so it goes stale too.
+  revalidatePath('/finance');
+  return { ok: true };
 }

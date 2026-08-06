@@ -6,9 +6,11 @@ import {
   deleteAllTrades,
   deleteManualTrade,
   isManualTicket,
+  getManualTrade,
   isManualTrade,
   listClosedTrades,
   listManualTrades,
+  updateManualTrade,
   upsertTrades,
   type ManualTradeInput,
   type TradeUpsert,
@@ -471,5 +473,134 @@ describe('reading one account at a time', () => {
     const book = await listClosedTrades(jack.ctx);
     expect(book).toHaveLength(2);
     expect(book.reduce((sum, trade) => sum + trade.profit, 0)).toBe(333);
+  });
+});
+
+describe('editing', () => {
+  it('rewrites the facts of a trade the trader typed', async () => {
+    const fixture = await createTenantFixture();
+    const id = await createManualTrade(fixture.ctx, manual({ symbol: 'EURUSD', profit: 100 }));
+
+    const saved = await updateManualTrade(fixture.ctx, id, {
+      ...manual(),
+      symbol: 'XAUUSD',
+      direction: 'short',
+      style: 'swing',
+      profit: -250,
+      risk: 500,
+      rr: -0.5,
+      volume: 3,
+    });
+
+    expect(saved).toBe(true);
+    const after = await getManualTrade(fixture.ctx, id);
+    expect(after).toMatchObject({
+      symbol: 'XAUUSD',
+      direction: 'short',
+      style: 'swing',
+      profit: -250,
+      risk: 500,
+      rr: -0.5,
+      volume: 3,
+    });
+  });
+
+  it('leaves the journal alone', async () => {
+    /*
+     * The failure this prevents: someone writes four paragraphs about a trade, notices the
+     * volume was wrong, corrects it, and loses the paragraphs. The journal columns are the
+     * trader's words about the trade rather than facts of it, and `ManualTradeInput` has no
+     * slot for them precisely so this write cannot carry a blank over them.
+     */
+    const fixture = await createTenantFixture();
+    const id = await createManualTrade(fixture.ctx, manual());
+    await testDb.trade.update({
+      where: { id },
+      data: {
+        note: 'waited for the retest',
+        tags: ['breakout', 'planned'],
+        rating: 4,
+        mood: 'calm',
+        strategy: 'Breakout',
+      },
+    });
+
+    await updateManualTrade(fixture.ctx, id, manual({ profit: 999 }));
+
+    const row = await testDb.trade.findUnique({ where: { id } });
+    expect(row!.note).toBe('waited for the retest');
+    expect(row!.tags).toEqual(['breakout', 'planned']);
+    expect(row!.rating).toBe(4);
+    expect(row!.mood).toBe('calm');
+    expect(row!.strategy).toBe('Breakout');
+    expect(Number(row!.profit)).toBe(999);
+  });
+
+  it('keeps the ticket, so a correction does not change the row’s identity', async () => {
+    // The ticket is derived from the trade's content on create, which is what makes a double
+    // submit idempotent. Re-deriving it here would rename the row on every correction — and
+    // an edit that made one trade resemble another would collide instead of saving.
+    const fixture = await createTenantFixture();
+    const id = await createManualTrade(fixture.ctx, manual());
+    const before = await testDb.trade.findUnique({ where: { id }, select: { ticket: true } });
+
+    await updateManualTrade(fixture.ctx, id, manual({ symbol: 'GOLD', profit: -5, volume: 9 }));
+
+    const after = await testDb.trade.findUnique({ where: { id }, select: { ticket: true } });
+    expect(after!.ticket).toBe(before!.ticket);
+  });
+
+  it('refuses a synced trade, whatever id it is handed', async () => {
+    const fixture = await createTenantFixture();
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [
+      synced('e001', { symbol: 'GBPUSD', profit: 93 }),
+    ]);
+    const row = await testDb.trade.findFirst({ where: { userId: fixture.userId } });
+
+    expect(await updateManualTrade(fixture.ctx, row!.id, manual({ symbol: 'HACKED' }))).toBe(false);
+    const after = await testDb.trade.findUnique({ where: { id: row!.id } });
+    expect(after!.symbol).toBe('GBPUSD');
+    expect(Number(after!.profit)).toBe(93);
+  });
+
+  it('refuses another trader’s trade', async () => {
+    const id = await createManualTrade(alice.ctx, manual({ symbol: 'MINE' }));
+    expect(await updateManualTrade(bob.ctx, id, manual({ symbol: 'THEIRS' }))).toBe(false);
+    expect((await getManualTrade(alice.ctx, id))?.symbol).toBe('MINE');
+  });
+
+  it('is false for a trade that no longer exists', async () => {
+    const fixture = await createTenantFixture();
+    const id = await createManualTrade(fixture.ctx, manual());
+    await deleteManualTrade(fixture.ctx, id);
+    expect(await updateManualTrade(fixture.ctx, id, manual())).toBe(false);
+  });
+
+  it('can move a trade between the Day and Swing books', async () => {
+    const fixture = await createTenantFixture();
+    const id = await createManualTrade(fixture.ctx, manual({ style: 'day' }));
+
+    await updateManualTrade(fixture.ctx, id, manual({ style: 'swing' }));
+
+    expect(await listManualTrades(fixture.ctx, 'day')).toHaveLength(0);
+    expect(await listManualTrades(fixture.ctx, 'swing')).toHaveLength(1);
+  });
+});
+
+describe('getManualTrade', () => {
+  it('returns the row the edit form fills from', async () => {
+    const fixture = await createTenantFixture();
+    const id = await createManualTrade(fixture.ctx, manual({ symbol: 'BTCUSD', volume: 2 }));
+    expect(await getManualTrade(fixture.ctx, id)).toMatchObject({ symbol: 'BTCUSD', volume: 2 });
+  });
+
+  it('is null for a synced trade and for another trader’s', async () => {
+    const fixture = await createTenantFixture();
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('e002')]);
+    const syncedRow = await testDb.trade.findFirst({ where: { userId: fixture.userId } });
+    expect(await getManualTrade(fixture.ctx, syncedRow!.id)).toBeNull();
+
+    const mine = await createManualTrade(alice.ctx, manual());
+    expect(await getManualTrade(bob.ctx, mine)).toBeNull();
   });
 });

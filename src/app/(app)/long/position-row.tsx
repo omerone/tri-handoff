@@ -2,8 +2,9 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { Check, Clock, NotebookPen, RefreshCw, Trash2, TriangleAlert, X } from 'lucide-react';
+import { Check, Clock, NotebookPen, Pencil, RefreshCw, Trash2, TriangleAlert, X } from 'lucide-react';
 import { Num } from '@/components/ui/kpi';
+import { PositionEditForm, type PositionEditLabels, type PositionEditValues } from './position-edit-form';
 import {
   closePositionAction,
   deletePositionAction,
@@ -37,6 +38,10 @@ export type PositionRowLabels = {
   autoOff: string;
   /** The link to the holding's own page, where the journal is. */
   journal: string;
+  /** The pencil, and the fields behind it. */
+  edit: string;
+  editFields: PositionEditLabels;
+  currencies: readonly string[];
 };
 
 export type PositionRowData = {
@@ -61,6 +66,8 @@ export type PositionRowData = {
   realizedPositive: boolean;
   /** True once the trader has written anything about this holding. */
   journalled: boolean;
+  /** Raw values for the editor, formatted for form inputs rather than for reading. */
+  edit: PositionEditValues;
 };
 
 const cell = 'px-3 py-2.5';
@@ -73,7 +80,28 @@ export function PositionRow({
   position: PositionRowData;
   labels: PositionRowLabels;
 }) {
-  const [mode, setMode] = useState<'idle' | 'price' | 'close'>('idle');
+  const [mode, setMode] = useState<'idle' | 'price' | 'close' | 'edit'>('idle');
+
+  /*
+   * The editor takes the whole row rather than a cell, because it is nine fields and the
+   * columns it would have to fit into are sized for one number each. The other two modes stay
+   * in their cells: each of them is a single input replacing the value it overwrites.
+   */
+  if (mode === 'edit') {
+    return (
+      <tr className="border-line bg-raised/30 border-b">
+        <td colSpan={8} className="px-3 py-3">
+          <PositionEditForm
+            id={position.id}
+            values={position.edit}
+            currencies={labels.currencies}
+            labels={labels.editFields}
+            onDone={() => setMode('idle')}
+          />
+        </td>
+      </tr>
+    );
+  }
 
   return (
     <tr className="border-line border-b last:border-b-0">
@@ -196,6 +224,16 @@ export function PositionRow({
               >
                 <NotebookPen size={14} aria-hidden />
               </Link>
+
+              <button
+                type="button"
+                onClick={() => setMode('edit')}
+                aria-label={labels.edit}
+                data-tip={labels.edit}
+                className="text-dim/60 hover:text-text inline-flex p-1"
+              >
+                <Pencil size={14} aria-hidden />
+              </button>
 
               {position.closed ? null : (
                 <button

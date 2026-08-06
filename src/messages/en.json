@@ -344,7 +344,14 @@
     "auto": "auto",
     "autoOn": "Priced automatically from the market",
     "autoOff": "Price this position automatically",
-    "trackAll": "Price all {count} automatically"
+    "trackAll": "Price all {count} automatically",
+    "edit": "Edit",
+    "editSave": "Save",
+    "editCancel": "Cancel",
+    "currentPriceField": "Current price",
+    "closeSection": "Fill both fields to mark the position closed — the realised P&L is derived from them and the prices above. Clear both to reopen it.",
+    "closeNeedsBoth": "Closing needs both a sell price and a close date, or neither.",
+    "closeBeforeBuy": "The close date is before the buy date."
   },
   "settings": {
     "language": "Language",

@@ -165,6 +165,78 @@ export async function createLongPosition(
 }
 
 /**
+ * The facts of a holding that the trader owns and may correct.
+ *
+ * Every field here was typed by a person, which is what makes all of it editable — a holding
+ * has no broker behind it to be the source of truth. The two nullable ones are the close: a
+ * position still open has neither, and one closed on the wrong date or at the wrong price has
+ * both wrong together.
+ */
+export type LongPositionEdit = {
+  symbol: string;
+  qty: number;
+  buyPrice: number;
+  buyDate: Date;
+  fees: number;
+  currency: string;
+  /** Per-unit, as stored. Editing it is how someone marks an untracked holding by hand. */
+  currentPrice: number;
+  /** Both null for an open position; both set for a closed one. */
+  realizedPnl: number | null;
+  closedAt: Date | null;
+};
+
+/**
+ * Corrects a holding — the "I got the numbers wrong" path.
+ *
+ * Deliberately separate from `updateCurrentPrice` and `closeLongPosition`, which each write
+ * one thing and are reached from a single button. This writes the whole record, including
+ * clearing a close to reopen a position, which is the only way back from a mis-clicked
+ * "close".
+ *
+ * **The journal is not in the write**, for the reason `updateLongPositionJournal` already
+ * gives: two writers on one row is how a save of one thing carries a stale copy of another.
+ *
+ * **Changing the price drops the holding to `manual`**, and only then. The same rule
+ * `updateCurrentPrice` follows — a trader correcting a number and the feed overwriting it a
+ * minute later is the one outcome nobody wants — but an edit that touched only the quantity
+ * must not stamp `valueUpdatedAt`, or a three-week-old price would look like it was checked
+ * today. That stamp is the whole point of showing it.
+ */
+export async function updateLongPosition(
+  ctx: TenantContext,
+  id: string,
+  input: LongPositionEdit,
+): Promise<boolean> {
+  assertContext(ctx);
+
+  const existing = await prisma.longPosition.findFirst({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    select: { currentPrice: true },
+  });
+  if (!existing) return false;
+
+  const priceChanged = Number(existing.currentPrice) !== input.currentPrice;
+
+  const { count } = await prisma.longPosition.updateMany({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    data: {
+      symbol: input.symbol,
+      qty: input.qty,
+      buyPrice: input.buyPrice,
+      buyDate: input.buyDate,
+      fees: input.fees,
+      currency: input.currency,
+      currentPrice: input.currentPrice,
+      realizedPnl: input.realizedPnl,
+      closedAt: input.closedAt,
+      ...(priceChanged ? { valueUpdatedAt: new Date(), priceSource: 'manual' } : {}),
+    },
+  });
+  return count > 0;
+}
+
+/**
  * The manual mark-to-market. Stamps `valueUpdatedAt`, which nothing else does.
  *
  * Typing a price also takes the position off the feed. Anything else means a user correcting
