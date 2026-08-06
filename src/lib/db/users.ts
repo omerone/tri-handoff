@@ -20,6 +20,22 @@ export async function findUserForLogin(tenantId: string, email: string) {
   });
 }
 
+/**
+ * The same fields as `findUserForLogin`, minus the password hash, keyed by id.
+ *
+ * For the second-factor step, which already knows *which* user it is about — the challenge
+ * row named them — and needs the preference columns to finish the sign-in. Unscoped by tenant
+ * because the challenge lookup that produced this id was already joined to one; asking again
+ * here would be checking the same boundary twice and implying the id came from somewhere less
+ * trusted than it did.
+ */
+export async function findUserById(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, tenantId: true, email: true, locale: true, theme: true },
+  });
+}
+
 export async function findUserByEmailForReset(tenantId: string, email: string) {
   return prisma.user.findUnique({
     where: { tenantId_email: { tenantId, email: email.trim().toLowerCase() } },

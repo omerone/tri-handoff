@@ -28,6 +28,26 @@ export const LIMITS = {
    */
   adminLoginPerAccount: { limit: 5, windowMs: 15 * 60 * 1000 },
   adminLoginPerIp: { limit: 10, windowMs: 15 * 60 * 1000 },
+  /**
+   * The second-factor step, per address.
+   *
+   * The challenge already dies after five wrong codes, which bounds one sign-in. This bounds
+   * the *loop* — password, five guesses, password again — which the challenge counter cannot
+   * see, because each pass is a new row. Twenty an hour against a six-digit space is a one in
+   * fifty-thousand chance per hour of standing there.
+   *
+   * Per-IP only. A per-account bucket here would be a way to lock a trader out of their own
+   * account by failing codes against it, and unlike the password step there is no equivalent
+   * risk on the other side: getting this far already required their password.
+   */
+  twoFactorPerIp: { limit: 20, windowMs: 60 * 60 * 1000 },
+  /**
+   * Changing the 2FA setting from inside a session. Both directions ask for the password, so
+   * this is the same guessing oracle `accountDelete` is budgeted against, and gets the same
+   * treatment — with a little more room, because turning it on can honestly take two or three
+   * goes when a phone's clock is out.
+   */
+  twoFactorManage: { limit: 10, windowMs: 60 * 60 * 1000 },
 } as const;
 
 /**

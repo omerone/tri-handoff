@@ -77,6 +77,21 @@ model User {
   /// tolerates any shape — this column outlives the code that wrote it.
   dashboardLayout Json?  @map("dashboard_layout")
 
+  /// TOTP shared secret, encrypted with ENCRYPTION_KEY like the MT5 investor password.
+  /// Present but unconfirmed while someone is part-way through setting 2FA up; the pair
+  /// (secret, confirmedAt) is what distinguishes "abandoned the wizard" from "2FA is on".
+  totpSecret      String?   @map("totp_secret")
+  /// When the first correct code was entered. NULL means 2FA is off, whatever the secret says.
+  totpConfirmedAt DateTime? @map("totp_confirmed_at")
+  /// The last time step a code was accepted for. Every code at or below it is refused, which
+  /// is what makes a code single-use rather than valid for its whole ninety-second window.
+  /// See `verifyTotp`. An Int holds a 30-second step until the year 4000.
+  totpLastStep    Int?      @map("totp_last_step")
+  /// SHA-256 of each *unused* recovery code. A code is spent by dropping its hash, so the
+  /// length of this array is also how many are left — there is no second column to disagree
+  /// with it. Empty when 2FA is off.
+  totpRecoveryCodes String[] @default([]) @map("totp_recovery_codes")
+
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   lastLoginAt DateTime? @map("last_login_at")
@@ -85,6 +100,7 @@ model User {
 
   sessions       Session[]
   resetTokens    PasswordResetToken[]
+  totpChallenges TwoFactorChallenge[]
   mt5Account     Mt5Account?
   trades         Trade[]
   financeEntries FinanceEntry[]
@@ -129,6 +145,36 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+/**
+ * The gap between "the password was right" and "the second factor was right".
+ *
+ * A row here, rather than a signed cookie carrying the user id, for the same reason sessions
+ * are rows: it can be revoked, it can be counted, and the thing in the browser is an opaque
+ * token that means nothing on its own. It also gives the attempt counter somewhere to live —
+ * a six-digit code is guessable in a million tries, so the challenge has to die long before
+ * anyone gets near that, and a cookie cannot count its own failures.
+ *
+ * Deliberately *not* a session with a flag. A half-authenticated session that `getSession`
+ * had to remember to reject is one forgotten check away from being a whole one.
+ */
+model TwoFactorChallenge {
+  id String @id @default(cuid())
+
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  /// Wrong codes so far. The challenge is destroyed on the last one rather than locked, so a
+  /// failed run costs the password again and cannot be ground at.
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("two_factor_challenges")
 }
 
 model SuperAdmin {

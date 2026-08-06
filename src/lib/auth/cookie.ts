@@ -15,6 +15,26 @@ export const SESSION_COOKIE = 'tri_session';
 export const ADMIN_SESSION_COOKIE = 'tri_admin_session';
 
 /**
+ * Carries the second-factor challenge between the password step and the code step.
+ *
+ * A separate cookie rather than an early session, because it must not be mistakable for one:
+ * `getSession` reads `SESSION_COOKIE` and nothing else, so a browser holding only this one is
+ * signed in nowhere. It is packed and unpacked with the same HMAC as the session cookie, and
+ * like it, the value is an opaque token whose hash is the only copy stored.
+ */
+export const TWO_FACTOR_COOKIE = 'tri_2fa';
+
+/**
+ * How long someone has to fetch their phone and type six digits.
+ *
+ * Five minutes. Long enough to find the app, unlock the phone and read a code that may be
+ * about to roll over; short enough that a challenge left open on a shared machine is not a
+ * standing invitation. Expiring costs the password again, which is a small price and the
+ * only safe direction to err in.
+ */
+export const TWO_FACTOR_TTL_MS = 5 * 60 * 1000;
+
+/**
  * Session lifetime lives in the database, not in the cookie.
  *
  * `SESSION_TTL_MS` is the authority: 30 days of inactivity ends the session, and every use

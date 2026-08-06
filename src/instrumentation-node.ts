@@ -1,4 +1,9 @@
-import { pruneExpiredAuditLogs, pruneExpiredRateLimits, pruneExpiredSessions } from '@/lib/db';
+import {
+  pruneExpiredAuditLogs,
+  pruneExpiredRateLimits,
+  pruneExpiredSessions,
+  pruneExpiredTwoFactorChallenges,
+} from '@/lib/db';
 import { initializeEnv } from '@/lib/env';
 import { verifyMailTransport } from '@/lib/mail/mailer';
 import { refreshDueQuotes } from '@/lib/quotes/refresh';
@@ -37,15 +42,18 @@ export async function startMaintenanceSweep(): Promise<void> {
 
   const sweep = async () => {
     try {
-      const [sessions, limits, auditRows] = await Promise.all([
+      const [sessions, limits, auditRows, challenges] = await Promise.all([
         pruneExpiredSessions(),
         pruneExpiredRateLimits(),
         pruneExpiredAuditLogs(),
+        // Written on every sign-in of an account with 2FA on, and abandoned whenever someone
+        // closes the tab at the code step. Nothing else deletes those.
+        pruneExpiredTwoFactorChallenges(),
       ]);
-      if (sessions > 0 || limits > 0 || auditRows > 0) {
+      if (sessions > 0 || limits > 0 || auditRows > 0 || challenges > 0) {
         console.warn(
           `[maintenance] pruned ${sessions} sessions, ${limits} rate-limit rows, ` +
-            `${auditRows} audit rows`,
+            `${auditRows} audit rows, ${challenges} two-factor challenges`,
         );
       }
     } catch (error) {

@@ -17,17 +17,35 @@ import { consumeRateLimit, resetRateLimit, touchLastLogin } from '@/lib/db';
 import {
   createResetToken,
   findUserByEmailForReset,
+  findUserById,
   findUserForLogin,
   findValidResetToken,
   makeTenantContext,
   redeemResetToken,
 } from '@/lib/db/unscoped';
+import {
+  answerChallenge,
+  clearTwoFactorChallenge,
+  pendingChallenge,
+  startTwoFactorChallenge,
+  twoFactorIsOn,
+} from '@/lib/auth/two-factor';
+import type { Locale } from '@/i18n/config';
+import type { Theme } from '@/lib/theme';
 import { sendPasswordResetEmail } from '@/lib/mail/password-reset';
 import { setLocaleCookie, setThemeCookie } from '@/lib/preferences/cookies';
 import { SecurityLogger } from '@/lib/security/logger';
 import { resolveTenant } from '@/lib/tenant/resolve';
 
-export type FormState = { error?: string; notice?: string };
+/**
+ * `step` is what the sign-in form renders.
+ *
+ * Absent, or `password`, is the form as it has always been. `totp` means the password was
+ * right and the browser is now holding a challenge — see `startTwoFactorChallenge`. There is
+ * deliberately no user id, email or name in this state: it crosses to the client, and the
+ * only thing the client needs to know is which field to draw.
+ */
+export type FormState = { error?: string; notice?: string; step?: 'password' | 'totp' };
 
 const RESET_TTL_MINUTES = 30;
 
@@ -136,6 +154,46 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
   }
 
   await resetRateLimit(limitKey('login', tenant.id, email));
+
+  /*
+   * The password was right, which is not the same as being signed in.
+   *
+   * With 2FA on, this returns *without* calling `startSession` — the browser gets a challenge
+   * token and nothing else, so every check that reads a session still says "nobody". The
+   * theme and locale cookies wait as well: writing them here would tell an attacker holding
+   * only the password which language the real owner reads in.
+   */
+  if (await twoFactorIsOn(user.id)) {
+    await startTwoFactorChallenge(user.id);
+    await SecurityLogger.logAuthEvent({
+      userId: user.id,
+      eventType: 'login_challenged',
+      description: 'Password accepted; awaiting the second factor',
+    });
+    return { step: 'totp' };
+  }
+
+  // `return`, not a bare call: `completeSignIn` ends in `redirect`, which signals by throwing,
+  // and returning its `Promise<never>` is how the type checker is told nothing follows.
+  return completeSignIn(user);
+}
+
+/**
+ * Everything that happens once identity is settled, whether that took one factor or two.
+ *
+ * Extracted so the two paths cannot drift: a session, the audit line, the login stamp and the
+ * two preference cookies belong together, and the failure mode of forgetting one of them on
+ * the 2FA path is silent — a trader who turns on 2FA and then finds their theme resets on
+ * every sign-in, or worse, a sign-in that never reaches the audit trail.
+ *
+ * Ends in `redirect`, which signals by throwing, so it never returns.
+ */
+async function completeSignIn(user: {
+  id: string;
+  tenantId: string;
+  locale: Locale;
+  theme: Theme;
+}): Promise<never> {
   await startSession(user.id);
   await SecurityLogger.logAuthEvent({
     userId: user.id,
@@ -151,6 +209,91 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
 
   // Outside the guarded section: redirect() signals by throwing.
   redirect('/dashboard');
+}
+
+// ---------------------------------------------------------------------------
+// The second factor
+// ---------------------------------------------------------------------------
+
+/**
+ * The code step.
+ *
+ * Reached only with a live challenge in the browser, which is only issued after a password
+ * verified. Everything that could go wrong — no challenge, an expired one, a wrong code, one
+ * too many wrong codes — returns the person to the password form, because in every one of
+ * those cases that is genuinely where they are: the challenge is gone and the way forward is
+ * to prove the first factor again.
+ */
+export async function verifyTwoFactorAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const t = await getTranslations('auth');
+  const tenantLookup = await resolveTenant();
+  if (tenantLookup.state !== 'active') return { error: t('invalidCredentials') };
+
+  const tenant = tenantLookup.tenant;
+  const ip = await clientIp();
+
+  /*
+   * Bounds the password-then-guess loop, which the challenge's own counter cannot see: each
+   * pass through it is a fresh row starting from zero attempts. Consumed before the challenge
+   * is looked up, so a caller with no challenge at all still pays for the attempt.
+   */
+  const perIp = await consumeRateLimit(
+    limitKey('2fa-ip', tenant.id, ip),
+    LIMITS.twoFactorPerIp.limit,
+    LIMITS.twoFactorPerIp.windowMs,
+  );
+  if (!perIp.allowed) {
+    await clearTwoFactorChallenge();
+    return {
+      step: 'password',
+      error: t('tooManyAttempts', {
+        minutes: Math.max(1, Math.ceil(perIp.retryAfterMs / 60_000)),
+      }),
+    };
+  }
+
+  const challenge = await pendingChallenge(tenant.id);
+  if (!challenge) {
+    await clearTwoFactorChallenge();
+    return { step: 'password', error: t('twoFactorExpired') };
+  }
+
+  const outcome = await answerChallenge(challenge, String(formData.get('code') ?? ''));
+
+  if (outcome.status === 'exhausted') {
+    await SecurityLogger.logAuthEvent({
+      userId: challenge.userId,
+      eventType: 'login_failed',
+      description: 'Second factor failed too many times; challenge destroyed',
+      result: 'blocked',
+      failureReason: 'two_factor_exhausted',
+    });
+    return { step: 'password', error: t('twoFactorExhausted') };
+  }
+
+  if (outcome.status !== 'passed') {
+    await SecurityLogger.logAuthEvent({
+      userId: challenge.userId,
+      eventType: 'login_failed',
+      description: 'Second factor rejected',
+      result: 'failure',
+      failureReason: 'two_factor_wrong',
+    });
+    return {
+      step: 'totp',
+      error: outcome.status === 'expired' ? t('twoFactorExpired') : t('twoFactorWrong'),
+    };
+  }
+
+  // The challenge names the user; re-reading the row is what supplies the theme and locale
+  // that `completeSignIn` needs, and confirms the account still exists.
+  const user = await findUserById(outcome.userId);
+  if (!user) return { step: 'password', error: t('invalidCredentials') };
+
+  return completeSignIn(user);
 }
 
 // ---------------------------------------------------------------------------

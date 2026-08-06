@@ -21,4 +21,10 @@ export * from './sessions';
 export * from './reset-tokens';
 export * from './super-admins';
 export * from './admin';
-export { findUserForLogin, findUserByEmailForReset, setPasswordHash } from './users';
+export {
+  findUserById,
+  findUserForLogin,
+  findUserByEmailForReset,
+  setPasswordHash,
+} from './users';
+export * from './two-factor';

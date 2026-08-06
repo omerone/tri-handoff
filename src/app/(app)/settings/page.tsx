@@ -4,8 +4,10 @@ import { CurrencyChoice, LanguageChoice, ThemeChoice } from './choices';
 import { SignOutButton } from '@/components/shell/sign-out-button';
 import { asTheme } from '@/lib/theme';
 import { Mt5Card, type ConnectedAccount } from './mt5-card';
+import { TwoFactorCard } from './two-factor-card';
 import { requireSession } from '@/lib/auth/session';
 import { getMt5Account } from '@/lib/db';
+import { getTwoFactorState } from '@/lib/db/two-factor';
 import type { Locale } from '@/i18n/config';
 import { asCurrency, formatMoney } from '@/lib/money/currency';
 import { formatDateTimeAt } from '@/lib/time/format';
@@ -18,7 +20,11 @@ export default async function SettingsPage() {
   const locale = (await getLocale()) as Locale;
   const tWizard = await getTranslations('settings.wizard');
 
-  const account = await getMt5Account(session.ctx);
+  const tTwoFactor = await getTranslations('settings.twoFactor');
+  const [account, twoFactor] = await Promise.all([
+    getMt5Account(session.ctx),
+    getTwoFactorState(session.ctx.userId),
+  ]);
 
   // Balance and equity are in the *account's* currency, which is not necessarily the one the
   // user reads the rest of the app in. Showing them in the account currency is the honest
@@ -102,6 +108,43 @@ export default async function SettingsPage() {
                 action: tWizard('success.action'),
               },
             },
+          }}
+        />
+      </Card>
+
+      {/*
+        Directly under the broker connection, and above the cosmetic settings, because it is
+        the only other thing on this page that decides who can reach the book. Language, theme
+        and currency change how it looks.
+      */}
+      <Card title={tTwoFactor('title')}>
+        <TwoFactorCard
+          enabledAt={twoFactor?.confirmedAt ? formatDateTimeAt(twoFactor.confirmedAt) : null}
+          recoveryCodesLeft={twoFactor?.recoveryCodes.length ?? 0}
+          labels={{
+            offTitle: tTwoFactor('offTitle'),
+            offBody: tTwoFactor('offBody'),
+            enable: tTwoFactor('enable'),
+            password: tTwoFactor('password'),
+            scanTitle: tTwoFactor('scanTitle'),
+            scanBody: tTwoFactor('scanBody'),
+            manualKey: tTwoFactor('manualKey'),
+            code: tTwoFactor('code'),
+            confirm: tTwoFactor('confirm'),
+            cancel: tTwoFactor('cancel'),
+            qrAlt: tTwoFactor('qrAlt'),
+            onSince: tTwoFactor('onSince', {
+              date: twoFactor?.confirmedAt ? formatDateTimeAt(twoFactor.confirmedAt) : '',
+            }),
+            codesLeft: tTwoFactor('codesLeft', { count: twoFactor?.recoveryCodes.length ?? 0 }),
+            codesLow: tTwoFactor('codesLow', { count: twoFactor?.recoveryCodes.length ?? 0 }),
+            saveCodesTitle: tTwoFactor('saveCodesTitle'),
+            saveCodesBody: tTwoFactor('saveCodesBody'),
+            codesSaved: tTwoFactor('codesSaved'),
+            regenerate: tTwoFactor('regenerate'),
+            regenerateBody: tTwoFactor('regenerateBody'),
+            disable: tTwoFactor('disable'),
+            disableBody: tTwoFactor('disableBody'),
           }}
         />
       </Card>
