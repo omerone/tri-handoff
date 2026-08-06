@@ -10,8 +10,22 @@
 # archive and greps for the table definitions it must contain; if either fails
 # the file is deleted rather than left to look like a good backup, and the run
 # exits non-zero so systemd records a failure.
+#
+# The dumps are readable by root and nobody else. What is in one is every
+# password hash, the encrypted MT5 credentials, every session's token hash and
+# the whole trading book — the same contents as the database, with none of the
+# database's access control in front of it. They were being written 0644 into a
+# 0755 directory, which was safe only because this box happens to have no
+# unprivileged users today. That is a fact about the box, not about the backup,
+# and the next thing installed here can change it without anyone deciding to.
 
 set -euo pipefail
+
+# Applies to the dump, its directory and the log alike, without each one having
+# to remember. `chmod` after the fact would leave a window where the file exists
+# and is world-readable, which for a file being streamed a database into is the
+# whole time it takes to write.
+umask 077
 
 COMPOSE_DIR=${COMPOSE_DIR:-/opt/tri-handoff}
 BACKUP_DIR=${BACKUP_DIR:-/var/backups/tri}
@@ -44,6 +58,9 @@ compose() { cd "$COMPOSE_DIR" && docker compose "$@"; }
 
 do_run() {
   mkdir -p "$BACKUP_DIR"
+  # Existing directories keep the mode they were made with, so `umask` above only
+  # covers a fresh install. This is what fixes the one already on disk.
+  chmod 700 "$BACKUP_DIR"
   local stamp file
   stamp=$(date '+%Y%m%d-%H%M%S')
   file="$BACKUP_DIR/tri-$stamp.sql.gz"

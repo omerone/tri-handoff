@@ -62,6 +62,18 @@ that fails either check is deleted rather than left looking valid, and the run
 exits non-zero so systemd records the failure. Old dumps are expired only after
 a good one lands, so a run of failures cannot empty the directory.
 
+Root-only, `umask 077` and a `0700` directory. A dump holds every password hash,
+the encrypted MT5 credentials, every session's token hash and the whole trading
+book — the database's contents with none of the database's access control in
+front of them. They were `0644` in a `0755` directory, which was safe only
+because this box has no unprivileged users today; that is a fact about the box
+rather than about the backup.
+
+Still on the same disk as the database they protect, and unencrypted. That covers
+the failure this was written for — a bad migration, a dropped table — and not the
+two it cannot: the disk dying, and someone reaching root. Copies off the box are
+the open item, and they need somewhere to go.
+
     install -m 755 ops/tri-backup.sh /usr/local/bin/tri-backup
     install -m 644 ops/tri-backup.{service,timer} /etc/systemd/system/
     systemctl daemon-reload && systemctl enable --now tri-backup.timer
