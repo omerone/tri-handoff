@@ -6,6 +6,10 @@ import { RefreshCw } from 'lucide-react';
 import { refreshSyncAction } from '@/app/(app)/settings/mt5-actions';
 
 export type SyncPillLabels = {
+  /** While the terminal is being woken — a cold start takes about a minute. */
+  connecting: string;
+  /** Idle, which is now the honest word for it: the broker link is down between syncs. */
+  disconnected: string;
   syncing: string;
   synced: string;
   refresh: string;
@@ -34,10 +38,27 @@ type Status = 'idle' | 'syncing' | 'failed' | 'rate-limited';
  * `autoSyncDue` is computed on the server as "the setting is on *and* the user has logged in
  * more recently than the last successful sync", so it is true at most once per login rather
  * than on every navigation.
+ *
+ * **Idle is grey and says "disconnected", because that is what is true.** The sync hands the
+ * broker terminal back when it finishes — MetaApi charges by the hour it runs — so between
+ * presses there is no live connection at all, only stored credentials. The pill used to sit
+ * green on the strength of those credentials, describing a link that was not up. It reads as
+ * a clock with a button on it now: grey and the time of the last successful read, amber while
+ * it wakes the terminal and pulls, green for the receipt, then grey again with a newer time.
  */
 
 /** How long the "3 new · 1 updated" note stays up before the pill goes back to normal. */
 const OUTCOME_MS = 20_000;
+
+/**
+ * How long a sync is described as waking the terminal before it is described as syncing.
+ *
+ * Measured against the real thing rather than guessed: a cold MetaApi account answers "not
+ * connected to broker yet" for roughly a minute before it will serve anything. Forty-five
+ * seconds is inside that, so the label changes while the wait is still plausibly provisioning
+ * and never claims to be connecting long after it must have been.
+ */
+const WAKING_MS = 45_000;
 
 export function SyncPill({
   labels,
@@ -63,10 +84,20 @@ export function SyncPill({
   const [outcome, setOutcome] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const autoSyncFired = useRef(false);
+  /*
+   * Whether the pill is still in the part of a sync that is spent waking the terminal.
+   *
+   * The server action is one call, so the client cannot be told when provisioning ends and
+   * reading begins. It does not need to be told precisely — the point is to set the right
+   * expectation for a wait that is normally about a minute, rather than showing "syncing"
+   * for sixty seconds during which nothing is being synced yet.
+   */
+  const [waking, setWaking] = useState(false);
 
   const run = (automatic: boolean) => {
     setStatus('syncing');
     setOutcome(null);
+    setWaking(true);
     void refreshSyncAction(automatic)
       .then((result) => {
         if (result.status === 'error') setStatus('failed');
@@ -96,6 +127,12 @@ export function SyncPill({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, autoSyncDue]);
 
+  useEffect(() => {
+    if (!waking) return;
+    const timer = setTimeout(() => setWaking(false), WAKING_MS);
+    return () => clearTimeout(timer);
+  }, [waking]);
+
   // The outcome is a receipt, not a state — it fades so the pill goes back to being a clock.
   useEffect(() => {
     if (outcome === null) return;
@@ -109,7 +146,12 @@ export function SyncPill({
   const label = !connected
     ? labels.notConnected
     : syncing
-      ? labels.syncing
+      ? // A cold start spends its first minute waiting for MetaApi to bring the terminal up and
+        // connect it to the broker, so "syncing" is wrong for the part of the wait a trader
+        // actually sits through. This flips once that phase is plausibly over.
+        waking
+        ? labels.connecting
+        : labels.syncing
       : status === 'failed'
         ? labels.failed
         : status === 'rate-limited'
@@ -119,7 +161,7 @@ export function SyncPill({
             : stale
               ? staleLabel
               : lastSyncedAt
-                ? labels.synced
+                ? labels.disconnected
                 : labels.never;
 
   // The clock is redundant next to a receipt or an age, and all three at once is a pill that
@@ -127,15 +169,25 @@ export function SyncPill({
   const showTime =
     connected && !syncing && status === 'idle' && outcome === null && !stale && lastSyncedAt !== null;
 
+  /*
+   * Green is reserved for the moment it worked.
+   *
+   * Idle is grey because idle *is* disconnected now, and a pill that goes green whenever an
+   * account exists tells a trader the broker is live when the terminal has been stopped for
+   * days. The receipt — "3 new · 1 updated" — is the one thing worth colouring, and it fades
+   * back to grey on its own.
+   */
   const tone = syncing
     ? 'text-warn'
     : status === 'failed'
       ? 'text-neg'
       : !connected
         ? 'text-dim'
-        : stale
-          ? 'text-warn'
-          : 'text-pos';
+        : outcome !== null
+          ? 'text-pos'
+          : stale
+            ? 'text-warn'
+            : 'text-dim';
 
   return (
     <button

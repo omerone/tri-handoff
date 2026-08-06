@@ -41,7 +41,9 @@
     "upToDate": "Up to date",
     "importedNone": "No new trades",
     "stale": "Synced {hours}h ago",
-    "pulled": "{imported} new · {updated} updated"
+    "pulled": "{imported} new · {updated} updated",
+    "disconnected": "Disconnected",
+    "connecting": "Connecting…"
   },
   "auth": {
     "signInTitle": "Sign in to TRi",
@@ -459,7 +461,9 @@
     "autoSyncOff": "Off",
     "autoSyncOnNote": "Every sign-in pulls from the broker without you pressing anything. Convenient — but on a provider that charges per call it is a cost every time you open the dashboard.",
     "autoSyncOffNote": "Only the refresh button in the header pulls from the broker. Nothing else costs anything. Once the last sync is more than 12 hours old, the button reports how long ago it was instead of the time of day.",
-    "addAnother": "Connect another account"
+    "addAnother": "Connect another account",
+    "twoAccounts": "You can connect two accounts — a day account and a swing account, say. Their books stay apart.",
+    "slotEmpty": "Second account"
   },
   "calendar": {
     "weekdays": [
@@ -600,7 +604,12 @@
     "added": "Trade added.",
     "invalid": "Something is missing or one of the fields is not valid.",
     "invalidDate": "That date is not valid.",
-    "openAfterClose": "The open date is later than the close date."
+    "openAfterClose": "The open date is later than the close date.",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saved": "Trade updated.",
+    "editGone": "That trade no longer exists, or cannot be edited."
   },
   "trades": {
     "source": {

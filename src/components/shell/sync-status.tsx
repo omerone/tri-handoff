@@ -53,6 +53,8 @@ export async function SyncStatus({
       autoSyncDue={isAutoSyncDue(status)}
       staleLabel={staleLabel}
       labels={{
+        connecting: t('connecting'),
+        disconnected: t('disconnected'),
         syncing: t('syncing'),
         synced: t('synced'),
         refresh: t('refresh'),
