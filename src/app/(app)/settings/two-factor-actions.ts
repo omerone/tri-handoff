@@ -4,16 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { limitKey, LIMITS } from '@/lib/auth/limits';
 import { generateRecoveryCodes } from '@/lib/auth/recovery-codes';
-import { requireSession } from '@/lib/auth/session';
+import { currentSessionTokenHash, requireSession } from '@/lib/auth/session';
 import { openSecret, sealSecret } from '@/lib/auth/two-factor';
-import {
-  formatSecretForEntry,
-  generateTotpSecret,
-  otpauthUri,
-  verifyTotp,
-} from '@/lib/auth/totp';
+import { formatSecretForEntry, generateTotpSecret, otpauthUri, verifyTotp } from '@/lib/auth/totp';
 import { verifyPassword } from '@/lib/crypto/password';
-import { consumeRateLimit } from '@/lib/db';
+import { consumeRateLimit, deleteOtherUserSessions } from '@/lib/db';
 import { findPasswordHash } from '@/lib/db/security-events';
 import {
   beginTwoFactorSetup,
@@ -156,10 +151,12 @@ export async function confirmTwoFactorAction(
     recoveryHashes: codes.hashes,
   });
 
+  const closed = await endOtherSessions(session.user.id);
+
   await SecurityLogger.logAuthEvent({
     userId: session.user.id,
     eventType: 'two_factor_enabled',
-    description: 'Two-factor authentication turned on',
+    description: `Two-factor authentication turned on; ${closed} other session(s) ended`,
   });
 
   revalidatePath('/settings');
@@ -225,12 +222,38 @@ export async function disableTwoFactorAction(
   }
 
   await disableTwoFactor(session.ctx.userId);
+  const closed = await endOtherSessions(session.user.id);
   await SecurityLogger.logAuthEvent({
     userId: session.user.id,
     eventType: 'two_factor_disabled',
-    description: 'Two-factor authentication turned off',
+    description: `Two-factor authentication turned off; ${closed} other session(s) ended`,
   });
 
   revalidatePath('/settings');
   return { notice: t('disabled') };
+}
+
+/**
+ * Ends every session for this user except the browser doing the changing.
+ *
+ * Someone turns 2FA on because they think their account is exposed — a password they reused,
+ * a laptop they left somewhere. Adding a second lock to the front door does nothing about
+ * whoever is already inside: a stolen session cookie keeps reading the book, and the person
+ * who just protected their account has been told it is protected.
+ *
+ * Turning it off is the same event in reverse. Either way the set of factors that opened
+ * those sessions is no longer the set of factors the account has, so they should not survive
+ * it. `redeemResetToken` has taken exactly this position on a password change since it was
+ * written; this is the same rule applied to the other credential.
+ *
+ * Every session *except this one*. Signing someone out of the tab they are looking at, one
+ * second after they turned on the protection, reads as the feature having failed.
+ */
+async function endOtherSessions(userId: string): Promise<number> {
+  const keep = await currentSessionTokenHash();
+  // No cookie to keep means no session is being preserved, which would take this one down
+  // with the rest. It cannot happen — `requireSession` has already read one — and if it ever
+  // did, ending nothing is the failure that leaves the user able to try again.
+  if (!keep) return 0;
+  return deleteOtherUserSessions(userId, keep);
 }

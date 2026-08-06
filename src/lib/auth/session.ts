@@ -98,6 +98,20 @@ export async function startSession(userId: string): Promise<void> {
   store.set(SESSION_COOKIE, packCookie(token), cookieOptions(SESSION_COOKIE_MAX_AGE_MS / 1000));
 }
 
+/**
+ * The hash of the token this browser is holding, for the one caller that needs to keep its
+ * own session while ending the rest.
+ *
+ * The hash, never the token: the pre-image is the credential, and nothing outside this file
+ * has a reason to hold it. Returns null when there is no cookie, which reads as "keep
+ * nothing" and is the safe way for that to fail.
+ */
+export async function currentSessionTokenHash(): Promise<string | null> {
+  const store = await cookies();
+  const token = unpackCookie(store.get(SESSION_COOKIE)?.value);
+  return token ? hashToken(token) : null;
+}
+
 export async function endSession(): Promise<void> {
   const store = await cookies();
   const token = unpackCookie(store.get(SESSION_COOKIE)?.value);

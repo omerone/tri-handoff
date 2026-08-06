@@ -47,7 +47,10 @@ export async function createSession(params: {
  * client's domain must not authenticate a request arriving on another's, so the tenant id
  * is part of the WHERE clause rather than something checked afterwards.
  */
-export async function findSession(tokenHash: string, tenantId: string): Promise<SessionRecord | null> {
+export async function findSession(
+  tokenHash: string,
+  tenantId: string,
+): Promise<SessionRecord | null> {
   const row = await prisma.session.findFirst({
     where: {
       tokenHash,
@@ -104,6 +107,24 @@ export async function deleteSession(tokenHash: string): Promise<void> {
 /** Invalidate every session for a user — used after a password change. */
 export async function deleteUserSessions(userId: string): Promise<void> {
   await prisma.session.deleteMany({ where: { userId } });
+}
+
+/**
+ * Every session for a user except the one asking.
+ *
+ * `deleteUserSessions` is right after a password reset, where nobody is signed in to keep.
+ * Changing a factor from *inside* a session is the other case: the browser doing it should
+ * stay, and every other one should go. Signing someone out of the tab they are looking at,
+ * one second after they turned on the protection, reads as the feature having failed.
+ */
+export async function deleteOtherUserSessions(
+  userId: string,
+  keepTokenHash: string,
+): Promise<number> {
+  const { count } = await prisma.session.deleteMany({
+    where: { userId, tokenHash: { not: keepTokenHash } },
+  });
+  return count;
 }
 
 export async function pruneExpiredSessions(): Promise<number> {

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { hashToken } from '@/lib/crypto/tokens';
-import { pruneExpiredSessions } from '@/lib/db';
+import { deleteOtherUserSessions, pruneExpiredSessions } from '@/lib/db';
 import {
   createSession,
   deleteSession,
@@ -162,6 +162,47 @@ describe('deleteUserSessions', () => {
     for (const token of aliceTokens) {
       expect(await findSession(hashToken(token), alice.tenantId)).toBeNull();
     }
+    expect(await findSession(hashToken(bobToken), bob.tenantId)).not.toBeNull();
+  });
+});
+
+describe('deleteOtherUserSessions', () => {
+  /**
+   * Called when a second factor is turned on or off from inside a session.
+   *
+   * Someone enables 2FA because they think their account is exposed. A second lock on the
+   * front door does nothing about whoever is already inside — a stolen cookie keeps reading
+   * the book, and the person who just protected their account has been told it is protected.
+   * `deleteUserSessions` above is the same rule for a password change; this is the version
+   * that has a browser to keep.
+   */
+  it('keeps the session that asked and revokes the rest', async () => {
+    const keep = await openSession(alice);
+    const others = [await openSession(alice), await openSession(alice)];
+    const bobToken = await openSession(bob);
+
+    const closed = await deleteOtherUserSessions(alice.userId, hashToken(keep));
+    expect(closed).toBe(others.length);
+
+    // The tab doing the changing stays signed in. Throwing the user out one second after
+    // they turned the protection on reads as the feature having failed.
+    expect(await findSession(hashToken(keep), alice.tenantId)).not.toBeNull();
+    for (const token of others) {
+      expect(await findSession(hashToken(token), alice.tenantId)).toBeNull();
+    }
+    expect(await findSession(hashToken(bobToken), bob.tenantId)).not.toBeNull();
+  });
+
+  it('revokes nothing belonging to anyone else even when the kept hash is unknown', async () => {
+    const aliceToken = await openSession(alice);
+    const bobToken = await openSession(bob);
+
+    // A hash that matches no row: every one of alice's sessions goes, and bob keeps his.
+    // The caller never passes this — `requireSession` has already read a cookie — but the
+    // failure mode worth pinning is that it stays inside one user, not that it deletes none.
+    await deleteOtherUserSessions(alice.userId, hashToken('not-a-real-token'));
+
+    expect(await findSession(hashToken(aliceToken), alice.tenantId)).toBeNull();
     expect(await findSession(hashToken(bobToken), bob.tenantId)).not.toBeNull();
   });
 });
