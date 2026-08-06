@@ -74,10 +74,19 @@ export function Chip({
   tone = 'brand',
 }: {
   children: ReactNode;
-  tone?: 'brand' | 'pos' | 'neg' | 'dim';
+  /**
+   * `broker` is the theme's second accent and is used for exactly one thing: whether a row
+   * came from MT5 or was typed in. It is deliberately not `brand`, which the asset-class chip
+   * beside it already uses, and not `pos`/`neg`, which mean money on this screen. A badge that
+   * shares a colour with the badge next to it is answering a different question in the same
+   * voice, and the question this one answers — "is this mine or the broker's?" — is the first
+   * one asked of a figure that looks wrong.
+   */
+  tone?: 'brand' | 'broker' | 'pos' | 'neg' | 'dim';
 }) {
   const classes = {
     brand: 'bg-brand/15 text-brand',
+    broker: 'bg-brand-2/15 text-brand-2',
     pos: 'bg-pos/15 text-pos',
     neg: 'bg-neg/15 text-neg',
     dim: 'bg-raised text-dim',

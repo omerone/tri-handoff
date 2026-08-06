@@ -214,9 +214,7 @@ export default async function TradesPage({
             trades in it, and the fix is different too — clear the box, rather than widen the
             date range. The message names the term so it is obvious *what* found nothing.
           */
-          <EmptyState>
-            {query ? t('table.emptySearch', { query }) : t('table.empty')}
-          </EmptyState>
+          <EmptyState>{query ? t('table.emptySearch', { query }) : t('table.empty')}</EmptyState>
         ) : (
           <>
             {/*
@@ -283,24 +281,27 @@ export default async function TradesPage({
                     </div>
 
                     <div className="text-dim flex items-center justify-between gap-2 text-[11px]">
-                      <Num>
-                        {trade.closeAt
-                          ? closedAt(trade.closeAt)
-                          : '—'}
-                      </Num>
+                      <Num>{trade.closeAt ? closedAt(trade.closeAt) : '—'}</Num>
                       <span className="flex items-center gap-2">
                         <span>
-                          {t('table.risk')} <Num>{trade.risk === null ? '—' : money(trade.risk)}</Num>
+                          {t('table.risk')}{' '}
+                          <Num>{trade.risk === null ? '—' : money(trade.risk)}</Num>
                         </span>
                         {trade.journalled ? (
-                          <NotebookPen size={13} className="text-brand" aria-label={t('journal.title')} />
+                          <NotebookPen
+                            size={13}
+                            className="text-brand"
+                            aria-label={t('journal.title')}
+                          />
                         ) : null}
                         {trade.rating === null ? null : (
                           <span className="text-dim text-[10px] leading-none" dir="ltr">
                             {'★'.repeat(trade.rating)}
                           </span>
                         )}
-                        {trade.mood ? <span className="text-dim text-[10px]">{trade.mood}</span> : null}
+                        {trade.mood ? (
+                          <span className="text-dim text-[10px]">{trade.mood}</span>
+                        ) : null}
                       </span>
                     </div>
                   </Link>
@@ -325,142 +326,144 @@ export default async function TradesPage({
             </ul>
 
             <div className="hidden overflow-x-auto md:block">
-            <table className="w-full border-collapse text-[13px]">
-              <thead>
-                <tr className="text-dim text-[11px]">
-                  {[
-                    t('table.closed'),
-                    t('table.symbol'),
-                    '',
-                    t('table.direction'),
-                    t('table.style'),
-                    t('table.risk'),
-                    t('table.rr'),
-                    t('table.pnl'),
-                    t('review.tpTiming'),
-                    '',
-                  ].map((header, index) => (
-                    <th
-                      key={index}
-                      className={`border-line border-b px-3.5 py-2.5 font-semibold ${align}`}
-                    >
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((trade) => (
-                  <tr key={trade.key} className="border-line border-b last:border-b-0">
-                    <td className="text-dim px-3.5 py-2.5 text-xs whitespace-nowrap">
-                      <Num>
-                        {trade.closeAt
-                          ? closedAt(trade.closeAt)
-                          : '—'}
-                      </Num>
-                    </td>
-                    <td className="px-3.5 py-2.5 font-bold">{trade.symbol}</td>
-                    <td className="px-3.5 py-2.5">
-                      <Chip>{t(`enum.assetClass.${trade.assetClass}`)}</Chip>
-                    </td>
-                    <td className="px-3.5 py-2.5">
-                      <span
-                        className={`inline-flex items-center gap-1 text-xs ${
-                          trade.direction === 'long' ? 'text-pos' : 'text-neg'
-                        }`}
+              <table className="w-full border-collapse text-[13px]">
+                <thead>
+                  <tr className="text-dim text-[11px]">
+                    {[
+                      t('table.closed'),
+                      t('table.symbol'),
+                      '',
+                      t('table.direction'),
+                      t('table.style'),
+                      t('table.risk'),
+                      t('table.rr'),
+                      t('table.pnl'),
+                      t('review.tpTiming'),
+                      '',
+                    ].map((header, index) => (
+                      <th
+                        key={index}
+                        className={`border-line border-b px-3.5 py-2.5 font-semibold ${align}`}
                       >
-                        {trade.direction === 'long' ? (
-                          <ArrowUpRight size={13} aria-hidden />
-                        ) : (
-                          <ArrowDownRight size={13} aria-hidden />
-                        )}
-                        {t(`enum.direction.${trade.direction}`)}
-                      </span>
-                    </td>
-                    <td className="text-dim px-3.5 py-2.5 text-xs">
-                      <span className="flex items-center gap-1.5">
-                        {t(`enum.style.${trade.style}`)}
-                        {/*
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((trade) => (
+                    <tr key={trade.key} className="border-line border-b last:border-b-0">
+                      <td className="text-dim px-3.5 py-2.5 text-xs whitespace-nowrap">
+                        <Num>{trade.closeAt ? closedAt(trade.closeAt) : '—'}</Num>
+                      </td>
+                      <td className="px-3.5 py-2.5 font-bold">{trade.symbol}</td>
+                      <td className="px-3.5 py-2.5">
+                        <Chip>{t(`enum.assetClass.${trade.assetClass}`)}</Chip>
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        <span
+                          className={`inline-flex items-center gap-1 text-xs ${
+                            trade.direction === 'long' ? 'text-pos' : 'text-neg'
+                          }`}
+                        >
+                          {trade.direction === 'long' ? (
+                            <ArrowUpRight size={13} aria-hidden />
+                          ) : (
+                            <ArrowDownRight size={13} aria-hidden />
+                          )}
+                          {t(`enum.direction.${trade.direction}`)}
+                        </span>
+                      </td>
+                      <td className="text-dim px-3.5 py-2.5 text-xs">
+                        <span className="flex items-center gap-1.5">
+                          {t(`enum.style.${trade.style}`)}
+                          {/*
                           Where the figure came from. The journal deliberately mixes the
                           broker's rows with the trader's own, and every calculation is meant
                           not to care — but the first question asked of a number that looks
                           wrong is "is this mine or the broker's?", and until this chip the
                           only way to answer it was to know that manual tickets start with
-                          `manual:`. Dim for MT5, because that is the common case and a badge
-                          on every row is no badge at all.
+                          `manual:`.
+
+                          MT5 carries the theme's second accent, which nothing else on this
+                          screen uses. It was grey, on the reasoning that the common case
+                          should be quiet — but grey is what every muted thing in the table
+                          looks like, so the badge read as decoration rather than as an answer.
+                          Hand-entered rows stay grey: between the two, the one worth spotting
+                          at a glance is the one the broker vouched for.
                         */}
-                        <Chip tone={trade.source === 'mt5' ? 'dim' : 'brand'}>
-                          {t(`trades.source.${trade.source}`)}
-                        </Chip>
-                      </span>
-                    </td>
-                    <td className="px-3.5 py-2.5 text-xs">
-                      <Num>{trade.risk === null ? '—' : money(trade.risk)}</Num>
-                    </td>
-                    <td className="px-3.5 py-2.5">
-                      {trade.rr === null ? (
-                        // No stop loss: shown as absent rather than as 0R, which would read
-                        // as a break-even trade.
-                        <Chip tone="dim">—</Chip>
-                      ) : (
-                        <Chip tone={trade.rr >= 0 ? 'pos' : 'neg'}>
-                          <Num>
-                            {trade.rr >= 0 ? '+' : ''}
-                            {formatNumber(trade.rr, locale, 2)}R
-                          </Num>
-                        </Chip>
-                      )}
-                    </td>
-                    <td
-                      className={`px-3.5 py-2.5 font-bold ${
-                        rowSign(trade) ? 'text-pos' : 'text-neg'
-                      }`}
-                    >
-                      <Num>{rowMoney(trade)}</Num>
-                    </td>
-                    <td className="px-3.5 py-2.5">
-                      {/*
+                          <Chip tone={trade.source === 'mt5' ? 'broker' : 'dim'}>
+                            {t(`trades.source.${trade.source}`)}
+                          </Chip>
+                        </span>
+                      </td>
+                      <td className="px-3.5 py-2.5 text-xs">
+                        <Num>{trade.risk === null ? '—' : money(trade.risk)}</Num>
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        {trade.rr === null ? (
+                          // No stop loss: shown as absent rather than as 0R, which would read
+                          // as a break-even trade.
+                          <Chip tone="dim">—</Chip>
+                        ) : (
+                          <Chip tone={trade.rr >= 0 ? 'pos' : 'neg'}>
+                            <Num>
+                              {trade.rr >= 0 ? '+' : ''}
+                              {formatNumber(trade.rr, locale, 2)}R
+                            </Num>
+                          </Chip>
+                        )}
+                      </td>
+                      <td
+                        className={`px-3.5 py-2.5 font-bold ${
+                          rowSign(trade) ? 'text-pos' : 'text-neg'
+                        }`}
+                      >
+                        <Num>{rowMoney(trade)}</Num>
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        {/*
                         Blank for a holding: it has no take-profit, so neither question has an
                         answer that would mean anything.
                       */}
-                      {trade.isPosition ? null : (
-                        <ReviewControl
-                          tradeId={trade.key.replace('trade:', '')}
-                          tpTiming={trade.tpTiming}
-                          tookOriginalTp={trade.tookOriginalTp}
-                          labels={reviewLabels}
-                        />
-                      )}
-                    </td>
-                    <td className="px-3.5 py-2.5 text-end">
-                      {/*
+                        {trade.isPosition ? null : (
+                          <ReviewControl
+                            tradeId={trade.key.replace('trade:', '')}
+                            tpTiming={trade.tpTiming}
+                            tookOriginalTp={trade.tookOriginalTp}
+                            labels={reviewLabels}
+                          />
+                        )}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-end">
+                        {/*
                         A filled icon means there is already something written here, so a
                         trader working through a week can see at a glance which trades they
                         have been through.
                       */}
-                      <span className="inline-flex items-center gap-1.5">
-                        {/* The score reads without opening anything; four thousand characters
+                        <span className="inline-flex items-center gap-1.5">
+                          {/* The score reads without opening anything; four thousand characters
                             of note do not, so the tooltip carries their first line. */}
-                        {trade.rating === null ? null : (
-                          <span className="text-dim text-[10px] leading-none" dir="ltr">
-                            {'★'.repeat(trade.rating)}
-                            <span className="text-dim/30">{'★'.repeat(5 - trade.rating)}</span>
-                          </span>
-                        )}
-                        <Link
-                          href={trade.href}
-                          aria-label={t('journal.title')}
-                          data-tip={trade.noteExcerpt ?? trade.strategy ?? t('journal.title')}
-                          className={`inline-flex ${trade.journalled ? 'text-brand' : 'text-dim/50 hover:text-text'}`}
-                        >
-                          <NotebookPen size={14} aria-hidden />
-                        </Link>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          {trade.rating === null ? null : (
+                            <span className="text-dim text-[10px] leading-none" dir="ltr">
+                              {'★'.repeat(trade.rating)}
+                              <span className="text-dim/30">{'★'.repeat(5 - trade.rating)}</span>
+                            </span>
+                          )}
+                          <Link
+                            href={trade.href}
+                            aria-label={t('journal.title')}
+                            data-tip={trade.noteExcerpt ?? trade.strategy ?? t('journal.title')}
+                            className={`inline-flex ${trade.journalled ? 'text-brand' : 'text-dim/50 hover:text-text'}`}
+                          >
+                            <NotebookPen size={14} aria-hidden />
+                          </Link>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </>
         )}
@@ -473,7 +476,10 @@ export default async function TradesPage({
           labels={{
             prev: t('table.prev'),
             next: t('table.next'),
-            page: t('table.page', { page: formatNumber(page, locale), total: formatNumber(pages, locale) }),
+            page: t('table.page', {
+              page: formatNumber(page, locale),
+              total: formatNumber(pages, locale),
+            }),
           }}
         />
       ) : null}

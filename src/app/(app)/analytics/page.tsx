@@ -366,8 +366,8 @@ export default async function AnalyticsPage({
       */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {charts.map((chart) => (
-          <Card key={chart.title} fill title={chart.title}>
-            <BreakdownChart data={chart.data} rtl={rtl} display={display} fill />
+          <Card key={chart.title} title={chart.title}>
+            <BreakdownChart data={chart.data} rtl={rtl} display={display} />
           </Card>
         ))}
       </div>
