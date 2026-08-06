@@ -112,9 +112,19 @@ describe('security headers', () => {
     expect(getHeader(response, 'x-frame-options')).toBe('DENY');
   });
 
-  it('sets X-XSS-Protection for older browsers', () => {
+  /**
+   * `0`, and the assertion is that it is *not* `1; mode=block` as much as that it is `0`.
+   *
+   * The header switches on a heuristic auditor that Chrome and Edge have removed and Firefox
+   * never had, and that auditor could be steered by a crafted URL into blocking scripts it
+   * decided were reflected — turning a page with no XSS into a way to disable defences
+   * selectively, and in `mode=block` into a cross-origin information leak. OWASP's guidance is
+   * `0`. Omitting the header is not the same thing: browsers that still carry the filter
+   * default to it being on, so switching it off has to be said.
+   */
+  it('switches the legacy XSS auditor off rather than on', () => {
     const response = respond();
-    expect(getHeader(response, 'x-xss-protection')).toBe('1; mode=block');
+    expect(getHeader(response, 'x-xss-protection')).toBe('0');
   });
 
   it('sets Referrer-Policy to strict-origin-when-cross-origin', () => {

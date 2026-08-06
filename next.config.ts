@@ -75,19 +75,19 @@ const nextConfig: NextConfig = {
     // Linting is a separate step in `npm run check`; don't run it twice during build.
     ignoreDuringBuilds: true,
   },
+  /*
+   * Caching only. The security headers used to be declared here as well as in
+   * `src/middleware.ts`, in two versions that had already drifted: this file allowed three
+   * Permissions-Policy features, the middleware nine, and the middleware won on every response
+   * — so the shorter list had never applied and nobody could have noticed. Two statements of
+   * one policy is the same hazard the nginx config had against the Caddyfile, in a place where
+   * the wrong one silently loses.
+   *
+   * Every security header is set in the middleware, which is the only layer that can carry a
+   * per-request CSP nonce and is therefore where the policy has to live anyway.
+   */
   async headers() {
     return [
-      {
-        source: '/:path*',
-        headers: [
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-          // Content-Security-Policy is set per-request in src/middleware.ts, because
-          // script-src carries a fresh nonce on every response.
-        ],
-      },
       {
         source: '/static/:path*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],

@@ -88,9 +88,26 @@ export function middleware(request: NextRequest) {
   // This is redundant with CSP frame-ancestors but provided for older browsers.
   response.headers.set('x-frame-options', 'DENY');
 
-  // X-XSS-Protection: enable XSS filter in older browsers (IE/Edge pre-Chromium).
-  // Note: modern browsers use CSP instead, but this is for defense-in-depth.
-  response.headers.set('x-xss-protection', '1; mode=block');
+  /*
+   * X-XSS-Protection: 0, which is not the same as leaving it out and is not a downgrade.
+   *
+   * It was `1; mode=block`, described here as defence in depth. It is the opposite. The header
+   * turns on a heuristic auditor that Chrome and Edge have since removed and Firefox never
+   * shipped, and that auditor was itself an attack surface: it could be steered — with a
+   * crafted URL — into blocking scripts it decided were reflected, which turned a page with no
+   * XSS into a way to disable defences selectively, and in `mode=block` into a way to leak
+   * cross-origin information a bit at a time. OWASP's guidance is now `0` for exactly that.
+   *
+   * `0` rather than omitting the header, because the browsers that still have the filter
+   * default to having it on. The only way to switch it off is to say so.
+   *
+   * What actually stops injected script here is the policy above, and it was verified against
+   * production rather than assumed: an inline event handler is refused and a cross-origin
+   * script does not load. A first probe appeared to show injected script running, which was an
+   * artefact of driving the page over the debugger protocol — `strict-dynamic` trusts what
+   * trusted script inserts, and code evaluated through CDP is outside the policy entirely.
+   */
+  response.headers.set('x-xss-protection', '0');
 
   // Referrer-Policy: limit referrer information sent to external sites.
   // "strict-origin-when-cross-origin" balances privacy and analytics utility.
@@ -99,15 +116,15 @@ export function middleware(request: NextRequest) {
   // Permissions-Policy (formerly Feature-Policy): disable unused browser features.
   // This prevents JavaScript from accessing sensitive APIs that aren't needed.
   const permissionsPolicy = [
-    'accelerometer=()',           // Disable accelerometer access
-    'camera=()',                  // Disable camera access
-    'geolocation=()',             // Disable geolocation access
-    'gyroscope=()',               // Disable gyroscope access
-    'magnetometer=()',            // Disable magnetometer access
-    'microphone=()',              // Disable microphone access
-    'payment=()',                 // Disable Payment Request API
-    'usb=()',                     // Disable USB access
-    'vr=()',                      // Disable VR device access
+    'accelerometer=()', // Disable accelerometer access
+    'camera=()', // Disable camera access
+    'geolocation=()', // Disable geolocation access
+    'gyroscope=()', // Disable gyroscope access
+    'magnetometer=()', // Disable magnetometer access
+    'microphone=()', // Disable microphone access
+    'payment=()', // Disable Payment Request API
+    'usb=()', // Disable USB access
+    'vr=()', // Disable VR device access
   ].join(', ');
   response.headers.set('permissions-policy', permissionsPolicy);
 
@@ -120,7 +137,7 @@ export function middleware(request: NextRequest) {
   if (isHttps) {
     response.headers.set(
       'strict-transport-security',
-      'max-age=31536000; includeSubDomains; preload'
+      'max-age=31536000; includeSubDomains; preload',
     );
   }
 
