@@ -355,17 +355,19 @@ export default async function AnalyticsPage({
         it belongs with, and an odd count simply leaves the last row half full.
       */}
       {/*
-        `items-start`, which is most of the reason this page was as tall as it was. A grid
-        stretches every cell to the tallest in its row, so "by direction" — two bars and one
-        line of caption — was drawn the same height as "by hour opened", which carries twelve
-        lines of them. Half of that card was blank, and the same happened on every row.
-        Letting each card be its own height leaves the bottoms ragged, which is what a set of
-        differently-sized answers actually looks like.
+        Level rows, and the charts grow into them.
+
+        This was `items-start` for a day, so each card stood at its own height — which stopped
+        "by direction", two bars and one caption line, being drawn as tall as "by hour opened"
+        with twelve. It did not shorten the page, since a row is as tall as its tallest member
+        either way, and it left the bottoms ragged: a wall of panels that no longer lined up.
+        Filling is the answer that is both — the row is level, and the shorter card spends the
+        difference on a taller plot instead of on blank surface.
       */}
-      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {charts.map((chart) => (
-          <Card key={chart.title} title={chart.title}>
-            <BreakdownChart data={chart.data} rtl={rtl} display={display} />
+          <Card key={chart.title} fill title={chart.title}>
+            <BreakdownChart data={chart.data} rtl={rtl} display={display} fill />
           </Card>
         ))}
       </div>
@@ -376,7 +378,7 @@ export default async function AnalyticsPage({
         heatmap because they answer "am I following my plan", and the heatmap answers "when
         does my plan work" — the first is the one worth reading first.
       */}
-      <div className="grid items-start gap-3 lg:grid-cols-3">
+      <div className="grid gap-3 lg:grid-cols-3">
         <Card title={t('review.tpTiming')}>
           <DonutChart
             data={timingSlices}
@@ -414,7 +416,7 @@ export default async function AnalyticsPage({
 
       {/*
         The asymmetry every other figure on this page hides.
-        
+
         A trader who closes winners in twenty minutes and sits with losers for two days can
         still show a decent win rate and a positive month. It only becomes visible when the
         two durations are put beside each other, which is why this is a comparison rather than

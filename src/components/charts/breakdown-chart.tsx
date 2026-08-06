@@ -35,10 +35,21 @@ export function BreakdownChart({
   data,
   rtl,
   display,
+  fill = false,
 }: {
   data: BreakdownDatum[];
   rtl: boolean;
   display: MoneyDisplay;
+  /**
+   * Grow into the height the card was given, instead of taking a fixed one.
+   *
+   * Only true inside the breakdown grid, where the cards fill their row and the short ones
+   * have space to hand over. It is a prop rather than the default because `flex-1` needs a
+   * parent with a height to divide: in a card that sizes itself to its content — the
+   * consistency panel further down the page — the growing version collapsed to nothing and
+   * drew an empty frame where the chart had been.
+   */
+  fill?: boolean;
 }) {
   const format = (value: number) => formatDisplayMoney(value, display);
   // The axis gets the short form; the tooltip keeps the exact figure.
@@ -56,8 +67,20 @@ export function BreakdownChart({
   const height = data.length <= 3 ? 108 : 148;
 
   return (
-    <>
-      <div style={{ height }}>
+    <div className={fill ? 'flex min-h-0 flex-1 flex-col' : undefined}>
+      {/*
+        Filling: a floor rather than a height. The card takes its whole grid row, so a
+        breakdown sitting beside one with twelve caption lines is handed the difference, and
+        the plot spends it rather than leaving it blank under the legend. It stops shrinking at
+        the floor — height is what makes small differences between bars readable, and there is
+        a point past which the chart no longer answers the question it was drawn for.
+
+        Not filling: exactly that height, because there is nothing to fill.
+      */}
+      <div
+        className={fill ? 'min-h-0 flex-1' : undefined}
+        style={fill ? { minHeight: height } : { height }}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
             <CartesianGrid stroke={TOKEN.line} vertical={false} />
@@ -113,6 +136,6 @@ export function BreakdownChart({
           </div>
         ))}
       </div>
-    </>
+    </div>
   );
 }
