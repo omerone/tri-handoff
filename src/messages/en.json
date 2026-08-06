@@ -288,7 +288,7 @@
   "finance": {
     "income": "Income",
     "expenses": "Expenses",
-    "monthNet": "Monthly net",
+    "allTimeNet": "All-time net",
     "periodNet": "Range net",
     "totalWealth": "Total wealth",
     "title": "Personal finance",

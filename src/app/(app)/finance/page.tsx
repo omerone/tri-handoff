@@ -190,7 +190,11 @@ export default async function FinancePage({
         <KPI label={t('income')} value={ils(balance.income)} tone="pos" />
         <KPI label={t('expenses')} value={ils(balance.expenses)} tone="neg" />
         <KPI
-          label={range.bounded ? t('periodNet') : t('monthNet')}
+          // The unbounded case is *all time*, not a month: `allTimeBounds` runs from the first
+          // entry to today. Labelling it "monthly net" described a figure spanning years as one
+          // month's flow — and the number beside it, cumulative cash, is a different quantity
+          // again. Every real month view is bounded and keeps the range wording.
+          label={range.bounded ? t('periodNet') : t('allTimeNet')}
           value={ils(balance.net, { signed: true })}
           tone={balance.net >= 0 ? 'pos' : 'neg'}
           sub={`${lookingAhead ? t('yearToDateAsOfToday') : t('yearToDate')}: ${ils(ytd.net, { signed: true })}`}

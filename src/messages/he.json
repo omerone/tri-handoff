@@ -288,7 +288,7 @@
   "finance": {
     "income": "הכנסות",
     "expenses": "הוצאות",
-    "monthNet": "מאזן חודשי",
+    "allTimeNet": "נטו כולל",
     "periodNet": "נטו בטווח",
     "totalWealth": "שווי כולל",
     "title": "מאזן פיננסי",
