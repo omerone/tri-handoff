@@ -23,6 +23,7 @@ import { wallClock } from '@/lib/time/zone';
 import { AddPositionForm } from './add-form';
 import { BookTabs, isBookTab, type BookTab } from './book-tabs';
 import { ManualBook } from './manual-book';
+import { OpenRowProvider } from './open-row';
 import { PositionRow } from './position-row';
 import { trackAllAction } from './actions';
 import { formatDateAt } from '@/lib/time/format';
@@ -90,7 +91,6 @@ export default async function LongPositionsPage({
     );
   }
 
-
   // One rate per currency actually held, resolved in parallel.
   //
   // A missing rate used to fall back to 1:1 *per currency*, so a portfolio holding EUR and
@@ -144,9 +144,7 @@ export default async function LongPositionsPage({
       unrealizedPositive: valuation.unrealized >= 0,
       unrealizedPercent: formatPercent(valuation.unrealizedPercent, locale),
       updatedAt: formatDateAt(position.valueUpdatedAt),
-      staleMessage: isStale(valuation)
-        ? t('staleWarning', { days: valuation.priceAgeDays })
-        : null,
+      staleMessage: isStale(valuation) ? t('staleWarning', { days: valuation.priceAgeDays }) : null,
       tracked: position.priceSource === 'auto',
       closed: position.closedAt !== null,
       realized:
@@ -179,10 +177,10 @@ export default async function LongPositionsPage({
       },
       journalled: Boolean(
         position.journal.note ||
-          position.journal.strategy ||
-          position.journal.mood ||
-          position.journal.rating !== null ||
-          position.journal.tags.length > 0,
+        position.journal.strategy ||
+        position.journal.mood ||
+        position.journal.rating !== null ||
+        position.journal.tags.length > 0,
       ),
     };
   };
@@ -322,47 +320,53 @@ export default async function LongPositionsPage({
         {positions.length === 0 ? (
           <EmptyState>{t('empty')}</EmptyState>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="tri-stack w-full border-collapse text-[13px]">
-              <thead>
-                <tr className="text-dim text-[11px]">
-                  {headers.map((header, index) => (
-                    <th
-                      key={index}
-                      className={`border-line border-b px-3 py-2.5 font-semibold ${align}`}
-                    >
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {open.map((position) => (
-                  <PositionRow key={position.id} position={rowFor(position)} labels={labels} />
-                ))}
-              </tbody>
-
-              {closed.length > 0 ? (
-                <>
-                  <thead className="tri-stack-keep">
-                    <tr>
+          <OpenRowProvider>
+            <div className="overflow-x-auto">
+              <table className="tri-stack w-full border-collapse text-[13px]">
+                <thead>
+                  <tr className="text-dim text-[11px]">
+                    {headers.map((header, index) => (
                       <th
-                        colSpan={headers.length}
-                        className={`text-dim border-line border-y px-3 py-2 text-[11px] font-semibold ${align}`}
+                        key={index}
+                        className={`border-line border-b px-3 py-2.5 font-semibold ${align}`}
                       >
-                        {t('closed')}
+                        {header}
                       </th>
-                    </tr>
-                  </thead>
-                  <tbody className="opacity-70">
-                    {closed.map((position) => (
-                      <PositionRow key={position.id} position={rowFor(position)} labels={labels} />
                     ))}
-                  </tbody>
-                </>
-              ) : null}
-            </table>
-          </div>
+                  </tr>
+                </thead>
+                <tbody>
+                  {open.map((position) => (
+                    <PositionRow key={position.id} position={rowFor(position)} labels={labels} />
+                  ))}
+                </tbody>
+
+                {closed.length > 0 ? (
+                  <>
+                    <thead className="tri-stack-keep">
+                      <tr>
+                        <th
+                          colSpan={headers.length}
+                          className={`text-dim border-line border-y px-3 py-2 text-[11px] font-semibold ${align}`}
+                        >
+                          {t('closed')}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="opacity-70">
+                      {closed.map((position) => (
+                        <PositionRow
+                          key={position.id}
+                          position={rowFor(position)}
+                          labels={labels}
+                        />
+                      ))}
+                    </tbody>
+                  </>
+                ) : null}
+              </table>
+            </div>
+          </OpenRowProvider>
         )}
       </Card>
     </div>

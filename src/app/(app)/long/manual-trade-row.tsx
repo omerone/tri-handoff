@@ -2,7 +2,8 @@
 
 import { ArrowDownRight, ArrowUpRight, NotebookPen, Pencil, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect } from 'react';
+import { useRowMode } from './open-row';
 import { Chip, Num } from '@/components/ui/kpi';
 import { FormMessage, SubmitButton } from '@/components/ui/form';
 import { DateField } from '@/components/ui/date-field';
@@ -78,7 +79,14 @@ export function ManualTradeRow({
   trade: ManualTradeView;
   labels: ManualTradeRowLabels;
 }) {
-  const [editing, setEditing] = useState(false);
+  /*
+   * The open editor belongs to the table, not to this row — see `useRowMode`. Two rows open at
+   * once meant two identical forms stacked down the screen, each with its own Save, and no way
+   * to tell at a glance which one a keystroke was going into.
+   */
+  const row = useRowMode(trade.id);
+  const editing = row.mode === 'edit';
+  const setEditing = (next: boolean) => (next ? row.open('edit') : row.close());
   const [state, action] = useActionState<ManualTradeFormState, FormData>(
     updateManualTradeAction,
     {},
@@ -96,6 +104,10 @@ export function ManualTradeRow({
    */
   useEffect(() => {
     if (state.notice) setEditing(false);
+    // `setEditing` closes over the shared row slot and is a fresh function each render; the
+    // action result is what should re-fire this, and depending on the setter would run it on
+    // every render instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   if (editing) {

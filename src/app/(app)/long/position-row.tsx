@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState } from 'react';
+import { useRowMode, type RowMode } from './open-row';
 import Link from 'next/link';
 import { Check, Clock, NotebookPen, Pencil, RefreshCw, Trash2, TriangleAlert, X } from 'lucide-react';
 import { Num } from '@/components/ui/kpi';
@@ -80,7 +81,14 @@ export function PositionRow({
   position: PositionRowData;
   labels: PositionRowLabels;
 }) {
-  const [mode, setMode] = useState<'idle' | 'price' | 'close' | 'edit'>('idle');
+  /*
+   * The open editor is the *table's* state, not this row's — see `useRowMode`. Kept behind the
+   * same `mode`/`setMode` shape the row already used, so every call site below reads the same
+   * as before and the only thing that changed is who owns the value.
+   */
+  const row = useRowMode(position.id);
+  const mode = row.mode ?? 'idle';
+  const setMode = (next: 'idle' | RowMode) => (next === 'idle' ? row.close() : row.open(next));
 
   /*
    * The editor takes the whole row rather than a cell, because it is nine fields and the
