@@ -64,8 +64,13 @@ export type RowFilter = {
   assetClass?: AssetClass;
   direction?: Direction;
   style?: RowStyle;
-  /** Deals only carry a strategy, so narrowing by one excludes every position. */
+  /**
+   * Only deals carry these, so narrowing by either excludes every holding — a position has
+   * no strategy and no tags to match, and showing it anyway would answer a question it was
+   * never asked.
+   */
   strategy?: string;
+  tag?: string;
 };
 
 function tradeRow(trade: TradeRecord): TableRow {
@@ -174,7 +179,10 @@ export async function toRows(
   // to a deal style excludes them for the same reason. Narrowing to `long` is the mirror
   // image: it asks for holdings, so no deal qualifies.
   const includePositions =
-    !options.filter.strategy && options.filter.style !== 'day' && options.filter.style !== 'swing';
+    !options.filter.strategy &&
+    !options.filter.tag &&
+    options.filter.style !== 'day' &&
+    options.filter.style !== 'swing';
   const includeTrades = options.filter.style !== 'long';
 
   const rows = includeTrades ? trades.map(tradeRow) : [];

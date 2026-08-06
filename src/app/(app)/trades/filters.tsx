@@ -15,16 +15,18 @@ export function TradeFilters({
   current,
   options,
 }: {
-  current: { class: string; dir: string; style: string; strategy: string };
+  current: { class: string; dir: string; style: string; strategy: string; tag: string };
   options: {
     all: string;
     allStrategies: string;
     /** What each dropdown filters by. See `Filter` below for why these are not optional. */
-    names: { class: string; direction: string; style: string; strategy: string };
+    names: { class: string; direction: string; style: string; strategy: string; tag: string };
     classes: readonly Option[];
     directions: readonly Option[];
     styles: readonly Option[];
     strategies: readonly Option[];
+    tags: readonly Option[];
+    allTags: string;
   };
 }) {
   const router = useRouter();
@@ -114,6 +116,19 @@ export function TradeFilters({
           param="strategy"
           empty={options.allStrategies}
           items={options.strategies}
+        />
+      ) : null}
+
+      {/* Same rule as strategies, and the same reason. The predicate has been in the query
+          since the tags column existed — `tags: { has: ... }` — with nothing in the UI able
+          to set it. */}
+      {options.tags.length > 0 ? (
+        <Filter
+          name={options.names.tag}
+          value={current.tag}
+          param="tag"
+          empty={options.allTags}
+          items={options.tags}
         />
       ) : null}
     </>

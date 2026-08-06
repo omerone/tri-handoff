@@ -33,6 +33,7 @@ type SearchParams = {
   dir?: string;
   style?: string;
   strategy?: string;
+  tag?: string;
   page?: string;
   range?: string;
 };
@@ -68,6 +69,7 @@ export default async function TradesPage({
     ...(isDirection(params.dir) ? { direction: params.dir } : {}),
     ...(rowStyle && rowStyle !== 'long' ? { style: rowStyle } : {}),
     ...(params.strategy ? { strategy: params.strategy } : {}),
+    ...(params.tag ? { tag: params.tag } : {}),
   };
 
   const page = Math.max(1, Number(params.page) || 1);
@@ -100,6 +102,7 @@ export default async function TradesPage({
       ...(isDirection(params.dir) ? { direction: params.dir } : {}),
       ...(rowStyle ? { style: rowStyle } : {}),
       ...(params.strategy ? { strategy: params.strategy } : {}),
+      ...(params.tag ? { tag: params.tag } : {}),
     },
   });
   const summary = summarize(allRows);
@@ -150,6 +153,7 @@ export default async function TradesPage({
               dir: params.dir ?? 'all',
               style: params.style ?? 'all',
               strategy: params.strategy ?? 'all',
+              tag: params.tag ?? 'all',
             }}
             options={{
               all: t('table.all'),
@@ -159,11 +163,14 @@ export default async function TradesPage({
                 direction: t('table.direction'),
                 style: t('table.style'),
                 strategy: t('table.strategy'),
+                tag: t('journal.tags'),
               },
               classes: ASSET_CLASSES.map((key) => [key, t(`enum.assetClass.${key}`)] as const),
               directions: DIRECTIONS.map((key) => [key, t(`enum.direction.${key}`)] as const),
               styles: ROW_STYLES.map((key) => [key, t(`enum.style.${key}`)] as const),
               strategies: vocabulary.strategies.map((value) => [value, value] as const),
+              tags: vocabulary.tags.map((value) => [value, value] as const),
+              allTags: t('table.all'),
             }}
           />
 

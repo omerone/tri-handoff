@@ -172,6 +172,26 @@ export default async function DashboardPage({
         sub={t('kpi.longestRuns', { wins: run.longestWin, losses: run.longestLoss })}
       />
     ),
+    expectancy: (
+      /*
+       * What the average trade is worth, which is the figure position sizing is actually
+       * built on. It has been computed on every dashboard load since the first release, and
+       * both translations were already written — only the tile was missing.
+       */
+      <KPI
+        label={t('kpi.expectancy')}
+        value={money(metrics.expectancy, { signed: true })}
+        tone={metrics.expectancy >= 0 ? 'pos' : 'neg'}
+        sub={t('kpi.tradesCount', { count: metrics.count })}
+      />
+    ),
+    avgWin: (
+      <KPI label={t('kpi.avgWin')} value={money(metrics.avgWin)} tone="pos" />
+    ),
+    avgLoss: (
+      // Stored as a positive magnitude; shown negative, because it is money leaving.
+      <KPI label={t('kpi.avgLoss')} value={money(-Math.abs(metrics.avgLoss))} tone="neg" />
+    ),
     rStrip: (
       // Collapsible, because this is the one panel whose narrow layout is a list rather than a
       // chart: thirty days as rows is most of a phone screen, and everything the trader
@@ -271,6 +291,9 @@ export default async function DashboardPage({
     maxDd: t('kpi.maxDD'),
     maxProfit: t('kpi.maxProfit'),
     streak: t('kpi.streak'),
+    expectancy: t('kpi.expectancy'),
+    avgWin: t('kpi.avgWin'),
+    avgLoss: t('kpi.avgLoss'),
     rStrip: t('dash.rStrip', { days: stripDays }),
     equity: t('dash.equity'),
     recent: t('dash.recent'),

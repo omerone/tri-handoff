@@ -130,7 +130,10 @@
     "byMood": "By mood",
     "unrated": "Unrated",
     "noMood": "No mood",
-    "ratingStars": "{count} stars"
+    "ratingStars": "{count} stars",
+    "byHour": "By hour opened",
+    "bySymbol": "By instrument",
+    "symbolsCapped": "Showing the {shown} largest of {total} instruments"
   },
   "enum": {
     "session": {

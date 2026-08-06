@@ -130,7 +130,10 @@
     "byMood": "לפי מצב רגשי",
     "unrated": "ללא ציון",
     "noMood": "ללא מצב רגשי",
-    "ratingStars": "{count} כוכבים"
+    "ratingStars": "{count} כוכבים",
+    "byHour": "לפי שעת פתיחה",
+    "bySymbol": "לפי נכס",
+    "symbolsCapped": "מוצגים {shown} הנכסים הגדולים מתוך {total}"
   },
   "enum": {
     "session": {

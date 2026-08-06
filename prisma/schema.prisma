@@ -311,6 +311,11 @@ model Trade {
   @@index([userId, assetClass])
   @@index([userId, direction])
   @@index([userId, style])
+  /// Both are `where` predicates on the trades table — the strategy dropdown and the tag
+  /// filter — and both were scanning. `tags` is an array column, so it takes a GIN index;
+  /// btree cannot answer `has`.
+  @@index([userId, strategy])
+  @@index([tags], type: Gin)
   @@map("trades")
 }
 

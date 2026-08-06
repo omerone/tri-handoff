@@ -21,7 +21,7 @@ import { toTradeFilter } from '@/lib/time/range';
 import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
-import { byMood, byRating, NO_MOOD, SESSIONS, UNRATED, WEEKDAYS } from '@/lib/analytics/dimensions';
+import { byHour, byMood, byRating, bySymbol, NO_MOOD, SESSIONS, UNRATED, WEEKDAYS } from '@/lib/analytics/dimensions';
 import { holdTimes } from '@/lib/analytics/streaks';
 import { formatDuration } from '@/lib/time/format';
 import { DonutChart } from '@/components/charts/donut-chart';
@@ -210,8 +210,38 @@ export default async function AnalyticsPage({
     ? toData(strategies, (key) => (key === UNLABELLED ? t('journal.unlabelled') : key))
     : [];
   if (hasStrategies) charts.push({ title: t('journal.byStrategy'), data: strategyData });
+  /*
+   * By hour and by instrument — both computed since the first release, neither ever drawn.
+   *
+   * Hours come back only for hours that were traded, so a book worked in one session is three
+   * bars rather than twenty-four with twenty-one gaps. Instruments are capped: a chart with
+   * forty bars is unreadable on a phone and illegible on a desktop, so the largest by absolute
+   * P&L are kept and the caption says how many were left out — a silent top-N reads as "this
+   * is everything", which it is not.
+   */
+  const hourData = toData(byHour(book.trades), (key) => `${key}:00`);
+
+  const allSymbols = bySymbol(book.trades);
+  const SYMBOL_LIMIT = 12;
+  const rankedSymbols = [...allSymbols].sort(
+    (a, b) => Math.abs(b.metrics.net) - Math.abs(a.metrics.net),
+  );
+  const shownSymbols = rankedSymbols.slice(0, SYMBOL_LIMIT);
+  const symbolData = toData(shownSymbols, (key) => key);
+  const symbolsOmitted = allSymbols.length - shownSymbols.length;
+
   if (ratingData.length > 0) charts.push({ title: t('analytics.byRating'), data: ratingData });
   if (moodData.length > 0) charts.push({ title: t('analytics.byMood'), data: moodData });
+  if (hourData.length > 0) charts.push({ title: t('analytics.byHour'), data: hourData });
+  if (symbolData.length > 0) {
+    charts.push({
+      title:
+        symbolsOmitted > 0
+          ? `${t('analytics.bySymbol')} · ${t('analytics.symbolsCapped', { shown: shownSymbols.length, total: allSymbols.length })}`
+          : t('analytics.bySymbol'),
+      data: symbolData,
+    });
+  }
 
   const insights = bestConditions(book.trades);
   const cells = heatmap(book.trades);
