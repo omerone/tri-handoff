@@ -25,16 +25,30 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const prisma = new PrismaClient();
 
-// Four sign-in attempts here, on top of the setup's and the smoke suite's, against a limiter
-// that allows ten per account per fifteen minutes. A successful sign-in clears its own bucket,
-// so this usually stays under — usually is not a thing to leave in a suite. Clearing the
-// login buckets first resets the world rather than weakening the limiter, which is the same
-// call `auth.setup.ts` makes and for the same reason.
-test.beforeAll(async () => {
-  await prisma.rateLimit.deleteMany({ where: { key: { startsWith: 'login' } } });
-});
+/*
+ * Before every test, and again at the end.
+ *
+ * The per-account limiter allows ten sign-ins per fifteen minutes and a successful one clears
+ * its own bucket — so what accumulates is failures, and this file is the only place in the
+ * suite that fails a sign-in on purpose. Four of them, twice over because two viewports run
+ * the same file, was enough to spend the budget and leave the *next* spec's sign-in refused:
+ * `auth.setup` reported "too many attempts" and eleven unrelated tests went red.
+ *
+ * `beforeAll` was not enough, since the cost lands between the tests inside this file as well
+ * as after it. Clearing afterwards too is the part that matters to everyone else: a spec that
+ * spends a shared budget and leaves it spent has made every spec after it flaky, and the
+ * failure surfaces somewhere with no connection to the cause.
+ *
+ * This resets the world rather than weakening the limiter — the same call `auth.setup.ts`
+ * makes, for the same reason.
+ */
+const clearLoginBudget = () =>
+  prisma.rateLimit.deleteMany({ where: { key: { startsWith: 'login' } } });
+
+test.beforeEach(clearLoginBudget);
 
 test.afterAll(async () => {
+  await clearLoginBudget();
   await prisma.$disconnect();
 });
 
