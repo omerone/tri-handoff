@@ -113,7 +113,7 @@ model User {
   sessions       Session[]
   resetTokens    PasswordResetToken[]
   totpChallenges TwoFactorChallenge[]
-  mt5Account     Mt5Account?
+  mt5Accounts    Mt5Account[]
   trades         Trade[]
   financeEntries FinanceEntry[]
   longPositions  LongPosition[]
@@ -229,11 +229,18 @@ enum Mt5Status {
 model Mt5Account {
   id String @id @default(cuid())
 
-  /// Unique: SPEC §3.3 — exactly one MT5 account per user.
-  userId String @unique @map("user_id")
+  userId String @map("user_id")
 
   login  String
   server String
+
+  /// What the trader calls this account — "Day", "Swing", the prop firm's name.
+  ///
+  /// SPEC §3.3 said one MT5 account per user and the column above was `@unique`. A real
+  /// client turned up running two FTMO accounts against one strategy each, and a journal that
+  /// merges them reports the average of two strategies, which describes neither. Null for an
+  /// account connected before there was anything to call it.
+  label String?
 
   /// AES-256-GCM ciphertext of the **investor (read-only)** password, encoded as
   /// iv:authTag:ciphertext in base64. Never logged, never sent to the client, and never
@@ -255,8 +262,12 @@ model Mt5Account {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades Trade[]
 
+  /// One registration per broker account, rather than one per user. The same login at two
+  /// brokers is two accounts; the same login twice at one broker is the same account.
+  @@unique([userId, login, server])
   @@map("mt5_accounts")
 }
 
@@ -412,12 +423,28 @@ model Trade {
   /// NULL means unanswered.
   tookOriginalTp Boolean?  @map("took_original_tp")
 
+  /// Null for a manual trade. See the note on the unique index below.
+  mt5AccountId String? @map("mt5_account_id")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mt5Account Mt5Account? @relation(fields: [mt5AccountId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, ticket])
+  /// Which broker account this came from, and null for a trade the trader typed.
+  ///
+  /// Without it two connected accounts share one book and every metric is the average of two
+  /// strategies. `SetNull` rather than `Cascade`: disconnecting a broker deliberately keeps
+  /// the trades — they are the trader's journal, not the broker's — so they lose the link
+  /// rather than the history.
+  ///
+  /// **The unique index over this column is `NULLS NOT DISTINCT`,** which Prisma cannot
+  /// express and the migration writes by hand. Without it Postgres treats every null as its
+  /// own value, and the manual trades — all of which have a null account — would stop
+  /// colliding with each other, silently undoing the idempotency in `createManualTrade`.
+  @@unique([userId, mt5AccountId, ticket])
+  @@index([userId, mt5AccountId])
   @@index([userId, closeAt])
   @@index([userId, kind])
   @@index([userId, kind, closeAt])

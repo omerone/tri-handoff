@@ -5,8 +5,9 @@ import {
   getMt5Account,
   latestSyncLog,
   listCashFlow,
+  listMt5Accounts,
   listClosedTrades,
-  readCredentialCiphertext,
+  readCredentialCiphertexts,
   recentSyncLogs,
 } from '@/lib/db';
 import { generateMockDeals } from '@/lib/mt5/mock/generator';
@@ -158,7 +159,7 @@ describe('tenant isolation', () => {
   });
 
   it("will not read another tenant's credentials", async () => {
-    expect(await readCredentialCiphertext(crossTenantContext(bob, alice))).toBeNull();
+    expect(await readCredentialCiphertexts(crossTenantContext(bob, alice))).toEqual([]);
   });
 
   it('does nothing for a user with no connected account', async () => {
@@ -182,11 +183,17 @@ describe('backfilling a journal that already has rows', () => {
   it('reads the whole history even when the cursor sits past the end of it', async () => {
     const dave = await createTenantFixture();
     await connect(dave, '77776666');
+    const account = await testDb.mt5Account.findFirstOrThrow({
+      where: { userId: dave.userId },
+      select: { id: true },
+    });
 
-    // Every mock deal closes by 2026-07-31; this one closes after all of them.
+    // Every mock deal closes by 2026-07-31; this one closes after all of them — and it belongs
+    // to the account being synced, which is what puts that account's cursor past the end.
     await testDb.trade.create({
       data: {
         userId: dave.userId,
+        mt5AccountId: account.id,
         ticket: 'newer-than-the-broker-has',
         symbol: 'EURUSD',
         assetClass: 'forex',
@@ -211,20 +218,84 @@ describe('backfilling a journal that already has rows', () => {
   });
 });
 
-describe('reconnecting a different account', () => {
-  it("does not mix two brokers' books together", async () => {
+describe('a second broker account', () => {
+  /**
+   * A trader running one account for day trades and another for swings.
+   *
+   * `connectMt5Account` used to be keyed on the user, so connecting the second account
+   * *replaced* the first — silently, and the first account's trades were left behind pointing
+   * at a row that now described a different broker account entirely. Keyed on the broker
+   * account, the same login at the same server is still an update and anything else is a new
+   * connection.
+   */
+  it('is added rather than replacing the first', async () => {
     const carol = await createTenantFixture();
     await connect(carol, '11112222');
-    await syncMt5(carol.ctx, 'backfill');
-    const first = await listClosedTrades(carol.ctx);
-    expect(first.length).toBeGreaterThan(0);
-
-    // Connecting a different login clears lastSyncAt, so the next sync backfills again
-    // rather than resuming from a cursor that belonged to the previous account.
     await connect(carol, '99998888');
-    const account = await getMt5Account(carol.ctx);
-    expect(account?.login).toBe('99998888');
-    expect(account?.lastSyncAt).toBeNull();
+
+    const accounts = await listMt5Accounts(carol.ctx);
+    expect(accounts.map((a) => a.login).sort()).toEqual(['11112222', '99998888']);
+  });
+
+  it('keeps each account\'s trades attributed to it', async () => {
+    const dora = await createTenantFixture();
+    await connect(dora, '31313131');
+    await connect(dora, '32323232');
+    await syncMt5(dora.ctx, 'backfill');
+
+    const accounts = await listMt5Accounts(dora.ctx);
+    const rows = await testDb.trade.findMany({
+      where: { userId: dora.userId },
+      select: { mt5AccountId: true },
+    });
+
+    // The mock returns the same book for any credentials, so both accounts import it — which
+    // is the point: on the old key the second would have overwritten the first row for row,
+    // and the journal would have been half the size it should be with no error anywhere.
+    expect(rows.length).toBeGreaterThan(0);
+    for (const id of accounts.map((a) => a.id)) {
+      expect(rows.filter((row) => row.mt5AccountId === id).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('gives each account its own cursor', async () => {
+    // A swing account connected today must not inherit the day account's watermark and be
+    // told there is nothing older than this week to fetch.
+    const edith = await createTenantFixture();
+    await connect(edith, '41414141');
+    await syncMt5(edith.ctx, 'backfill');
+
+    await connect(edith, '42424242');
+    const result = await syncMt5(edith.ctx, 'login');
+
+    expect(result.status).toBe('success');
+    // The newly connected account has no history of its own, so an ordinary login sync — not a
+    // backfill — still reads it from the beginning.
+    expect(result.status === 'success' && result.imported).toBeGreaterThan(0);
+  });
+
+  it('lets one broker fail without losing the other account\'s trades', async () => {
+    const fred = await createTenantFixture();
+    await connect(fred, '51515151');
+    // A row whose ciphertext cannot be decrypted stands in for a broker that will not answer:
+    // the sync for that account throws, and the run must still deliver the other one.
+    await testDb.mt5Account.create({
+      data: {
+        userId: fred.userId,
+        login: '52525252',
+        server: 'MetaQuotes-Demo',
+        investorPwEncrypted: 'not-a-valid-ciphertext',
+        status: 'connected',
+      },
+    });
+
+    const result = await syncMt5(fred.ctx, 'backfill');
+
+    expect(result.status).toBe('success');
+    expect((await listClosedTrades(fred.ctx)).length).toBeGreaterThan(0);
+    // And the failure is not swallowed: the log says which account could not be read.
+    const log = await latestSyncLog(fred.ctx);
+    expect(log?.error).toContain('52525252');
   });
 });
 

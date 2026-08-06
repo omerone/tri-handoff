@@ -142,14 +142,52 @@ export async function createManualTrade(
     rr: input.rr,
   } as const;
 
-  const row = await prisma.trade.upsert({
-    where: { userId_ticket: { userId: ctx.userId, ticket } },
-    create: { userId: ctx.userId, ticket, ...fields },
-    update: fields,
+  /*
+   * Find-then-write rather than `upsert`, because Prisma types a compound unique `where` as
+   * non-nullable even when the column is nullable, and a manual trade's account is null by
+   * definition. The database is still the thing enforcing this: the unique index is
+   * `NULLS NOT DISTINCT`, so two typed trades with the same fingerprint collide there even
+   * though the two nulls would otherwise be distinct values.
+   *
+   * The gap between the read and the write is closed by that index rather than by a lock. A
+   * double submit that races itself makes the second insert fail on the constraint, which is
+   * caught and turned into the update it should have been — the same outcome as winning the
+   * race, one statement later.
+   */
+  const existing = await prisma.trade.findFirst({
+    where: { userId: ctx.userId, mt5AccountId: null, ticket },
     select: { id: true },
   });
 
-  return row.id;
+  if (existing) {
+    await prisma.trade.update({ where: { id: existing.id }, data: fields });
+    return existing.id;
+  }
+
+  try {
+    const row = await prisma.trade.create({
+      data: { userId: ctx.userId, mt5AccountId: null, ticket, ...fields },
+      select: { id: true },
+    });
+    return row.id;
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    const raced = await prisma.trade.findFirstOrThrow({
+      where: { userId: ctx.userId, mt5AccountId: null, ticket },
+      select: { id: true },
+    });
+    await prisma.trade.update({ where: { id: raced.id }, data: fields });
+    return raced.id;
+  }
+}
+
+/** Prisma's code for "a unique constraint said no". */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 'P2002'
+  );
 }
 
 /**

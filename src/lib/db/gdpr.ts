@@ -284,7 +284,7 @@ export async function exportUserData(userId: string) {
           userAgent: true,
         },
       },
-      mt5Account: true,
+      mt5Accounts: true,
       trades: true,
       financeEntries: true,
       longPositions: true,
@@ -315,17 +315,20 @@ export async function exportUserData(userId: string) {
       createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt,
     },
-    mt5Account: user.mt5Account
-      ? {
-          login: user.mt5Account.login,
-          server: user.mt5Account.server,
-          status: user.mt5Account.status,
-          lastSyncAt: user.mt5Account.lastSyncAt,
-          accountCurrency: user.mt5Account.accountCurrency,
-          balance: user.mt5Account.balance,
-          equity: user.mt5Account.equity,
-        }
-      : null,
+    // Every connected account, not one. A subject access request that returned the first of
+    // two would be an incomplete answer to a legal question, and the encrypted password is
+    // excluded here exactly as it always was — the export is the trader's data, not a way to
+    // get their broker credentials out of the database in plaintext.
+    mt5Accounts: user.mt5Accounts.map((account) => ({
+      login: account.login,
+      server: account.server,
+      label: account.label,
+      status: account.status,
+      lastSyncAt: account.lastSyncAt,
+      accountCurrency: account.accountCurrency,
+      balance: account.balance,
+      equity: account.equity,
+    })),
     trades: user.trades,
     financeEntries: user.financeEntries,
     longPositions: user.longPositions,

@@ -16,6 +16,34 @@ import {
 import { cleanup, createTenantFixture, testDb, type Fixture } from '../helpers/fixtures';
 
 /**
+ * The broker account a test's synced trades belong to, created once per trader.
+ *
+ * `upsertTrades` takes an account id because two brokers can issue the same position ticket
+ * and the unique key has to tell them apart. These tests are about something else, so they
+ * get one account each, memoised on the context they already pass around.
+ */
+const accounts = new Map<string, Promise<string>>();
+function accountFor(ctx: { userId: string }): Promise<string> {
+  const existing = accounts.get(ctx.userId);
+  if (existing) return existing;
+  const created = testDb.mt5Account
+    .create({
+      data: {
+        userId: ctx.userId,
+        login: '50214437',
+        server: 'MetaQuotes-Demo',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        accountCurrency: 'USD',
+        status: 'connected',
+      },
+      select: { id: true },
+    })
+    .then((row) => row.id);
+  accounts.set(ctx.userId, created);
+  return created;
+}
+
+/**
  * The boundary between what the trader typed and what the broker sent.
  *
  * Both live in `trades`, which is the point — a hand-entered trade reaches the analytics, the
@@ -135,7 +163,7 @@ describe('a sync running over a book that has manual trades in it', () => {
     const fixture = await createTenantFixture();
     const id = await createManualTrade(fixture.ctx, manual({ profit: 500, symbol: 'XAUUSD' }));
 
-    await upsertTrades(fixture.ctx, [synced('1001'), synced('1002')]);
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('1001'), synced('1002')]);
 
     const still = await testDb.trade.findUnique({ where: { id } });
     expect(still).not.toBeNull();
@@ -147,7 +175,7 @@ describe('a sync running over a book that has manual trades in it', () => {
     const fixture = await createTenantFixture();
     await createManualTrade(fixture.ctx, manual());
 
-    const result = await upsertTrades(fixture.ctx, [synced('2001')]);
+    const result = await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('2001')]);
     // The count the sync shows the user is about the broker's rows, not the whole table.
     expect(result).toEqual({ imported: 1, updated: 0 });
   });
@@ -155,7 +183,7 @@ describe('a sync running over a book that has manual trades in it', () => {
   it('puts both kinds in the same book, which is the point of the design', async () => {
     const fixture = await createTenantFixture();
     await createManualTrade(fixture.ctx, manual({ profit: 100 }));
-    await upsertTrades(fixture.ctx, [synced('3001', { profit: 40 })]);
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('3001', { profit: 40 })]);
 
     const book = await listClosedTrades(fixture.ctx);
     expect(book).toHaveLength(2);
@@ -173,7 +201,7 @@ describe('connecting a different broker account', () => {
      */
     const fixture = await createTenantFixture();
     const manualId = await createManualTrade(fixture.ctx, manual({ profit: 250 }));
-    await upsertTrades(fixture.ctx, [synced('4001'), synced('4002'), synced('4003')]);
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('4001'), synced('4002'), synced('4003')]);
 
     const removed = await deleteAllTrades(fixture.ctx);
 
@@ -191,7 +219,7 @@ describe('connecting a different broker account', () => {
     const fixture = await createTenantFixture();
     await createManualTrade(fixture.ctx, manual());
     await createManualTrade(fixture.ctx, manual());
-    await upsertTrades(fixture.ctx, [synced('5001'), synced('5002')]);
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('5001'), synced('5002')]);
 
     expect(await countSyncedTrades(fixture.ctx)).toBe(2);
   });
@@ -206,7 +234,7 @@ describe('deleting', () => {
 
   it('refuses a synced trade, whatever id it is handed', async () => {
     const fixture = await createTenantFixture();
-    await upsertTrades(fixture.ctx, [synced('6001')]);
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('6001')]);
     const row = await testDb.trade.findFirst({ where: { userId: fixture.userId } });
 
     expect(await deleteManualTrade(fixture.ctx, row!.id)).toBe(false);
@@ -245,7 +273,7 @@ describe('listing', () => {
   it('lists manual trades only, never a synced one', async () => {
     const fixture = await createTenantFixture();
     await createManualTrade(fixture.ctx, manual({ symbol: 'TYPED' }));
-    await upsertTrades(fixture.ctx, [synced('7001', { symbol: 'SYNCED' })]);
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('7001', { symbol: 'SYNCED' })]);
 
     const listed = await listManualTrades(fixture.ctx, 'day');
     expect(listed.map((trade) => trade.symbol)).toEqual(['TYPED']);
@@ -259,7 +287,7 @@ describe('listing', () => {
     await createManualTrade(fixture.ctx, manual({ style: 'day', profit: 11 }));
     await createManualTrade(fixture.ctx, manual({ style: 'swing', profit: 22 }));
     await createManualTrade(fixture.ctx, manual({ style: 'swing', profit: 33 }));
-    await upsertTrades(fixture.ctx, [synced('8001')]);
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('8001')]);
 
     expect(await countManualTrades(fixture.ctx)).toEqual({ day: 1, swing: 2 });
   });
@@ -284,7 +312,7 @@ describe('isManualTrade', () => {
 
   it('is false for a synced trade', async () => {
     const fixture = await createTenantFixture();
-    await upsertTrades(fixture.ctx, [synced('9001')]);
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('9001')]);
     const row = await testDb.trade.findFirst({ where: { userId: fixture.userId } });
     expect(await isManualTrade(fixture.ctx, row!.id)).toBe(false);
   });

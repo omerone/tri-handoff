@@ -4,7 +4,7 @@ import {
   failStaleSyncLogs,
   finishSyncLog,
   newestCloseAt,
-  readCredentialCiphertext,
+  readCredentialCiphertexts,
   recordSnapshot,
   ticketsWithExcursions,
   recordSyncFailure,
@@ -47,27 +47,89 @@ export type SyncOutcome =
  */
 const OVERLAP_MS = 2 * 24 * 60 * 60 * 1000;
 
+/**
+ * Syncs every account the trader has connected, and reports the run as a whole.
+ *
+ * One log line and one outcome for what may be two broker round trips, because that is what
+ * the person who pressed refresh is waiting for. **One account failing does not fail the
+ * run**: a swing account whose broker is briefly unreachable must not stop the day account's
+ * trades arriving, and the alternative — abandoning the loop on the first error — would make
+ * the whole journal hostage to the least reliable connection. Failures are collected, recorded
+ * against the account they belong to, and reported once everything that could be read has been.
+ */
 export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise<SyncOutcome> {
-  const stored = await readCredentialCiphertext(ctx);
-  if (!stored) return { status: 'skipped', reason: 'not-connected' };
+  const accounts = await readCredentialCiphertexts(ctx);
+  if (accounts.length === 0) return { status: 'skipped', reason: 'not-connected' };
 
   await failStaleSyncLogs(ctx);
   const logId = await startSyncLog(ctx, trigger);
 
-  try {
+  let imported = 0;
+  let updated = 0;
+  let accountCurrency: string | null = null;
+  const failures: string[] = [];
+
+  for (const stored of accounts) {
+    try {
+      const result = await syncOneAccount(ctx, trigger, stored);
+      imported += result.imported;
+      updated += result.updated;
+      accountCurrency ??= result.currency;
+    } catch (error) {
+      // Deliberately not rethrown. The credentials are in scope in the frame below, and an
+      // unhandled error would put a stack trace containing them in front of a user.
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push(`${stored.login}: ${message}`);
+      await recordSyncFailure(ctx, stored.id);
+      console.error('[mt5] sync failed for', stored.login, '—', message);
+    }
+  }
+
+  if (failures.length === accounts.length) {
+    const message = failures.join('; ');
+    await finishSyncLog(ctx, logId, { status: 'error', error: message });
+    return { status: 'error', message };
+  }
+
+  await finishSyncLog(ctx, logId, {
+    status: 'success',
+    tradesImported: imported,
+    tradesUpdated: updated,
+    // A partially successful run is a successful run with something worth saying about it.
+    error: failures.length > 0 ? failures.join('; ') : undefined,
+  });
+
+  return { status: 'success', imported, updated, accountCurrency: accountCurrency ?? 'USD' };
+}
+
+/** One broker account, start to finish. Throws; the caller decides what a failure means. */
+async function syncOneAccount(
+  ctx: TenantContext,
+  trigger: SyncTrigger,
+  stored: {
+    id: string;
+    login: string;
+    server: string;
+    investorPwEncrypted: string;
+    providerAccountId: string | null;
+  },
+): Promise<{ imported: number; updated: number; currency: string }> {
+  {
     const credentials: Mt5Credentials = {
       login: stored.login,
       server: stored.server,
       investorPassword: decryptSecret(stored.investorPwEncrypted),
       // The tenant boundary, carried down to the broker: the provider registers and finds the
       // account under this, so one client's book cannot be reached from another's session.
+      // The tenant boundary, carried down to the broker, and now the account boundary with
+      // it: two accounts belonging to one trader must register separately with the provider.
       accountKey: ctx.userId,
     };
 
     const provider = mt5Provider();
     // A backfill means what it says: read the account from the beginning. Everything else
     // resumes from where the journal ends.
-    const since = trigger === 'backfill' ? null : await incrementalCursor(ctx);
+    const since = trigger === 'backfill' ? null : await incrementalCursor(ctx, stored.id);
 
     const [account, deals] = await Promise.all([
       provider.fetchAccountState(credentials),
@@ -76,9 +138,9 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
 
     // A backfill recomputes the excursions it already has; every other trigger trusts them.
     const trades = await toTradeRecords(ctx, deals, account, credentials, trigger === 'backfill');
-    const { imported, updated } = await upsertTrades(ctx, trades);
+    const { imported, updated } = await upsertTrades(ctx, stored.id, trades);
 
-    await recordSyncSuccess(ctx, {
+    await recordSyncSuccess(ctx, stored.id, {
       currency: account.currency,
       balance: account.balance,
       equity: account.equity,
@@ -99,17 +161,7 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
       equity: account.equity,
       currency: account.currency,
     });
-    await finishSyncLog(ctx, logId, { status: 'success', tradesImported: imported, tradesUpdated: updated });
-
-    return { status: 'success', imported, updated, accountCurrency: account.currency };
-  } catch (error) {
-    // Deliberately not rethrown. The credentials are in scope here, and an unhandled error
-    // would put a stack trace containing this frame in front of a user.
-    const message = error instanceof Error ? error.message : String(error);
-    await recordSyncFailure(ctx);
-    await finishSyncLog(ctx, logId, { status: 'error', error: message });
-    console.error('[mt5] sync failed:', message);
-    return { status: 'error', message };
+    return { imported, updated, currency: account.currency };
   }
 }
 
@@ -124,8 +176,10 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
  * nothing, and reported success. A wall of green syncs that imported zero rows is what that
  * looks like from the outside, and it is indistinguishable from a broker with no new deals.
  */
-async function incrementalCursor(ctx: TenantContext): Promise<Date | null> {
-  const newest = await newestCloseAt(ctx);
+async function incrementalCursor(ctx: TenantContext, mt5AccountId: string): Promise<Date | null> {
+  // Per account, not per trader: a swing account connected today would otherwise inherit the
+  // day account's cursor and be told there is nothing older than this week to fetch.
+  const newest = await newestCloseAt(ctx, mt5AccountId);
   return newest ? new Date(newest.getTime() - OVERLAP_MS) : null;
 }
 

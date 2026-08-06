@@ -3,7 +3,35 @@ import { upsertTrades, type TradeUpsert } from '@/lib/db';
 import { loadBook } from '@/lib/analytics/load';
 import { computeMetrics, equityCurve } from '@/lib/analytics';
 import { resolveRange, toTradeFilter, type TimeRange } from '@/lib/time/range';
-import { cleanup, createTenantFixture, type Fixture } from '../helpers/fixtures';
+import { cleanup, createTenantFixture, testDb, type Fixture } from '../helpers/fixtures';
+
+/**
+ * The broker account a test's synced trades belong to, created once per trader.
+ *
+ * `upsertTrades` takes an account id because two brokers can issue the same position ticket
+ * and the unique key has to tell them apart. These tests are about something else, so they
+ * get one account each, memoised on the context they already pass around.
+ */
+const accounts = new Map<string, Promise<string>>();
+function accountFor(ctx: { userId: string }): Promise<string> {
+  const existing = accounts.get(ctx.userId);
+  if (existing) return existing;
+  const created = testDb.mt5Account
+    .create({
+      data: {
+        userId: ctx.userId,
+        login: '50214437',
+        server: 'MetaQuotes-Demo',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        accountCurrency: 'USD',
+        status: 'connected',
+      },
+      select: { id: true },
+    })
+    .then((row: { id: string }) => row.id);
+  accounts.set(ctx.userId, created);
+  return created;
+}
 
 /**
  * Reading the book through a window.
@@ -51,7 +79,7 @@ function trade(overrides: Partial<TradeUpsert> & { ticket: string }): TradeUpser
 beforeAll(async () => {
   alice = await createTenantFixture();
 
-  await upsertTrades(alice.ctx, [
+  await upsertTrades(alice.ctx, await accountFor(alice.ctx), [
     // The money that started the account. Not a trade, and not performance.
     trade({
       ticket: 'deposit-1',

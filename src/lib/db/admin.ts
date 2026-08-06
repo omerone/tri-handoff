@@ -4,6 +4,24 @@ import { isValidDomain, normalizeDomain } from '@/lib/tenant/domain';
 import { prisma } from './prisma';
 
 /**
+ * The account that spoke to its broker most recently, out of however many are connected.
+ *
+ * A tenant used to have exactly one, so "when did this tenant last sync" was one column. With
+ * two accounts the honest answer for a health screen is the newest of them: a trader whose
+ * swing account has been quiet for a month is not silent if their day account synced an hour
+ * ago. Accounts that have never synced sort last rather than being dropped, so a tenant with
+ * one live account and one that has never connected still reports the live one.
+ */
+function newestSync<T extends { lastSyncAt: Date | null }>(accounts: readonly T[]): T | null {
+  let best: T | null = null;
+  for (const account of accounts) {
+    if (best === null) best = account;
+    else if ((account.lastSyncAt?.getTime() ?? -1) > (best.lastSyncAt?.getTime() ?? -1)) best = account;
+  }
+  return best;
+}
+
+/**
  * Cross-tenant operator queries (SPEC §2, §6 phase 4).
  *
  * Everything here deliberately spans tenants, which is why it lives beside the other
@@ -63,7 +81,7 @@ export async function getTenantDetail(tenantId: string): Promise<TenantDetail | 
           locale: true,
           displayCurrency: true,
           lastLoginAt: true,
-          mt5Account: {
+          mt5Accounts: {
             select: {
               login: true,
               server: true,
@@ -106,7 +124,9 @@ export async function getTenantDetail(tenantId: string): Promise<TenantDetail | 
           lastLoginAt: row.user.lastLoginAt,
         }
       : null,
-    mt5: row.user?.mt5Account ?? null,
+    // One row per connected broker account now. The admin health list shows the account
+    // most recently synced, because a tenant is "quiet" only when all of them are.
+    mt5: newestSync(row.user?.mt5Accounts ?? []),
     counts: {
       trades: row.user?._count.trades ?? 0,
       financeEntries: row.user?._count.financeEntries ?? 0,
@@ -149,7 +169,7 @@ export async function syncHealth(): Promise<SyncHealth[]> {
           // The user id comes back with the tenant it belongs to. An earlier version fetched
           // every user on the platform separately to build the same mapping.
           id: true,
-          mt5Account: { select: { lastSyncAt: true, status: true } },
+          mt5Accounts: { select: { lastSyncAt: true, status: true } },
           syncLogs: {
             orderBy: { startedAt: 'desc' },
             take: 1,
@@ -169,7 +189,7 @@ export async function syncHealth(): Promise<SyncHealth[]> {
 
   const rows: SyncHealth[] = tenants.map((tenant) => {
     const userId = tenant.user?.id;
-    const account = tenant.user?.mt5Account ?? null;
+    const account = newestSync(tenant.user?.mt5Accounts ?? []);
     const lastLog = tenant.user?.syncLogs[0] ?? null;
 
     return {

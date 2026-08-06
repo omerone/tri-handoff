@@ -34,7 +34,13 @@ export async function finishSyncLog(
   ctx: TenantContext,
   id: string,
   result:
-    | { status: 'success'; tradesImported: number; tradesUpdated: number }
+    /**
+     * A successful run may still carry an error string. With more than one account connected,
+     * one broker being unreachable while the other syncs is a partial success — reporting it
+     * as a failure would hide the trades that did arrive, and reporting it as a clean success
+     * would hide that a whole account is silent.
+     */
+    | { status: 'success'; tradesImported: number; tradesUpdated: number; error?: string }
     | { status: 'error'; error: string },
 ): Promise<void> {
   assertContext(ctx);
@@ -44,7 +50,14 @@ export async function finishSyncLog(
       finishedAt: new Date(),
       status: result.status,
       ...(result.status === 'success'
-        ? { tradesImported: result.tradesImported, tradesUpdated: result.tradesUpdated }
+        ? {
+            tradesImported: result.tradesImported,
+            tradesUpdated: result.tradesUpdated,
+            // Carried on a success too: with two accounts connected, one broker refusing while
+            // the other delivers is a run that worked and has something to say. A green log
+            // with nothing in it would leave a whole account silently unread.
+            ...(result.error === undefined ? {} : { error: result.error.slice(0, 500) }),
+          }
         : // Truncated: a provider stack trace can be long, and it is shown to a human.
           { error: result.error.slice(0, 500) }),
     },

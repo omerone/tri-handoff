@@ -133,15 +133,21 @@ function toRecord(row: TradeRow): TradeRecord {
 /**
  * Idempotent import.
  *
- * Keyed on `(user_id, ticket)`, so re-running a sync — which happens on every login, and
- * again whenever the user hits refresh — updates rather than duplicates. That matters
- * beyond tidiness: a duplicated trade would inflate net P&L and drag win rate toward the
- * duplicated outcome, and nothing in the UI would look wrong.
+ * Keyed on `(user_id, mt5_account_id, ticket)`, so re-running a sync — which happens on
+ * every login, and again whenever the user hits refresh — updates rather than duplicates.
+ * That matters beyond tidiness: a duplicated trade would inflate net P&L and drag win rate
+ * toward the duplicated outcome, and nothing in the UI would look wrong.
+ *
+ * **The account is part of the key**, not a passenger. A trader can run two broker accounts —
+ * one for day trades, one for swings — and two brokers can issue the same position ticket. On
+ * the old key the second account's trade would land on the first's row and overwrite it, and
+ * the book would be missing a trade it never reported losing.
  *
  * Returns how many rows were new, which is what the sync log reports back to the user.
  */
 export async function upsertTrades(
   ctx: TenantContext,
+  mt5AccountId: string,
   trades: TradeUpsert[],
 ): Promise<{ imported: number; updated: number }> {
   assertContext(ctx);
@@ -149,7 +155,7 @@ export async function upsertTrades(
 
   const tickets = trades.map((trade) => trade.ticket);
   const existing = await prisma.trade.findMany({
-    where: { userId: ctx.userId, ticket: { in: tickets } },
+    where: { userId: ctx.userId, mt5AccountId, ticket: { in: tickets } },
     select: { ticket: true },
   });
   const known = new Set(existing.map((row) => row.ticket));
@@ -197,8 +203,14 @@ export async function upsertTrades(
     await prisma.$transaction(
       chunk.map((trade) =>
         prisma.trade.upsert({
-          where: { userId_ticket: { userId: ctx.userId, ticket: trade.ticket } },
-          create: { userId: ctx.userId, ticket: trade.ticket, ...data(trade) },
+          where: {
+            userId_mt5AccountId_ticket: {
+              userId: ctx.userId,
+              mt5AccountId,
+              ticket: trade.ticket,
+            },
+          },
+          create: { userId: ctx.userId, mt5AccountId, ticket: trade.ticket, ...data(trade) },
           update: data(trade),
         }),
       ),
@@ -519,10 +531,19 @@ export async function listJournalVocabulary(
   return { strategies: sorted(strategies), tags: sorted(tags), moods: sorted(moods) };
 }
 
-export async function newestCloseAt(ctx: TenantContext): Promise<Date | null> {
+export async function newestCloseAt(
+  ctx: TenantContext,
+  /** Scopes the cursor to one broker account; omitted, it answers for the whole journal. */
+  mt5AccountId?: string,
+): Promise<Date | null> {
   assertContext(ctx);
   const row = await prisma.trade.findFirst({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, closeAt: { not: null } },
+    where: {
+      userId: ctx.userId,
+      user: { tenantId: ctx.tenantId },
+      closeAt: { not: null },
+      ...(mt5AccountId === undefined ? {} : { mt5AccountId }),
+    },
     orderBy: { closeAt: 'desc' },
     select: { closeAt: true },
   });

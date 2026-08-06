@@ -4,6 +4,15 @@ import type { ActiveTenant } from '@/lib/tenant/context';
 import { normalizeDomain } from '@/lib/tenant/domain';
 import { prisma } from './prisma';
 
+/** The most recent sync across a trader's connected accounts; null when none has ever run. */
+function newestSyncAt(accounts: readonly { lastSyncAt: Date | null }[]): Date | null {
+  let newest: Date | null = null;
+  for (const { lastSyncAt } of accounts) {
+    if (lastSyncAt !== null && (newest === null || lastSyncAt > newest)) newest = lastSyncAt;
+  }
+  return newest;
+}
+
 export type TenantLookup =
   | { state: 'active'; tenant: ActiveTenant }
   | { state: 'suspended'; tenant: ActiveTenant }
@@ -56,7 +65,7 @@ export async function listTenants(): Promise<TenantSummary[]> {
       domain: true,
       status: true,
       createdAt: true,
-      user: { select: { email: true, mt5Account: { select: { lastSyncAt: true } } } },
+      user: { select: { email: true, mt5Accounts: { select: { lastSyncAt: true } } } },
     },
   });
 
@@ -67,7 +76,7 @@ export async function listTenants(): Promise<TenantSummary[]> {
     status: row.status,
     createdAt: row.createdAt,
     userEmail: row.user?.email ?? null,
-    lastSyncAt: row.user?.mt5Account?.lastSyncAt ?? null,
+    lastSyncAt: newestSyncAt(row.user?.mt5Accounts ?? []),
   }));
 }
 

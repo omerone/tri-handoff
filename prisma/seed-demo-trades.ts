@@ -131,7 +131,15 @@ async function main() {
 
   for (const trade of sampleTrades) {
     await prisma.trade.upsert({
-      where: { userId_ticket: { userId: user.id, ticket: trade.ticket } },
+      // No broker account: these are demo rows, and the unique index is NULLS NOT DISTINCT so
+      // re-seeding still lands on the same row rather than adding a second copy.
+      where: {
+        userId_mt5AccountId_ticket: {
+          userId: user.id,
+          mt5AccountId: null as unknown as string,
+          ticket: trade.ticket,
+        },
+      },
       update: {},
       create: trade,
     });

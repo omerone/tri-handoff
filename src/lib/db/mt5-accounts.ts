@@ -6,7 +6,13 @@ import { assertContext } from './context';
 import { prisma } from './prisma';
 
 /**
- * The MT5 account, one per user (SPEC §3.3).
+ * The trader's MT5 accounts.
+ *
+ * SPEC §3.3 said one per user and the schema enforced it. A client running a day-trading
+ * account and a swing account against one journal made that wrong: merged into one book every
+ * metric is the average of two strategies and describes neither. Each function here is scoped
+ * to an account id, because the alternative — "the user's account" — is the assumption that
+ * silently overwrote one connection with the other.
  *
  * The stored investor password is the most sensitive thing in the database, so it leaves
  * this module by exactly one door: `readCredentialCiphertext`, which the sync uses and
@@ -18,6 +24,7 @@ export type Mt5AccountView = {
   id: string;
   login: string;
   server: string;
+  label: string | null;
   status: Mt5Status;
   lastSyncAt: Date | null;
   accountCurrency: string | null;
@@ -30,6 +37,7 @@ const VIEW_FIELDS = {
   id: true,
   login: true,
   server: true,
+  label: true,
   status: true,
   lastSyncAt: true,
   accountCurrency: true,
@@ -42,6 +50,7 @@ function toView(row: {
   id: string;
   login: string;
   server: string;
+  label: string | null;
   status: Mt5Status;
   lastSyncAt: Date | null;
   accountCurrency: string | null;
@@ -53,6 +62,7 @@ function toView(row: {
     id: row.id,
     login: row.login,
     server: row.server,
+    label: row.label,
     status: row.status,
     lastSyncAt: row.lastSyncAt,
     accountCurrency: row.accountCurrency,
@@ -76,41 +86,72 @@ function toView(row: {
  * React's `cache` gets the part that was actually worth having — one query per request no
  * matter how many components ask — and cannot go stale, because it dies with the request.
  */
-export const getMt5Account = cache(
-  async (ctx: TenantContext): Promise<Mt5AccountView | null> => {
+export const listMt5Accounts = cache(
+  async (ctx: TenantContext): Promise<Mt5AccountView[]> => {
     assertContext(ctx);
-    const row = await prisma.mt5Account.findFirst({
+    const rows = await prisma.mt5Account.findMany({
       where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+      orderBy: { createdAt: 'asc' },
       select: VIEW_FIELDS,
     });
-    return row ? toView(row) : null;
+    return rows.map(toView);
+  },
+);
+
+/**
+ * The first connected account, for the screens that still speak of "the" account.
+ *
+ * Kept so this change does not have to rewrite every caller at once, and ordered by creation
+ * so it is stable rather than whichever row the planner happened to return. Anything that
+ * shows figures per account should use `listMt5Accounts` instead.
+ */
+export const getMt5Account = cache(
+  async (ctx: TenantContext): Promise<Mt5AccountView | null> => {
+    const accounts = await listMt5Accounts(ctx);
+    return accounts[0] ?? null;
   },
 );
 
 export async function connectMt5Account(
   ctx: TenantContext,
-  data: { login: string; server: string; investorPwEncrypted: string; accountCurrency?: string },
+  data: {
+    login: string;
+    server: string;
+    investorPwEncrypted: string;
+    accountCurrency?: string;
+    /** What the trader calls this one. Undefined leaves an existing label alone. */
+    label?: string | null;
+  },
 ): Promise<Mt5AccountView> {
   assertContext(ctx);
+  /*
+   * Keyed on the broker account, not on the trader.
+   *
+   * It used to be `where: { userId }`, which was correct while a trader could only have one:
+   * connecting a second account *replaced* the first, silently, and the first account's trades
+   * were left behind pointing at a row that now described a different broker account. With two
+   * accounts supported, connecting the swing account must add it rather than overwrite the day
+   * one — so the same login at the same server is the same account and gets updated, and
+   * anything else is a new row.
+   */
   const row = await prisma.mt5Account.upsert({
-    where: { userId: ctx.userId },
+    where: {
+      userId_login_server: { userId: ctx.userId, login: data.login, server: data.server },
+    },
     create: {
       userId: ctx.userId,
       login: data.login,
       server: data.server,
+      label: data.label ?? null,
       investorPwEncrypted: data.investorPwEncrypted,
       accountCurrency: data.accountCurrency ?? null,
       status: 'connected',
     },
     update: {
-      login: data.login,
-      server: data.server,
       investorPwEncrypted: data.investorPwEncrypted,
       accountCurrency: data.accountCurrency ?? null,
       status: 'connected',
-      // A different account means the old history no longer belongs to it; the caller
-      // clears the trades in the same transaction.
-      lastSyncAt: null,
+      ...(data.label === undefined ? {} : { label: data.label }),
     },
     select: VIEW_FIELDS,
   });
@@ -121,26 +162,37 @@ export async function connectMt5Account(
  * The only path that returns the ciphertext. Named so that a reviewer grepping for where the
  * investor password can escape finds one call site.
  */
-export async function readCredentialCiphertext(ctx: TenantContext): Promise<{
-  login: string;
-  server: string;
-  investorPwEncrypted: string;
-  providerAccountId: string | null;
-} | null> {
+export async function readCredentialCiphertexts(ctx: TenantContext): Promise<
+  {
+    id: string;
+    login: string;
+    server: string;
+    investorPwEncrypted: string;
+    providerAccountId: string | null;
+  }[]
+> {
   assertContext(ctx);
-  return prisma.mt5Account.findFirst({
+  return prisma.mt5Account.findMany({
     where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
-    select: { login: true, server: true, investorPwEncrypted: true, providerAccountId: true },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      login: true,
+      server: true,
+      investorPwEncrypted: true,
+      providerAccountId: true,
+    },
   });
 }
 
 export async function recordSyncSuccess(
   ctx: TenantContext,
+  mt5AccountId: string,
   state: { currency: string; balance: number; equity: number; providerAccountId?: string | null },
 ): Promise<void> {
   assertContext(ctx);
   await prisma.mt5Account.updateMany({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    where: { id: mt5AccountId, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
     data: {
       status: 'connected',
       lastSyncAt: new Date(),
@@ -152,20 +204,33 @@ export async function recordSyncSuccess(
   });
 }
 
-export async function recordSyncFailure(ctx: TenantContext): Promise<void> {
+export async function recordSyncFailure(ctx: TenantContext, mt5AccountId: string): Promise<void> {
   assertContext(ctx);
   await prisma.mt5Account.updateMany({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    where: { id: mt5AccountId, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
     data: { status: 'error' },
   });
 }
 
-export async function disconnectMt5Account(ctx: TenantContext): Promise<void> {
+/**
+ * Disconnects one account, named explicitly.
+ *
+ * Deletes rather than marking disconnected: keeping an encrypted password for an account the
+ * user has walked away from serves nobody. The trades stay — they are the trader's journal,
+ * not the broker's — and the foreign key is `ON DELETE SET NULL`, so they lose the link and
+ * keep the history. Passing no id disconnects every account, which is what account deletion
+ * and the tests want; the settings screen always names one.
+ */
+export async function disconnectMt5Account(
+  ctx: TenantContext,
+  mt5AccountId?: string,
+): Promise<void> {
   assertContext(ctx);
-  // Delete rather than mark disconnected: keeping an encrypted password for an account the
-  // user has walked away from serves nobody. The trades stay — they are the user's journal,
-  // not the broker's.
   await prisma.mt5Account.deleteMany({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    where: {
+      userId: ctx.userId,
+      user: { tenantId: ctx.tenantId },
+      ...(mt5AccountId ? { id: mt5AccountId } : {}),
+    },
   });
 }

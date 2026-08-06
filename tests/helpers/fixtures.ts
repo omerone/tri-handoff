@@ -86,3 +86,29 @@ export async function cleanup(): Promise<void> {
   }
   await testDb.$disconnect();
 }
+
+/**
+ * A connected broker account for a fixture, and the id trades hang off.
+ *
+ * `upsertTrades` takes an account because two brokers can issue the same position ticket and
+ * the key has to tell them apart. Tests that only care about trades existing should not have
+ * to know that, so this is one line at the top of them.
+ */
+export async function connectAccountFixture(
+  fixture: Fixture,
+  over: { login?: string; server?: string; label?: string } = {},
+): Promise<string> {
+  const row = await testDb.mt5Account.create({
+    data: {
+      userId: fixture.userId,
+      login: over.login ?? '50214437',
+      server: over.server ?? 'MetaQuotes-Demo',
+      label: over.label ?? null,
+      investorPwEncrypted: 'v1.test.ciphertext',
+      accountCurrency: 'USD',
+      status: 'connected',
+    },
+    select: { id: true },
+  });
+  return row.id;
+}
