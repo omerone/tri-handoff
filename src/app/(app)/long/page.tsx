@@ -2,7 +2,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { EmptyState, KPI } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
-import { countManualTrades, listLongPositions, type StoredLongPosition } from '@/lib/db';
+import { countTradesByStyle, listLongPositions, type StoredLongPosition } from '@/lib/db';
 import {
   isStale,
   portfolioTotals,
@@ -57,7 +57,7 @@ export default async function LongPositionsPage({
 
   const [positions, manualCounts] = await Promise.all([
     listLongPositions(session.ctx),
-    countManualTrades(session.ctx),
+    countTradesByStyle(session.ctx),
   ]);
 
   /*

@@ -661,7 +661,8 @@
     "cancel": "Cancel",
     "save": "Save",
     "saved": "Trade updated.",
-    "editGone": "That trade no longer exists, or cannot be edited."
+    "editGone": "That trade no longer exists, or cannot be edited.",
+    "syncedRow": "From MT5"
   },
   "trades": {
     "source": {

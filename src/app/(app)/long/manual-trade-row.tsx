@@ -29,6 +29,15 @@ export type ManualTradeView = {
   rr: string | null;
   rrPositive: boolean;
   journalled: boolean;
+  /**
+   * Whether the trader typed this one.
+   *
+   * These tabs list the whole book for their style now, so most rows arrived from a broker.
+   * Those are the broker's record: editing one would be overwritten by the next sync and
+   * deleting one would be undone by it, so the controls are simply not offered. The chip
+   * says which is which, because a row with no buttons and no explanation reads as broken.
+   */
+  isManual: boolean;
   /** The raw values, formatted for form inputs rather than for reading. */
   edit: {
     symbol: string;
@@ -50,6 +59,8 @@ export type ManualTradeView = {
 export type ManualTradeRowLabels = {
   journal: string;
   edit: string;
+  /** Chip wording for a row the broker sent, where edit and delete are not offered. */
+  synced: string;
   cancel: string;
   save: string;
   delete: string;
@@ -238,30 +249,46 @@ export function ManualTradeRow({
             <NotebookPen size={14} aria-hidden />
           </Link>
 
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            aria-label={labels.edit}
-            data-tip={labels.edit}
-            className="text-dim/60 hover:text-text inline-flex p-1"
-          >
-            <Pencil size={14} aria-hidden />
-          </button>
+          {/*
+            Edit and delete only on what the trader typed.
 
-          <form action={deleteManualTradeAction} className="inline-flex">
-            <input type="hidden" name="id" value={trade.id} />
-            <button
-              type="submit"
-              aria-label={labels.delete}
-              data-tip={labels.delete}
-              onClick={(event) => {
-                if (!window.confirm(labels.deleteConfirm)) event.preventDefault();
-              }}
-              className="text-dim/60 hover:text-neg inline-flex p-1"
-            >
-              <Trash2 size={14} aria-hidden />
-            </button>
-          </form>
+            These tabs list the whole book for their style, so most rows came from a broker.
+            Offering the controls on those would be offering an action the product undoes: the
+            next sync writes the broker's version back over an edit, and puts a deleted row
+            straight back. `deleteManualTrade` already refuses on the server — this is the
+            same rule where the person can see it, rather than a button that appears to work.
+          */}
+          {trade.isManual ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                aria-label={labels.edit}
+                data-tip={labels.edit}
+                className="text-dim/60 hover:text-text inline-flex p-1"
+              >
+                <Pencil size={14} aria-hidden />
+              </button>
+
+              <form action={deleteManualTradeAction} className="inline-flex">
+                <input type="hidden" name="id" value={trade.id} />
+                <button
+                  type="submit"
+                  aria-label={labels.delete}
+                  data-tip={labels.delete}
+                  onClick={(event) => {
+                    if (!window.confirm(labels.deleteConfirm)) event.preventDefault();
+                  }}
+                  className="text-dim/60 hover:text-neg inline-flex p-1"
+                >
+                  <Trash2 size={14} aria-hidden />
+                </button>
+              </form>
+            </>
+          ) : (
+            // Said rather than left blank: a row with no controls and no reason reads as broken.
+            <span className="text-dim/60 text-[10px] whitespace-nowrap">{labels.synced}</span>
+          )}
         </span>
       </td>
     </tr>

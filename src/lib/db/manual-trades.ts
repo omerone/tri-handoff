@@ -301,12 +301,33 @@ export type ManualTradeRow = {
   swap: number;
   /** Whether anything has been written in the journal against it. */
   journalled: boolean;
+  /**
+   * Whether the trader typed this one.
+   *
+   * The Day and Swing tabs list the whole book for their style now, broker rows included,
+   * so the screen has to know which rows it is allowed to edit or delete: a synced trade is
+   * the broker's record and the next sync would put back anything changed here anyway.
+   */
+  isManual: boolean;
 };
 
 const num = (value: Prisma.Decimal | null): number | null => (value === null ? null : Number(value));
 
 /** The manual rows of one style, newest close first — what the tab lists. */
-export async function listManualTrades(
+/**
+ * Every trade of one style, whatever wrote it.
+ *
+ * This used to be the manual rows only, which made the Day and Swing tabs a record of what
+ * somebody had typed rather than of how they had traded — a swing book that omitted every
+ * swing the broker reported. With an account declaring what it is for, the style column is now
+ * the whole answer: the swing account's trades are swings, the typed ones say so themselves,
+ * and both belong in the same tab.
+ *
+ * Each row still carries `isManual`, because the screen may only edit and delete the ones the
+ * trader wrote. A synced trade is the broker's record, and the next sync would put back
+ * anything changed here.
+ */
+export async function listTradesByStyle(
   ctx: TenantContext,
   style: TradeStyle,
 ): Promise<ManualTradeRow[]> {
@@ -318,7 +339,6 @@ export async function listManualTrades(
       user: { tenantId: ctx.tenantId },
       kind: 'trade',
       style,
-      ...MANUAL_ONLY,
     },
     orderBy: [{ closeAt: 'desc' }, { createdAt: 'desc' }],
     take: 2000,
@@ -333,6 +353,7 @@ export async function listManualTrades(
  */
 function toManualRow(row: {
   id: string;
+  ticket: string;
   symbol: string;
   assetClass: AssetClass;
   direction: Direction;
@@ -373,6 +394,7 @@ function toManualRow(row: {
     takeProfit: num(row.tp),
     commission: Number(row.commission),
     swap: Number(row.swap),
+    isManual: isManualTicket(row.ticket),
     journalled: Boolean(
       row.note || row.tags.length > 0 || row.rating || row.mood || row.strategy,
     ),
@@ -401,13 +423,14 @@ export async function countSyncedTrades(ctx: TenantContext): Promise<number> {
 }
 
 /** How many manual trades exist, per style — for the tab counts. */
-export async function countManualTrades(
+export async function countTradesByStyle(
   ctx: TenantContext,
 ): Promise<Record<TradeStyle, number>> {
   assertContext(ctx);
   const grouped = await prisma.trade.groupBy({
     by: ['style'],
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, kind: 'trade', ...MANUAL_ONLY },
+    // No MANUAL_ONLY: the number on a tab has to be the number of rows under it.
+    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, kind: 'trade' },
     _count: { _all: true },
   });
 

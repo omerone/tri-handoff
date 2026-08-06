@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { KPI } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { computeMetrics } from '@/lib/analytics';
-import { getMt5Account, listManualTrades } from '@/lib/db';
+import { getMt5Account, listTradesByStyle } from '@/lib/db';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
@@ -36,7 +36,7 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
   const rtl = LOCALE_DIR[locale] === 'rtl';
 
   const [trades, account] = await Promise.all([
-    listManualTrades(session.ctx, style),
+    listTradesByStyle(session.ctx, style),
     getMt5Account(session.ctx),
   ]);
 
@@ -135,6 +135,7 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
         : `${trade.rr >= 0 ? '+' : ''}${formatNumber(trade.rr, locale, 2)}R`,
     rrPositive: (trade.rr ?? 0) >= 0,
     journalled: trade.journalled,
+    isManual: trade.isManual,
     style: trade.style,
     edit: {
       symbol: trade.symbol,
@@ -208,6 +209,7 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
             row: {
               journal: tJournal('title'),
               edit: t('edit'),
+      synced: t('syncedRow'),
               cancel: t('cancel'),
               save: t('save'),
               delete: t('delete'),

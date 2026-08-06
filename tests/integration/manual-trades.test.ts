@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
-  countManualTrades,
+  countTradesByStyle,
   countSyncedTrades,
   createManualTrade,
   deleteAllTrades,
@@ -9,7 +9,7 @@ import {
   getManualTrade,
   isManualTrade,
   listClosedTrades,
-  listManualTrades,
+  listTradesByStyle,
   updateManualTrade,
   upsertTrades,
   type ManualTradeInput,
@@ -68,7 +68,7 @@ let bob: Fixture;
 
 const JULY = new Date('2026-07-15T12:00:00.000Z');
 
-/** `countManualTrades` answers per style; most assertions here only care about the total. */
+/** `countTradesByStyle` answers per style; most assertions here only care about the total. */
 const totalManual = (counts: { day: number; swing: number }) => counts.day + counts.swing;
 
 function manual(over: Partial<ManualTradeInput> = {}): ManualTradeInput {
@@ -265,20 +265,41 @@ describe('listing', () => {
     await createManualTrade(fixture.ctx, manual({ style: 'swing', symbol: 'GOLD' }));
     await createManualTrade(alice.ctx, manual({ style: 'day', symbol: 'NOTYOURS' }));
 
-    const day = await listManualTrades(fixture.ctx, 'day');
-    const swing = await listManualTrades(fixture.ctx, 'swing');
+    const day = await listTradesByStyle(fixture.ctx, 'day');
+    const swing = await listTradesByStyle(fixture.ctx, 'swing');
 
     expect(day.map((trade) => trade.symbol).sort()).toEqual(['EURUSD', 'USDJPY']);
     expect(swing.map((trade) => trade.symbol)).toEqual(['GOLD']);
   });
 
-  it('lists manual trades only, never a synced one', async () => {
+  /**
+   * The tab is a book, not a record of what somebody typed.
+   *
+   * It used to list the manual rows alone, which made the Swing tab a swing book that omitted
+   * every swing the broker reported — the trader's own trades, missing from their own journal,
+   * because of where they had arrived from. With an account declaring what it is for, style is
+   * the whole answer and both belong under it.
+   */
+  it('lists the whole book for its style, typed and synced alike', async () => {
     const fixture = await createTenantFixture();
     await createManualTrade(fixture.ctx, manual({ symbol: 'TYPED' }));
     await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('7001', { symbol: 'SYNCED' })]);
 
-    const listed = await listManualTrades(fixture.ctx, 'day');
-    expect(listed.map((trade) => trade.symbol)).toEqual(['TYPED']);
+    const listed = await listTradesByStyle(fixture.ctx, 'day');
+    expect(listed.map((trade) => trade.symbol).sort()).toEqual(['SYNCED', 'TYPED']);
+  });
+
+  it('says which rows the trader may edit', async () => {
+    // The screen offers edit and delete on the typed rows only: a synced trade is the broker's
+    // record, and the next sync would write its version back over an edit and restore a delete.
+    const fixture = await createTenantFixture();
+    await createManualTrade(fixture.ctx, manual({ symbol: 'TYPED' }));
+    await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('7002', { symbol: 'SYNCED' })]);
+
+    const listed = await listTradesByStyle(fixture.ctx, 'day');
+    const bySymbol = new Map(listed.map((trade) => [trade.symbol, trade.isManual]));
+    expect(bySymbol.get('TYPED')).toBe(true);
+    expect(bySymbol.get('SYNCED')).toBe(false);
   });
 
   it('counts per style for the tabs', async () => {
@@ -289,9 +310,11 @@ describe('listing', () => {
     await createManualTrade(fixture.ctx, manual({ style: 'day', profit: 11 }));
     await createManualTrade(fixture.ctx, manual({ style: 'swing', profit: 22 }));
     await createManualTrade(fixture.ctx, manual({ style: 'swing', profit: 33 }));
+    // Counted too: the number on a tab has to be the number of rows under it, and the synced
+    // trade is one of them.
     await upsertTrades(fixture.ctx, await accountFor(fixture.ctx), [synced('8001')]);
 
-    expect(await countManualTrades(fixture.ctx)).toEqual({ day: 1, swing: 2 });
+    expect(await countTradesByStyle(fixture.ctx)).toEqual({ day: 2, swing: 2 });
   });
 
   it('keeps the style the trader chose rather than deriving it from the dates', async () => {
@@ -300,8 +323,8 @@ describe('listing', () => {
     const fixture = await createTenantFixture();
     await createManualTrade(fixture.ctx, manual({ style: 'swing', openAt: JULY, closeAt: JULY }));
 
-    expect(await listManualTrades(fixture.ctx, 'swing')).toHaveLength(1);
-    expect(await listManualTrades(fixture.ctx, 'day')).toHaveLength(0);
+    expect(await listTradesByStyle(fixture.ctx, 'swing')).toHaveLength(1);
+    expect(await listTradesByStyle(fixture.ctx, 'day')).toHaveLength(0);
   });
 });
 
@@ -337,7 +360,7 @@ describe('submitting the same trade twice', () => {
     const second = await createManualTrade(carol.ctx, input);
 
     expect(second).toBe(first);
-    expect(totalManual(await countManualTrades(carol.ctx))).toBe(1);
+    expect(totalManual(await countTradesByStyle(carol.ctx))).toBe(1);
     const trades = await listClosedTrades(carol.ctx);
     expect(trades.filter((t) => t.symbol === 'GBPUSD')).toHaveLength(1);
   });
@@ -349,7 +372,7 @@ describe('submitting the same trade twice', () => {
     await createManualTrade(dave.ctx, manual({ symbol: 'USDJPY', profit: 100 }));
     await createManualTrade(dave.ctx, manual({ symbol: 'USDJPY', profit: 120 }));
 
-    expect(totalManual(await countManualTrades(dave.ctx))).toBe(2);
+    expect(totalManual(await countTradesByStyle(dave.ctx))).toBe(2);
   });
 
   it('keeps two trades apart when only the clock separates them', async () => {
@@ -361,7 +384,7 @@ describe('submitting the same trade twice', () => {
       closeAt: new Date(base.closeAt.getTime() + 1000),
     });
 
-    expect(totalManual(await countManualTrades(erin.ctx))).toBe(2);
+    expect(totalManual(await countTradesByStyle(erin.ctx))).toBe(2);
   });
 
   it('does not let one trader collapse another trader\'s identical trade', async () => {
@@ -373,8 +396,8 @@ describe('submitting the same trade twice', () => {
     await createManualTrade(frank.ctx, input);
     await createManualTrade(grace.ctx, input);
 
-    expect(totalManual(await countManualTrades(frank.ctx))).toBe(1);
-    expect(totalManual(await countManualTrades(grace.ctx))).toBe(1);
+    expect(totalManual(await countTradesByStyle(frank.ctx))).toBe(1);
+    expect(totalManual(await countTradesByStyle(grace.ctx))).toBe(1);
   });
 
   it('leaves the note on the row it already wrote', async () => {
@@ -582,8 +605,8 @@ describe('editing', () => {
 
     await updateManualTrade(fixture.ctx, id, manual({ style: 'swing' }));
 
-    expect(await listManualTrades(fixture.ctx, 'day')).toHaveLength(0);
-    expect(await listManualTrades(fixture.ctx, 'swing')).toHaveLength(1);
+    expect(await listTradesByStyle(fixture.ctx, 'day')).toHaveLength(0);
+    expect(await listTradesByStyle(fixture.ctx, 'swing')).toHaveLength(1);
   });
 });
 
