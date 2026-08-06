@@ -43,9 +43,21 @@ export function BreakdownChart({
   const format = (value: number) => formatDisplayMoney(value, display);
   // The axis gets the short form; the tooltip keeps the exact figure.
   const axisFormat = (value: number) => formatCompactMoney(value, display);
+
+  /*
+   * Shorter when there is less to compare.
+   *
+   * Height is what makes small differences between bars readable, and with ten weekday-hours
+   * side by side that matters. With two — long against short, winners against losers — the
+   * comparison is one subtraction and the captions underneath already give both figures
+   * exactly. A fixed 148px meant a month holding a single trade drew the same tall, mostly
+   * empty frame as a year holding ninety-two, on every one of eight cards.
+   */
+  const height = data.length <= 3 ? 108 : 148;
+
   return (
     <>
-      <div style={{ height: 180 }}>
+      <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
             <CartesianGrid stroke={TOKEN.line} vertical={false} />
@@ -86,7 +98,15 @@ export function BreakdownChart({
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+      {/*
+        A wrapping row, and it was briefly a fixed grid of columns instead — twelve captions on
+        the by-hour and by-instrument cards wrap to several lines, and those two are the tallest
+        things in this grid, which sets the height of everything beside them. Columns saved
+        nineteen pixels off a 2,545px page and cut "USDJPY: 1.02R · 60%" to "USDJPY: 1.02R ·",
+        because a third of a 440px card is not wide enough for the numbers these exist to show.
+        Nineteen pixels is not worth a truncated figure on a page whose whole job is figures.
+      */}
+      <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
         {data.map((entry) => (
           <div key={entry.key} className="text-dim text-[11px]">
             {entry.label}: <span className="tri-num text-text">{entry.caption}</span>

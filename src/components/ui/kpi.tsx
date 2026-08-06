@@ -92,7 +92,14 @@ export function Chip({
   );
 }
 
-/** The prototype's empty state: centred, quiet, never a spinner that never resolves. */
+/**
+ * The prototype's empty state: centred, quiet, never a spinner that never resolves.
+ *
+ * `py-4` rather than `py-8`. A card holding one sentence was 161px tall on the analytics
+ * screen — taller than the hold-time card, which holds actual numbers — and there are several
+ * of them on a book that has not been filled in yet. Emptiness should take the space of what
+ * it says, not the space of what would have been there.
+ */
 export function EmptyState({ children }: { children: ReactNode }) {
-  return <p className="text-dim py-8 text-center text-sm">{children}</p>;
+  return <p className="text-dim py-4 text-center text-sm">{children}</p>;
 }

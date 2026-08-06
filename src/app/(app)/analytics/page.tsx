@@ -21,7 +21,16 @@ import { toTradeFilter } from '@/lib/time/range';
 import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
-import { byHour, byMood, byRating, bySymbol, NO_MOOD, SESSIONS, UNRATED, WEEKDAYS } from '@/lib/analytics/dimensions';
+import {
+  byHour,
+  byMood,
+  byRating,
+  bySymbol,
+  NO_MOOD,
+  SESSIONS,
+  UNRATED,
+  WEEKDAYS,
+} from '@/lib/analytics/dimensions';
 import { holdTimes } from '@/lib/analytics/streaks';
 import { formatDuration } from '@/lib/time/format';
 import { DonutChart } from '@/components/charts/donut-chart';
@@ -110,8 +119,7 @@ export default async function AnalyticsPage({
   const learned = learningTotals(learning);
 
   const sharePct = (value: number) => `${formatNumber(value * 100, locale, 0)}%`;
-  const learningHours = (value: number) =>
-    `${formatNumber(value, locale, hoursDecimals(value))}h`;
+  const learningHours = (value: number) => `${formatNumber(value, locale, hoursDecimals(value))}h`;
 
   const timingSlices = timing.slices.map((slice) => ({
     key: slice.key,
@@ -307,7 +315,7 @@ export default async function AnalyticsPage({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <Card title={t('analytics.insights')}>
         {insights.length === 0 ? (
           <EmptyState>{t('analytics.noData')}</EmptyState>
@@ -346,7 +354,15 @@ export default async function AnalyticsPage({
         with the least in it. Beside the other breakdowns it is the same size as the questions
         it belongs with, and an odd count simply leaves the last row half full.
       */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {/*
+        `items-start`, which is most of the reason this page was as tall as it was. A grid
+        stretches every cell to the tallest in its row, so "by direction" — two bars and one
+        line of caption — was drawn the same height as "by hour opened", which carries twelve
+        lines of them. Half of that card was blank, and the same happened on every row.
+        Letting each card be its own height leaves the bottoms ragged, which is what a set of
+        differently-sized answers actually looks like.
+      */}
+      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
         {charts.map((chart) => (
           <Card key={chart.title} title={chart.title}>
             <BreakdownChart data={chart.data} rtl={rtl} display={display} />
@@ -360,7 +376,7 @@ export default async function AnalyticsPage({
         heatmap because they answer "am I following my plan", and the heatmap answers "when
         does my plan work" — the first is the one worth reading first.
       */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid items-start gap-3 lg:grid-cols-3">
         <Card title={t('review.tpTiming')}>
           <DonutChart
             data={timingSlices}
@@ -403,6 +419,12 @@ export default async function AnalyticsPage({
         still show a decent win rate and a positive month. It only becomes visible when the
         two durations are put beside each other, which is why this is a comparison rather than
         a KPI tile — the single number that matters is the relationship between them.
+      */}
+      {/*
+        Not paired with the costs card beside it, which was tried. It saved eighty-five pixels
+        and left a hundred and eighty of blank column under this one, because `items-start`
+        stops a short card stretching but nothing fills the row it leaves behind. A void that
+        size reads as something having failed to load.
       */}
       <Card title={t('analytics.holdTimes')}>
         <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
@@ -526,7 +548,9 @@ export default async function AnalyticsPage({
             sub={
               spread.restsOnOneTrade
                 ? t('analytics.restsOnOne')
-                : t('analytics.withoutBest', { amount: money(spread.netWithoutBest, { signed: true }) })
+                : t('analytics.withoutBest', {
+                    amount: money(spread.netWithoutBest, { signed: true }),
+                  })
             }
             title={t('analytics.topShareHint', { count: spread.topCount })}
           />
@@ -565,7 +589,9 @@ export default async function AnalyticsPage({
             <KPI
               label={t('analytics.capture')}
               value={
-                excursions.capture === null ? '—' : `${formatNumber(excursions.capture, locale, 0)}%`
+                excursions.capture === null
+                  ? '—'
+                  : `${formatNumber(excursions.capture, locale, 0)}%`
               }
               sub={t('analytics.leftOnTable', { amount: money(excursions.leftOnTable) })}
               title={t('analytics.captureHint')}
@@ -611,9 +637,7 @@ export default async function AnalyticsPage({
               grid={grid}
               rtl={rtl}
               money={money}
-              formatPercent={(value) =>
-                `${value > 0 ? '+' : ''}${formatNumber(value, locale, 1)}%`
-              }
+              formatPercent={(value) => `${value > 0 ? '+' : ''}${formatNumber(value, locale, 1)}%`}
               labels={{
                 months: monthNames,
                 year: t('analytics.year'),
@@ -705,9 +729,7 @@ function Row({
             <div className="text-on-heat text-xs font-bold">
               <Num>{money(cell.net, { signed: true })}</Num>
             </div>
-            <div className="text-on-heat/70 text-[10px]">
-              {tradeCount(cell.count)}
-            </div>
+            <div className="text-on-heat/70 text-[10px]">{tradeCount(cell.count)}</div>
           </div>
         );
       })}

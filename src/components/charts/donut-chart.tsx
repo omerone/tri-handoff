@@ -37,9 +37,23 @@ export function DonutChart({
 }) {
   const drawable = data.filter((slice) => slice.value > 0);
 
+  /*
+   * A smaller ring when there is nothing in it.
+   *
+   * 168px is the size a donut needs to be readable when it is divided into slices. An empty
+   * one is not divided into anything: it is a dashed circle around a zero, and it was being
+   * given the same space as a chart. Three of these sit in a row on the analytics page, and a
+   * trader who has not reviewed any trades yet was scrolling past half a screen of them to
+   * reach the numbers that do exist.
+   *
+   * The page should cost what it has to say. A month with one trade was as long as a year
+   * with ninety-two.
+   */
+  const size = drawable.length === 0 ? 104 : 168;
+
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <div className="relative shrink-0" style={{ width: 168, height: 168 }}>
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
         {drawable.length === 0 ? (
           /*
            * A dashed ring where the chart would be, and nothing written inside it. The
@@ -100,19 +114,19 @@ export function DonutChart({
       {drawable.length === 0 ? (
         <p className="text-dim min-w-0 flex-1 text-xs leading-relaxed">{emptyLabel}</p>
       ) : (
-      <ul className="flex min-w-0 flex-1 flex-col gap-1.5">
-        {data.map((slice) => (
-          <li key={slice.key} className="flex items-baseline gap-2 text-xs">
-            <span
-              aria-hidden
-              className="mt-0.5 size-2.5 shrink-0 rounded-[3px]"
-              style={{ background: slice.color }}
-            />
-            <span className="text-text min-w-0 flex-1 truncate">{slice.label}</span>
-            <span className="tri-num text-dim shrink-0">{slice.caption}</span>
-          </li>
-        ))}
-      </ul>
+        <ul className="flex min-w-0 flex-1 flex-col gap-1.5">
+          {data.map((slice) => (
+            <li key={slice.key} className="flex items-baseline gap-2 text-xs">
+              <span
+                aria-hidden
+                className="mt-0.5 size-2.5 shrink-0 rounded-[3px]"
+                style={{ background: slice.color }}
+              />
+              <span className="text-text min-w-0 flex-1 truncate">{slice.label}</span>
+              <span className="tri-num text-dim shrink-0">{slice.caption}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
