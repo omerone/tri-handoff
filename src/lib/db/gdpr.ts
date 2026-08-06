@@ -61,7 +61,7 @@ interface DeletionAuditLog {
 export async function validateDeletionRequest(
   userId: string,
   passwordHash: string,
-  userProvidedPassword: string
+  userProvidedPassword: string,
 ): Promise<{ valid: boolean; error?: string }> {
   // Import password verification from crypto module
   const { verifyPassword } = await import('@/lib/crypto/password');
@@ -92,7 +92,7 @@ export async function validateDeletionRequest(
 export async function deleteUserDataGDPR(
   userId: string,
   ipAddress?: string,
-  userAgent?: string
+  userAgent?: string,
 ): Promise<DeletionAuditLog> {
   const startTime = Date.now();
 
@@ -206,9 +206,7 @@ export async function deleteUserDataGDPR(
  * Count all records associated with a user
  * Used for audit logging
  */
-async function countUserRecords(
-  userId: string
-): Promise<DeletionAuditLog['recordsDeleted']> {
+async function countUserRecords(userId: string): Promise<DeletionAuditLog['recordsDeleted']> {
   const [
     sessions,
     resetTokens,
@@ -254,8 +252,23 @@ export async function exportUserData(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      sessions: true,
-      resetTokens: true,
+      // Sessions by their columns rather than whole, and no reset tokens at all.
+      //
+      // Both tables were pulled in full. The returned object already picks safe fields off a
+      // session and never mentions reset tokens, so nothing leaked — but `tokenHash` was
+      // loaded into memory for both, and the only reason to load a row is to return it.
+      // Whoever next adds a field to this export will do it by reaching into what is already
+      // here, and what is already here is credential material.
+      sessions: {
+        select: {
+          id: true,
+          createdAt: true,
+          lastSeenAt: true,
+          expiresAt: true,
+          ip: true,
+          userAgent: true,
+        },
+      },
       mt5Account: true,
       trades: true,
       financeEntries: true,
