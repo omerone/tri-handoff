@@ -52,16 +52,23 @@ setup('authenticate and connect MT5', async ({ page }) => {
   await page.goto('/settings');
   const connected = page.getByText('#50214437').first();
   if (!(await connected.count())) {
-    const next = page.getByRole('button', { name: 'Next' });
+    /*
+     * Scoped to one account slot. The screen offers two now — a swing account and a
+     * day-trading one, each with its own copy of the whole wizard — so every control in here
+     * exists twice on the page and an unscoped `Next` matches both. The suite needs one
+     * connected account, and the swing slot is the first of them.
+     */
+    const wizard = page.locator('section').filter({ hasText: 'Swing account' }).first();
+    const next = wizard.getByRole('button', { name: 'Next' });
     await next.click();
-    await page.locator('#login-field').fill('50214437');
+    await wizard.locator('#login-field').fill('50214437');
     await next.click();
     // A free-text field now, not a list: every broker names its servers its own way, so a
     // closed dropdown could not express a real account.
-    await page.locator('#server').fill('MetaQuotes-Live01');
+    await wizard.locator('#server').fill('MetaQuotes-Live01');
     await next.click();
-    await page.locator('#password-field').fill('investor-read-only');
-    await page.getByRole('button', { name: 'Connect account' }).click();
+    await wizard.locator('#password-field').fill('investor-read-only');
+    await wizard.getByRole('button', { name: 'Connect account' }).click();
   }
   await expect(connected).toBeVisible({ timeout: 60_000 });
 
