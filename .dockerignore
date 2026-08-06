@@ -1,0 +1,35 @@
+# What must never reach a container image.
+#
+# There was no .dockerignore, the builder stage is `COPY . .`, and Next's
+# standalone output copies `.env` files on purpose — it loads them itself at
+# runtime. So the shipped image carried /app/.env and /app/.env.local, holding
+# SESSION_SECRET, ENCRYPTION_KEY, DATABASE_URL, POSTGRES_PASSWORD and the market
+# data key. That is every session forgeable and every MT5 investor password
+# decryptable, to anyone who can read the image.
+#
+# It never needed to be there. docker-compose passes each of those to the
+# container through `environment:`, which is where the running app reads them
+# from; the file was a passenger.
+#
+# Layers are the reason this matters more than a stray file usually would. A
+# secret added in one layer and deleted in a later one is still in the image, and
+# an image is a thing that gets pushed, exported, cached and copied — the day
+# this one goes to a registry is the day the secrets go with it, whatever the
+# filesystem looks like by then.
+.env
+.env.*
+!.env.example
+ops/
+
+# Nothing below is a secret; it is weight and noise in the build context.
+.git
+.github
+.husky
+node_modules
+.next
+e2e
+playwright-report
+test-results
+coverage
+docs
+*.log
