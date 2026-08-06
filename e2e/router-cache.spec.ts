@@ -51,7 +51,23 @@ test('a tab left open cannot keep reading the book after another tab signs out',
     .getByRole('link', { name: /עסקאות|Trades/ })
     .first()
     .click();
-  await left.waitForLoadState('networkidle');
 
-  expect(left.url(), 'a client-side click served an app screen with no session').toMatch(/\/login/);
+  /*
+   * A retrying assertion on the URL, not `waitForLoadState('networkidle')` and then a read.
+   *
+   * That is what this was, and it failed intermittently while the app was fine: a soft
+   * navigation swaps the URL and the tree in stages, so there is a moment where the request
+   * has settled, the redirect has not landed, and `page.url()` still says `/dashboard`. The
+   * test reported a signed-out tab reading the book. It was reading the clock.
+   *
+   * Worth being exact about what this claims, because it is a security test. The tab keeps its
+   * own previously-rendered document in memory until the redirect paints — that is the
+   * browser, not the server, and nothing new is disclosed by it. What must not happen is the
+   * *server* answering a sessionless request with a screen, and landing on /login is what
+   * proves it did not.
+   */
+  await expect(left, 'a client-side click served an app screen with no session').toHaveURL(
+    /\/login/,
+  );
+  await expect(left.locator('input[name="password"]')).toBeVisible();
 });
