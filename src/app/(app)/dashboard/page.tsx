@@ -140,7 +140,18 @@ export default async function DashboardPage({
         label={t('kpi.maxDD')}
         value={money(-drawdown.maxDrawdown)}
         tone="neg"
-        sub={formatPercent(drawdown.maxDrawdownPercent, locale)}
+        /*
+         * The percentage is of the peak at the time, and a peak at or below zero has no base
+         * to be a fraction of — an account funded from nothing starts there. The engine
+         * returns 0 in that case rather than an infinity, which is right, but printing "0.0%"
+         * under a real drawdown states something false. Absent says what is true: there is a
+         * figure, and no percentage to go with it.
+         */
+        sub={
+          drawdown.maxDrawdownPercent > 0
+            ? formatPercent(drawdown.maxDrawdownPercent, locale)
+            : undefined
+        }
       />
     ),
     maxProfit: (
@@ -148,7 +159,8 @@ export default async function DashboardPage({
         label={t('kpi.maxProfit')}
         value={money(runUp.maxRunUp, { signed: true })}
         tone="pos"
-        sub={formatPercent(runUp.maxRunUpPercent, locale)}
+        // Same reasoning as the drawdown above.
+        sub={runUp.maxRunUpPercent > 0 ? formatPercent(runUp.maxRunUpPercent, locale) : undefined}
       />
     ),
     streak: (

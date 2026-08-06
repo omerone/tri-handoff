@@ -78,3 +78,25 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint
+
+  waf-rules:
+    name: WAF Rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # The rules file is loaded by scripts/deploy-waf.ts. It carried a raw NUL byte where a
+      # pattern *for* a NUL byte was meant, which no YAML parser will read — so the file was
+      # unloadable and this check had been failing since it was written.
+      - name: Validate WAF rules parse
+        run: |
+          python3 - <<'PY'
+          import sys, yaml
+          rules = yaml.safe_load(open('docs/WAF_RULES.yaml', encoding='utf-8'))
+          count = len(rules.get('rules', []))
+          if count == 0:
+              sys.exit('WAF_RULES.yaml parsed but declares no rules')
+          print(f'WAF rules parse cleanly: {count} rules')
+          PY
