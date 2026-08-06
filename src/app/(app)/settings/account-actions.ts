@@ -113,10 +113,10 @@ export async function deleteUserAccount(
       userAgent || undefined,
     );
 
-    // Log successful deletion
-    console.error('[GDPR] Account deletion completed', {
-      userId: auditLog.userId,
-      email: auditLog.email,
+    // The second copy of the same line, and the same reasoning as the one inside
+    // `deleteUserDataGDPR`: the email and the id do not go to a log that no future
+    // erasure request can reach. The counts answer what a compliance question asks.
+    console.error('[GDPR] account deletion completed', {
       timestamp: auditLog.deletedAt.toISOString(),
       recordsDeleted: auditLog.recordsDeleted,
     });

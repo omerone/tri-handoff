@@ -188,15 +188,30 @@ export async function deleteUserDataGDPR(
     userAgent,
   };
 
-  // Log deletion to application logs (for compliance records)
-  console.error('[GDPR] User account deleted', {
-    userId: user.id,
-    email: user.email,
-    tenantId: user.tenantId,
+  /*
+   * That a deletion happened, and how much it took — not who it was.
+   *
+   * This line used to carry the address, the email and the requesting IP of the
+   * person whose entire request was that we stop holding those. The rows go, the log
+   * keeps them: container logs rotate on size rather than on any policy, nothing
+   * prunes them on a schedule, and no future erasure request reaches them. Doing that
+   * in the one function whose purpose is erasure is the wrong place to be careless.
+   *
+   * The counts stay, and they are what a compliance question actually asks — *did we
+   * delete, and what*. They identify nobody: the userId and tenantId are gone from the
+   * line for the same reason `deleteUserDataGDPR` nullifies them in `admin_audit_logs`
+   * rather than leaving them to point at a user who no longer exists. Re-creating that
+   * link in stderr would undo the care taken twenty lines above.
+   *
+   * If a per-request record is ever needed — the regulation wants you able to show a
+   * request was honoured — it belongs in a store designed for it, with its own
+   * retention and its own access control. `auditLog` is returned for a caller to do
+   * exactly that. A rotating log file is not that store.
+   */
+  console.error('[GDPR] account deleted on request', {
     timestamp: deletedAt.toISOString(),
     durationMs: duration,
     recordsDeleted: counts,
-    requestedFrom: ipAddress,
   });
 
   return auditLog;
