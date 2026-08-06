@@ -40,6 +40,7 @@ export const WIDGETS = {
   profitFactor: { kind: 'kpi', span: 2 },
   maxDd: { kind: 'kpi', span: 2 },
   maxProfit: { kind: 'kpi', span: 2 },
+  streak: { kind: 'kpi', span: 2 },
   rStrip: { kind: 'panel', span: 12 },
   equity: { kind: 'panel', span: 8 },
   recent: { kind: 'panel', span: 4 },

@@ -99,6 +99,57 @@ export function byStrategy(trades: readonly AnalyticsTrade[]): Bucket<string>[] 
   return bucketBy(trades, keys, (trade) => trade.strategy || UNLABELLED);
 }
 
+/**
+ * By the trader's own score for the trade, 1–5.
+ *
+ * The question this exists to answer is whether the self-assessment is worth anything: if the
+ * trades someone marks one star lose and the five-star ones win, the score is a signal they
+ * can act on before the P&L arrives. If the two are unrelated, it is a mood ring, and better
+ * to know that too.
+ *
+ * Unrated trades are their own bucket for the same reason `byStrategy` keeps `UNLABELLED` —
+ * a comparison across forty rated trades out of four hundred has to show what it rests on.
+ */
+export const RATINGS = [1, 2, 3, 4, 5] as const;
+export const UNRATED = '__unrated__';
+
+export function byRating(trades: readonly AnalyticsTrade[]): Bucket<string>[] {
+  const used = RATINGS.filter((score) => trades.some((trade) => trade.rating === score)).map(String);
+  const keys = trades.some((trade) => trade.rating === null) ? [...used, UNRATED] : used;
+  return bucketBy(trades, keys, (trade) =>
+    trade.rating === null ? UNRATED : String(trade.rating),
+  );
+}
+
+/**
+ * By the state the trader was in.
+ *
+ * Free text, so the buckets are whatever words that person actually uses — which is the point:
+ * "revenge" and "FOMO" are their categories, not ours. Compared case-insensitively so "Calm"
+ * and "calm" are one row rather than two half-rows that each look insignificant; the label
+ * kept is the first spelling seen, so it reads back the way it was typed.
+ */
+export const NO_MOOD = '__nomood__';
+
+export function byMood(trades: readonly AnalyticsTrade[]): Bucket<string>[] {
+  const labels = new Map<string, string>();
+  for (const trade of trades) {
+    const mood = trade.mood?.trim();
+    if (!mood) continue;
+    const key = mood.toLowerCase();
+    if (!labels.has(key)) labels.set(key, mood);
+  }
+
+  const named = [...labels.values()].sort((a, b) => a.localeCompare(b));
+  const keys = trades.some((trade) => !trade.mood?.trim()) ? [...named, NO_MOOD] : named;
+
+  return bucketBy(trades, keys, (trade) => {
+    const mood = trade.mood?.trim();
+    if (!mood) return NO_MOOD;
+    return labels.get(mood.toLowerCase()) ?? NO_MOOD;
+  });
+}
+
 export function bySymbol(trades: readonly AnalyticsTrade[]): Bucket<string>[] {
   const symbols = [...new Set(trades.map((t) => t.symbol))].sort();
   return bucketBy(trades, symbols, (trade) => trade.symbol);

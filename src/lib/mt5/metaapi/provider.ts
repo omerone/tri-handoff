@@ -165,6 +165,18 @@ class MetaApiError extends Error {
     return null;
   }
 
+  /**
+   * The subscription is unpaid, rather than the credentials being wrong.
+   *
+   * MetaApi will register an account for free but will not *start* one, and it says so with a
+   * 403 — the same status it uses for a rejected token. Matched on the sentence because the
+   * body carries no machine-readable code for it: `{"error":"ForbiddenError","message":"To
+   * allow trading account deployment please top up your account.","details":{}}`.
+   */
+  isBillingProblem(): boolean {
+    return /top up your account|insufficient funds|please top up/i.test(this.message);
+  }
+
   isUnknownServer(): boolean {
     if (this.code() === 'E_SRV_NOT_FOUND') return true;
     // Kept as a backstop only: MetaApi is free to reword a sentence, so the code above is the
@@ -507,6 +519,15 @@ export class MetaApiProvider implements Mt5Provider {
       return { ok: true, account };
     } catch (error) {
       if (error instanceof MetaApiError) {
+        // Before the blanket 401/403 rule: a 403 is also how MetaApi says the *subscription*
+        // is unpaid, and that has nothing to do with the password the user just typed.
+        // Observed live: POST .../deploy answers 403 ForbiddenError "To allow trading account
+        // deployment please top up your account." Reading that as invalid-credentials sends
+        // the trader to re-check a password that was correct all along, while the account sits
+        // UNDEPLOYED and every subsequent client call answers 504.
+        if (error.isBillingProblem()) {
+          return { ok: false, reason: 'unreachable', detail: error.message };
+        }
         if (error.status === 401 || error.status === 403) {
           return { ok: false, reason: 'invalid-credentials' };
         }

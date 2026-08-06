@@ -1,4 +1,5 @@
 import type { Locale } from '@/i18n/config';
+import { formatNumber } from '@/lib/money/currency';
 import { ANALYTICS_TIME_ZONE, wallClock } from './zone';
 
 /**
@@ -173,4 +174,23 @@ export function formatTimeAt(instant: Date, timeZone: string = ANALYTICS_TIME_ZO
 
 export function formatDateTimeAt(instant: Date, timeZone: string = ANALYTICS_TIME_ZONE): string {
   return formatDateTime(wallClock(instant, timeZone));
+}
+
+/**
+ * A span of minutes, read the way a trader says it: minutes under an hour, hours and minutes
+ * under a day, days and hours beyond that.
+ *
+ * Lived in the single-trade page until the hold-time comparison on the analytics screen
+ * needed the same thing. Two copies of a formatter drift, and a hold time that reads "90m"
+ * on one screen and "1h 30m" on another is two facts as far as the reader is concerned.
+ */
+export function formatDuration(minutes: number, locale: Locale): string {
+  if (minutes < 60) return `${formatNumber(minutes, locale)}m`;
+  if (minutes < 60 * 24) {
+    const hours = Math.floor(minutes / 60);
+    return `${formatNumber(hours, locale)}h ${formatNumber(minutes % 60, locale)}m`;
+  }
+  const days = Math.floor(minutes / (60 * 24));
+  const hours = Math.floor((minutes % (60 * 24)) / 60);
+  return `${formatNumber(days, locale)}d ${formatNumber(hours, locale)}h`;
 }

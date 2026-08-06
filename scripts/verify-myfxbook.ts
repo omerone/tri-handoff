@@ -37,8 +37,20 @@ function required(name: string): string {
   return value;
 }
 
+/**
+ * The session token goes on the wire **unencoded**, and this is not a style choice.
+ *
+ * Myfxbook does not URL-decode the parameter: it compares the literal characters it received.
+ * A session is 98 characters of base64-ish text, so `URLSearchParams` percent-encodes the `+`
+ * and `/` in it, and the server then compares that escaped string against the real one and
+ * answers `{"error":true,"message":"Invalid session."}` — a login that plainly succeeded,
+ * followed by a session that plainly does not work. Verified both ways against the live API on
+ * one token: raw returns the account, encoded does not.
+ */
 async function call<T>(path: string, params: Record<string, string>): Promise<Envelope<T>> {
-  const query = new URLSearchParams(params).toString();
+  const query = Object.entries(params)
+    .map(([key, value]) => `${key}=${key === 'session' ? value : encodeURIComponent(value)}`)
+    .join('&');
   const response = await fetch(`${API}/${path}.json?${query}`, {
     signal: AbortSignal.timeout(30_000),
   });
@@ -54,26 +66,36 @@ async function call<T>(path: string, params: Record<string, string>): Promise<En
 type Account = {
   id: number;
   name?: string;
-  accountId?: number;
   balance?: number;
   equity?: number;
   profit?: number;
+  deposits?: number;
+  withdrawals?: number;
   gain?: number;
   drawdown?: number;
   currency?: string;
+  demo?: boolean;
   server?: { name?: string } | string;
+  firstTradeDate?: string;
   lastUpdateDate?: string;
 };
 
+/**
+ * Field names taken from a live response, not from the documentation.
+ *
+ * Two of them are not what a reader would guess: the swap column is called `interest`, and
+ * the volume column is called `sizing`. Guessing `swap` and `lots` yields `undefined`,
+ * which arithmetic quietly turns into a plausible wrong total rather than an error.
+ */
 type HistoryRow = {
   openTime?: string;
   closeTime?: string;
   symbol?: string;
   action?: string;
-  lots?: number;
+  sizing?: number | string;
   profit?: number;
   commission?: number;
-  swap?: number;
+  interest?: number;
 };
 
 const money = (value: number | undefined, currency = 'USD') =>
@@ -129,7 +151,7 @@ async function main() {
 
     const closed = history.filter((row) => row.closeTime);
     const net = history.reduce(
-      (sum, row) => sum + (row.profit ?? 0) + (row.commission ?? 0) + (row.swap ?? 0),
+      (sum, row) => sum + (row.profit ?? 0) + (row.commission ?? 0) + (row.interest ?? 0),
       0,
     );
     const times = closed
@@ -142,18 +164,34 @@ async function main() {
     console.log(`  rows returned   ${history.length}   (${span})`);
     console.log(`  net from those  ${money(net, currency)}`);
 
-    // The whole question. Anything at or just under 50 means we are seeing the cap rather than
-    // the account, and the backfill has to come from the FTMO CSV export.
-    if (history.length >= 50) {
-      console.log(
-        '\n  ⚠ 50 or more rows came back — this is the documented cap, not the whole account.',
-      );
-      console.log('    Myfxbook can keep the journal current; it cannot populate it.');
+    /*
+     * Whether those rows are the account, decided by arithmetic rather than by a row count.
+     *
+     * Counting against a documented cap is what a first version of this did, and it was worse
+     * than useless: the documentation says fifty in one place and forty in another, the live
+     * answer is forty, and "40 is under 50, so this looks complete" is a green tick in front
+     * of a truncated history. Money cannot be talked round the same way. Deposits, less
+     * withdrawals, plus everything the account ever earned, is the balance — so if the rows we
+     * were given do not add up to the balance the same API reports, rows are missing, and the
+     * gap is exactly what they were worth.
+     */
+    const deposits = target.deposits ?? 0;
+    const withdrawals = target.withdrawals ?? 0;
+    const reconstructed = deposits - withdrawals + net;
+    const balance = target.balance ?? 0;
+    const gap = balance - reconstructed;
+
+    console.log(`\n  deposits − withdrawals + those rows = ${money(reconstructed, currency)}`);
+    console.log(`  balance this same API reports       = ${money(balance, currency)}`);
+
+    if (Math.abs(gap) < 0.01) {
+      console.log('\n  ✓ It reconciles. These rows are the whole account.');
     } else {
-      console.log(
-        `\n  ✓ ${history.length} rows is under the documented 50-row cap, so this looks like the whole account.`,
-      );
-      console.log('    Worth confirming against the trade count in MetaTrader before trusting it.');
+      console.log(`\n  ✗ Off by ${money(gap, currency)} — the history is INCOMPLETE.`);
+      console.log(`    ${history.length} rows came back; the missing trades are worth that gap.`);
+      console.log('    get-history is hard-capped: neither a date range nor a limit parameter');
+      console.log('    raises it. Myfxbook can carry the headline numbers; it cannot carry the');
+      console.log('    journal. That has to come from the FTMO CSV export.');
     }
 
     console.log('\nDaily series (what an equity curve would be drawn from)…');

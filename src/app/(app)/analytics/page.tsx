@@ -21,7 +21,9 @@ import { toTradeFilter } from '@/lib/time/range';
 import { LOCALE_DIR, LOCALE_TAG, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
-import { SESSIONS, WEEKDAYS } from '@/lib/analytics/dimensions';
+import { byMood, byRating, NO_MOOD, SESSIONS, UNRATED, WEEKDAYS } from '@/lib/analytics/dimensions';
+import { holdTimes } from '@/lib/analytics/streaks';
+import { formatDuration } from '@/lib/time/format';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { listLearningEntries } from '@/lib/db';
 import { hoursDecimals, learningTotals } from '@/lib/learning/types';
@@ -64,6 +66,10 @@ export default async function AnalyticsPage({
    * see the comments in `review/stats.ts`. The captions carry both the count and the share so
    * the legend answers "how many" and "what fraction" without a second glance at the ring.
    */
+  const hold = holdTimes(book.trades);
+  const ratingBuckets = byRating(book.trades);
+  const moodBuckets = byMood(book.trades);
+
   const timing = tpTimingBreakdown(book.trades);
   const original = originalTpBreakdown(book.trades);
   const learned = learningTotals(learning);
@@ -177,12 +183,35 @@ export default async function AnalyticsPage({
    * than simply not being there. The unlabelled bucket stays in the chart when it exists,
    * because a comparison resting on 40 of 300 trades needs to show the other 260.
    */
+  /*
+   * By the trader's own score, and by the state they were in.
+   *
+   * Both were being collected from the first release and never left the journal form — the
+   * notebook icon in the trades table only knew whether *something* had been written. These
+   * are the question the fields were being filled in for: whether a one-star trade is also a
+   * losing one, and whether "revenge" costs what it feels like it costs.
+   *
+   * Each appears only once there is something to compare. A single bar reading "unrated" is a
+   * worse way of saying "you have not started scoring these" than an absent chart.
+   */
+  const ratingData = ratingBuckets.some((bucket) => bucket.key !== UNRATED)
+    ? toData(ratingBuckets, (key) =>
+        key === UNRATED ? t('analytics.unrated') : t('analytics.ratingStars', { count: key }),
+      )
+    : [];
+
+  const moodData = moodBuckets.some((bucket) => bucket.key !== NO_MOOD)
+    ? toData(moodBuckets, (key) => (key === NO_MOOD ? t('analytics.noMood') : key))
+    : [];
+
   const strategies = byStrategy(book.trades);
   const hasStrategies = strategies.some((bucket) => bucket.key !== UNLABELLED);
   const strategyData = hasStrategies
     ? toData(strategies, (key) => (key === UNLABELLED ? t('journal.unlabelled') : key))
     : [];
   if (hasStrategies) charts.push({ title: t('journal.byStrategy'), data: strategyData });
+  if (ratingData.length > 0) charts.push({ title: t('analytics.byRating'), data: ratingData });
+  if (moodData.length > 0) charts.push({ title: t('analytics.byMood'), data: moodData });
 
   const insights = bestConditions(book.trades);
   const cells = heatmap(book.trades);
@@ -286,6 +315,38 @@ export default async function AnalyticsPage({
           </p>
         </Card>
       </div>
+
+      {/*
+        The asymmetry every other figure on this page hides.
+        
+        A trader who closes winners in twenty minutes and sits with losers for two days can
+        still show a decent win rate and a positive month. It only becomes visible when the
+        two durations are put beside each other, which is why this is a comparison rather than
+        a KPI tile — the single number that matters is the relationship between them.
+      */}
+      <Card title={t('analytics.holdTimes')}>
+        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
+          <div>
+            <div className="text-dim text-[11px] font-semibold">{t('analytics.holdWinners')}</div>
+            <div className="tri-num text-pos text-lg font-extrabold">
+              {hold.winners === null ? '—' : formatDuration(Math.round(hold.winners), locale)}
+            </div>
+          </div>
+          <div>
+            <div className="text-dim text-[11px] font-semibold">{t('analytics.holdLosers')}</div>
+            <div className="tri-num text-neg text-lg font-extrabold">
+              {hold.losers === null ? '—' : formatDuration(Math.round(hold.losers), locale)}
+            </div>
+          </div>
+          <p className="text-dim min-w-0 flex-1 text-[11px] leading-relaxed">
+            {hold.ratio === null
+              ? t('analytics.holdNoPair')
+              : hold.ratio < 1
+                ? t('analytics.holdRatioShort')
+                : t('analytics.holdRatioLong')}
+          </p>
+        </div>
+      </Card>
 
       <Card title={t('analytics.heatmap')}>
         <div className="overflow-x-auto">

@@ -261,6 +261,12 @@ export default async function TradesPage({
                         {trade.journalled ? (
                           <NotebookPen size={13} className="text-brand" aria-label={t('journal.title')} />
                         ) : null}
+                        {trade.rating === null ? null : (
+                          <span className="text-dim text-[10px] leading-none" dir="ltr">
+                            {'★'.repeat(trade.rating)}
+                          </span>
+                        )}
+                        {trade.mood ? <span className="text-dim text-[10px]">{trade.mood}</span> : null}
                       </span>
                     </div>
                   </Link>
@@ -384,14 +390,24 @@ export default async function TradesPage({
                         trader working through a week can see at a glance which trades they
                         have been through.
                       */}
-                      <Link
-                        href={trade.href}
-                        aria-label={t('journal.title')}
-                        data-tip={trade.strategy ?? t('journal.title')}
-                        className={`inline-flex ${trade.journalled ? 'text-brand' : 'text-dim/50 hover:text-text'}`}
-                      >
-                        <NotebookPen size={14} aria-hidden />
-                      </Link>
+                      <span className="inline-flex items-center gap-1.5">
+                        {/* The score reads without opening anything; four thousand characters
+                            of note do not, so the tooltip carries their first line. */}
+                        {trade.rating === null ? null : (
+                          <span className="text-dim text-[10px] leading-none" dir="ltr">
+                            {'★'.repeat(trade.rating)}
+                            <span className="text-dim/30">{'★'.repeat(5 - trade.rating)}</span>
+                          </span>
+                        )}
+                        <Link
+                          href={trade.href}
+                          aria-label={t('journal.title')}
+                          data-tip={trade.noteExcerpt ?? trade.strategy ?? t('journal.title')}
+                          className={`inline-flex ${trade.journalled ? 'text-brand' : 'text-dim/50 hover:text-text'}`}
+                        >
+                          <NotebookPen size={14} aria-hidden />
+                        </Link>
+                      </span>
                     </td>
                   </tr>
                 ))}

@@ -82,7 +82,12 @@
     "rrCoverage": "{percent}% of trades have an SL",
     "fxUnavailable": "No exchange rate available right now — amounts are shown in {currency}.",
     "fxStale": "Exchange rate from {date}",
-    "tradesCount": "{count, plural, one {# trade} other {# trades}}"
+    "tradesCount": "{count, plural, one {# trade} other {# trades}}",
+    "streak": "Current streak",
+    "streakWins": "{count} in a row",
+    "streakLosses": "{count} in a row",
+    "streakNone": "No streak",
+    "longestRuns": "Longest: {wins} wins · {losses} losses"
   },
   "dash": {
     "rStrip": "Last {days} days (R)",
@@ -114,7 +119,18 @@
     "byDirection": "By direction",
     "heatmap": "Heatmap — day × session",
     "bestNote": "Closed trades only · minimum 5 trades per category",
-    "noData": "Not enough data yet"
+    "noData": "Not enough data yet",
+    "holdTimes": "Hold time by outcome",
+    "holdWinners": "Winners",
+    "holdLosers": "Losers",
+    "holdRatioShort": "Winners held for less — the mark of cutting them short",
+    "holdRatioLong": "Winners held for longer — the ratio you want",
+    "holdNoPair": "Needs both a winning and a losing trade in range",
+    "byRating": "By self-rating",
+    "byMood": "By mood",
+    "unrated": "Unrated",
+    "noMood": "No mood",
+    "ratingStars": "{count} stars"
   },
   "enum": {
     "session": {

@@ -17,6 +17,8 @@ const book = (...profits: number[]): AnalyticsTrade[] =>
     risk: null,
     rr: null,
     strategy: null,
+    rating: null,
+    mood: null,
     tpTiming: null,
     tookOriginalTp: null,
   }));

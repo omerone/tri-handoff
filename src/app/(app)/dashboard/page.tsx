@@ -7,7 +7,7 @@ import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { EquityChart } from '@/components/charts/equity-chart';
 import { RStrip } from '@/components/charts/r-strip';
 import { requireSession } from '@/lib/auth/session';
-import { computeMetrics, equityCurve, maxDrawdown, maxRunUp, recentDailyR } from '@/lib/analytics';
+import { computeMetrics, equityCurve, maxDrawdown, maxRunUp, recentDailyR, streaks } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { toTradeFilter } from '@/lib/time/range';
@@ -79,6 +79,7 @@ export default async function DashboardPage({
   // The same curve read the other way up — see maxRunUp. Cheap enough to compute beside it,
   // and the pair is only legible together.
   const runUp = maxRunUp(curve, book.openingBalance);
+  const run = streaks(book.trades);
   const balance = book.openingBalance + metrics.net;
 
   const recent = [...book.trades].slice(-6).reverse();
@@ -148,6 +149,27 @@ export default async function DashboardPage({
         value={money(runUp.maxRunUp, { signed: true })}
         tone="pos"
         sub={formatPercent(runUp.maxRunUpPercent, locale)}
+      />
+    ),
+    streak: (
+      /*
+       * The run the book is on, and the worst and best it has been on.
+       *
+       * A profit factor cannot say this: eight wins and four losses is the same ratio whether
+       * the losses were spread out or arrived in a row on one afternoon, and only the second
+       * is the one that makes someone double their size to win it back.
+       */
+      <KPI
+        label={t('kpi.streak')}
+        value={
+          run.current === 0
+            ? t('kpi.streakNone')
+            : run.current > 0
+              ? t('kpi.streakWins', { count: run.current })
+              : t('kpi.streakLosses', { count: -run.current })
+        }
+        tone={run.current === 0 ? 'neutral' : run.current > 0 ? 'pos' : 'neg'}
+        sub={t('kpi.longestRuns', { wins: run.longestWin, losses: run.longestLoss })}
       />
     ),
     rStrip: (
@@ -248,6 +270,7 @@ export default async function DashboardPage({
     profitFactor: t('kpi.profitFactor'),
     maxDd: t('kpi.maxDD'),
     maxProfit: t('kpi.maxProfit'),
+    streak: t('kpi.streak'),
     rStrip: t('dash.rStrip', { days: stripDays }),
     equity: t('dash.equity'),
     recent: t('dash.recent'),

@@ -10,7 +10,7 @@ import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { JournalForm } from './journal-form';
-import { formatDateTimeAt } from '@/lib/time/format';
+import { formatDateTimeAt, formatDuration } from '@/lib/time/format';
 
 /**
  * One trade, everything about it, plus the journal (SPEC §1.1 — the "trade report" adopted
@@ -169,13 +169,3 @@ function priceDecimals(value: number): number {
   return 5;
 }
 
-function formatDuration(minutes: number, locale: Locale): string {
-  if (minutes < 60) return `${formatNumber(minutes, locale)}m`;
-  if (minutes < 60 * 24) {
-    const hours = Math.floor(minutes / 60);
-    return `${formatNumber(hours, locale)}h ${formatNumber(minutes % 60, locale)}m`;
-  }
-  const days = Math.floor(minutes / (60 * 24));
-  const hours = Math.floor((minutes % (60 * 24)) / 60);
-  return `${formatNumber(days, locale)}d ${formatNumber(hours, locale)}h`;
-}

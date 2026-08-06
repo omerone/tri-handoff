@@ -1,6 +1,7 @@
 export * from './types';
 export * from './metrics';
 export * from './dimensions';
+export * from './streaks';
 
 import type { TradeRecord } from '@/lib/db/trades';
 import type { AnalyticsTrade } from './types';
@@ -28,6 +29,8 @@ export function toAnalyticsTrades(records: readonly TradeRecord[]): AnalyticsTra
       risk: record.risk,
       rr: record.rr,
       strategy: record.strategy,
+      rating: record.rating,
+      mood: record.mood,
       tpTiming: record.tpTiming,
       tookOriginalTp: record.tookOriginalTp,
     });

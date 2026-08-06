@@ -29,6 +29,16 @@ export type AnalyticsTrade = {
    */
   strategy: string | null;
   /**
+   * How the trader scored their own execution, 1–5, and how they felt taking it.
+   *
+   * Both were collected from the first release and never left the journal form — the icon in
+   * the trades table only knew whether *something* had been written. They are here so the two
+   * can be crossed with the outcome, which is the question they were being collected for:
+   * whether the trades someone rated badly are the ones that lose.
+   */
+  rating: number | null;
+  mood: string | null;
+  /**
    * The two exit-review answers. They are on the trade rather than in a side table because
    * every screen that charts them already has the book loaded, and because a review is a
    * property of the trade it is about.

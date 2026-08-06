@@ -42,6 +42,17 @@ export type TableRow = {
   journalled: boolean;
   strategy: string | null;
   /**
+   * Enough of the journal to scan a week without opening every trade.
+   *
+   * The table used to collapse note, tags, rating and mood into one boolean icon, which meant
+   * a trader could write four thousand characters about a trade and then only ever find them
+   * again by opening that trade and looking inside a textarea. The score reads at a glance and
+   * the first line of the note is usually the whole point of it.
+   */
+  rating: number | null;
+  mood: string | null;
+  noteExcerpt: string | null;
+  /**
    * The two exit questions. Null on a holding, which has no take-profit to have hit — the
    * row renders nothing rather than an unanswerable control.
    */
@@ -75,6 +86,9 @@ function tradeRow(trade: TradeRecord): TableRow {
       trade.note || trade.tags.length > 0 || trade.rating || trade.mood || trade.strategy,
     ),
     strategy: trade.strategy,
+    rating: trade.rating,
+    mood: trade.mood,
+    noteExcerpt: excerpt(trade.note),
     tpTiming: trade.tpTiming,
     tookOriginalTp: trade.tookOriginalTp,
   };
@@ -128,6 +142,9 @@ async function positionRows(
       isPosition: true,
       journalled: false,
       strategy: null,
+      rating: null,
+      mood: null,
+      noteExcerpt: null,
       tpTiming: null,
       tookOriginalTp: null,
     };
@@ -207,4 +224,19 @@ export function summarize(rows: readonly TableRow[]): {
    * money and a holding's realised gain is money.
    */
   return { trades, positions, net, unconverted };
+}
+
+/**
+ * The first line of a note, short enough for a tooltip.
+ *
+ * Newlines collapse to spaces: a tooltip renders them as nothing, so a note written as a list
+ * would otherwise arrive as one run-on line with words fused together at the joins.
+ */
+const EXCERPT_LENGTH = 140;
+
+function excerpt(note: string | null): string | null {
+  if (!note) return null;
+  const flat = note.replace(/\s+/g, ' ').trim();
+  if (!flat) return null;
+  return flat.length > EXCERPT_LENGTH ? `${flat.slice(0, EXCERPT_LENGTH - 1)}…` : flat;
 }

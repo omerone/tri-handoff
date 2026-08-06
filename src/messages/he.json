@@ -82,7 +82,12 @@
     "rrCoverage": "{percent}% מהעסקאות עם SL",
     "fxUnavailable": "שער חליפין אינו זמין כרגע — הסכומים מוצגים ב-{currency}.",
     "fxStale": "שער חליפין מ-{date}",
-    "tradesCount": "{count, plural, one {עסקה אחת} two {שתי עסקאות} other {# עסקאות}}"
+    "tradesCount": "{count, plural, one {עסקה אחת} two {שתי עסקאות} other {# עסקאות}}",
+    "streak": "רצף נוכחי",
+    "streakWins": "{count} ברצף",
+    "streakLosses": "{count} ברצף",
+    "streakNone": "אין רצף",
+    "longestRuns": "הארוך ביותר: {wins} רווחים · {losses} הפסדים"
   },
   "dash": {
     "rStrip": "{days} הימים האחרונים (R)",
@@ -114,7 +119,18 @@
     "byDirection": "לפי כיוון",
     "heatmap": "מפת חום — יום × סשן",
     "bestNote": "עסקאות סגורות בלבד · מינימום 5 עסקאות לקטגוריה",
-    "noData": "אין מספיק נתונים להצגה"
+    "noData": "אין מספיק נתונים להצגה",
+    "holdTimes": "משך החזקה לפי תוצאה",
+    "holdWinners": "מרוויחות",
+    "holdLosers": "מפסידות",
+    "holdRatioShort": "מרוויחות מוחזקות פחות — סימן לחיתוך רווחים מוקדם",
+    "holdRatioLong": "מרוויחות מוחזקות יותר — היחס הרצוי",
+    "holdNoPair": "צריך גם עסקה מרוויחה וגם מפסידה בטווח",
+    "byRating": "לפי ציון עצמי",
+    "byMood": "לפי מצב רגשי",
+    "unrated": "ללא ציון",
+    "noMood": "ללא מצב רגשי",
+    "ratingStars": "{count} כוכבים"
   },
   "enum": {
     "session": {
