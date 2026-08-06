@@ -28,6 +28,10 @@ type Row = {
   realizedPnl: Decimalish | null;
   closedAt: Date | null;
   note: string | null;
+  tags: string[];
+  rating: number | null;
+  mood: string | null;
+  strategy: string | null;
   priceSource: string;
   micCode: string;
 };
@@ -44,6 +48,22 @@ export type StoredLongPosition = LongPosition & {
   priceSource: 'auto' | 'manual';
   /** Which listing the price comes from. Empty for manual positions and crypto pairs. */
   micCode: string;
+  /**
+   * The trader's own words about the holding — the same five columns a synced trade carries.
+   *
+   * Out of `LongPosition` for the same reason `priceSource` is: the valuation has no business
+   * knowing what someone wrote about why they bought.
+   */
+  journal: LongPositionJournal;
+};
+
+/** The five journal columns, by the same names the trades table uses. */
+export type LongPositionJournal = {
+  note: string | null;
+  tags: string[];
+  rating: number | null;
+  mood: string | null;
+  strategy: string | null;
 };
 
 function toPosition(row: Row): StoredLongPosition {
@@ -62,7 +82,35 @@ function toPosition(row: Row): StoredLongPosition {
     note: row.note,
     priceSource: row.priceSource === 'auto' ? 'auto' : 'manual',
     micCode: row.micCode,
+    journal: {
+      note: row.note,
+      tags: row.tags ?? [],
+      rating: row.rating,
+      mood: row.mood,
+      strategy: row.strategy,
+    },
   };
+}
+
+/**
+ * Writes the journal, and nothing else.
+ *
+ * Its own function rather than a branch of a general update, for the same reason
+ * `updateTradeJournal` is: these five columns are the only ones on this row that a person
+ * typed, and the quote refresh writes `currentPrice` on a timer. Keeping the two writers
+ * apart is what stops a save of someone's notes carrying a stale price back over a fresh one.
+ */
+export async function updateLongPositionJournal(
+  ctx: TenantContext,
+  id: string,
+  journal: LongPositionJournal,
+): Promise<boolean> {
+  assertContext(ctx);
+  const { count } = await prisma.longPosition.updateMany({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    data: journal,
+  });
+  return count > 0;
 }
 
 export async function listLongPositions(ctx: TenantContext): Promise<StoredLongPosition[]> {

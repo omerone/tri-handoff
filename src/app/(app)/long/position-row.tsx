@@ -1,7 +1,8 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { Check, Clock, RefreshCw, Trash2, TriangleAlert, X } from 'lucide-react';
+import Link from 'next/link';
+import { Check, Clock, NotebookPen, RefreshCw, Trash2, TriangleAlert, X } from 'lucide-react';
 import { Num } from '@/components/ui/kpi';
 import {
   closePositionAction,
@@ -34,6 +35,8 @@ export type PositionRowLabels = {
   auto: string;
   autoOn: string;
   autoOff: string;
+  /** The link to the holding's own page, where the journal is. */
+  journal: string;
 };
 
 export type PositionRowData = {
@@ -56,6 +59,8 @@ export type PositionRowData = {
   closed: boolean;
   realized: string | null;
   realizedPositive: boolean;
+  /** True once the trader has written anything about this holding. */
+  journalled: boolean;
 };
 
 const cell = 'px-3 py-2.5';
@@ -175,6 +180,23 @@ export function PositionRow({
             <CloseForm id={position.id} labels={labels} onDone={() => setMode('idle')} />
           ) : (
             <>
+              {/*
+                The same control the trades table carries, in the same place and with the same
+                icon: a filled pen means there is already something written here. A trader
+                working through their book should not have to learn that one kind of position
+                keeps its notes somewhere else.
+              */}
+              <Link
+                href={`/long/${position.id}`}
+                aria-label={labels.journal}
+                data-tip={labels.journal}
+                className={`inline-flex p-1 ${
+                  position.journalled ? 'text-brand' : 'text-dim/50 hover:text-text'
+                }`}
+              >
+                <NotebookPen size={14} aria-hidden />
+              </Link>
+
               {position.closed ? null : (
                 <button
                   type="button"

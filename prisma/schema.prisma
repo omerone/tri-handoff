@@ -505,7 +505,19 @@ model LongPosition {
   realizedPnl Decimal?  @map("realized_pnl") @db.Decimal(20, 8)
   closedAt    DateTime? @map("closed_at")
 
-  note String?
+  /// The same journal the synced trades carry, and the same columns by name.
+  ///
+  /// A position held for months is the one a trader has most to say about — the thesis it was
+  /// opened on, whether they added to it, why they are still in it — and until now the only
+  /// place to write any of that was a single unlabelled `note` with no way to file it. The
+  /// reason for holding remains the reason for holding whether the broker reported the fill
+  /// or the trader typed it, so the analytics group them by the same strategy and the same
+  /// tag rather than by two vocabularies that happen to look alike.
+  note     String?
+  tags     String[] @default([])
+  rating   Int?
+  mood     String?
+  strategy String?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

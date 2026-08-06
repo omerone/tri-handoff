@@ -44,6 +44,7 @@ export default async function LongPositionsPage({
   const session = await requireSession();
   const t = await getTranslations('long');
   const tManual = await getTranslations('manual');
+  const tJournal = await getTranslations('journal');
   const locale = (await getLocale()) as Locale;
   const rtl = LOCALE_DIR[locale] === 'rtl';
 
@@ -153,6 +154,13 @@ export default async function LongPositionsPage({
           ? null
           : money(position.realizedPnl, currency, { signed: true }),
       realizedPositive: (position.realizedPnl ?? 0) >= 0,
+      journalled: Boolean(
+        position.journal.note ||
+          position.journal.strategy ||
+          position.journal.mood ||
+          position.journal.rating !== null ||
+          position.journal.tags.length > 0,
+      ),
     };
   };
 
@@ -179,6 +187,7 @@ export default async function LongPositionsPage({
     auto: t('auto'),
     autoOn: t('autoOn'),
     autoOff: t('autoOff'),
+    journal: tJournal('title'),
   };
 
   // Offered only while there is something to switch — once the book is on the feed the

@@ -446,18 +446,35 @@ export async function listJournalVocabulary(
   ctx: TenantContext,
 ): Promise<{ strategies: string[]; tags: string[]; moods: string[] }> {
   assertContext(ctx);
-  const rows = await prisma.trade.findMany({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, kind: 'trade' },
-    select: { strategy: true, tags: true, mood: true },
-    orderBy: { closeAt: 'desc' },
-    take: 1000,
-  });
+  /*
+   * Both books, one vocabulary.
+   *
+   * A long-term holding now carries the same five journal columns a synced trade does, and
+   * the reason for taking a position is the reason for taking it whether the broker reported
+   * the fill or the trader typed it. Suggesting from only one of the two would quietly split
+   * "Breakout" into a day-trade Breakout and a long-trade breakout — which is the exact
+   * outcome this function exists to prevent, arrived at from the other direction.
+   */
+  const [tradeRows, positionRows] = await Promise.all([
+    prisma.trade.findMany({
+      where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, kind: 'trade' },
+      select: { strategy: true, tags: true, mood: true },
+      orderBy: { closeAt: 'desc' },
+      take: 1000,
+    }),
+    prisma.longPosition.findMany({
+      where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+      select: { strategy: true, tags: true, mood: true },
+      orderBy: { buyDate: 'desc' },
+      take: 1000,
+    }),
+  ]);
 
   const strategies = new Set<string>();
   const tags = new Set<string>();
   const moods = new Set<string>();
 
-  for (const row of rows) {
+  for (const row of [...tradeRows, ...positionRows]) {
     if (row.strategy) strategies.add(row.strategy);
     if (row.mood) moods.add(row.mood);
     for (const tag of row.tags) tags.add(tag);

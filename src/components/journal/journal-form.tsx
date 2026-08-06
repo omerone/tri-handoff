@@ -4,7 +4,9 @@ import { useActionState } from 'react';
 import { Star } from 'lucide-react';
 import { useState } from 'react';
 import { FormMessage, SubmitButton } from '@/components/ui/form';
-import { saveTradeJournalAction, type JournalFormState } from '../journal-actions';
+
+/** What both save actions answer with. */
+export type JournalFormState = { error?: string; notice?: string };
 
 export type JournalLabels = {
   note: string;
@@ -37,17 +39,26 @@ const field =
  * has already written — the same reasoning as the finance categories: a fixed vocabulary is
  * wrong for one user per tenant, and no vocabulary at all turns "Breakout", "breakout" and
  * "break-out" into three strategies inside a month.
+ *
+ * The save action is a prop, because there are two books and one journal. A synced trade and a
+ * long-term holding are different rows in different tables with different lifecycles, and the
+ * *form* is not: the same five fields, the same star widget that clears on a second click, the
+ * same shared vocabulary. Copying it to serve the second book would have meant two of those
+ * behaviours to keep in step, and this one is fiddly enough that they would have drifted.
  */
 export function JournalForm({
   values,
   labels,
   vocabulary,
+  save,
 }: {
   values: JournalValues;
   labels: JournalLabels;
   vocabulary: { strategies: string[]; tags: string[]; moods: string[] };
+  /** The server action that writes it — one per book. */
+  save: (prev: JournalFormState, formData: FormData) => Promise<JournalFormState>;
 }) {
-  const [state, action] = useActionState<JournalFormState, FormData>(saveTradeJournalAction, {});
+  const [state, action] = useActionState<JournalFormState, FormData>(save, {});
   const [rating, setRating] = useState<number | null>(values.rating);
 
   return (

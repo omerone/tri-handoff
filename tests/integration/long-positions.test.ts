@@ -4,11 +4,18 @@ import {
   createLongPosition,
   deleteLongPosition,
   getLongPosition,
+  listJournalVocabulary,
   listLongPositions,
   updateCurrentPrice,
+  updateLongPositionJournal,
 } from '@/lib/db';
 import { portfolioTotals, realizedPnlOnClose, valuePosition } from '@/lib/positions/valuation';
-import { cleanup, createTenantFixture, crossTenantContext, type Fixture } from '../helpers/fixtures';
+import {
+  cleanup,
+  createTenantFixture,
+  crossTenantContext,
+  type Fixture,
+} from '../helpers/fixtures';
 
 let alice: Fixture;
 let bob: Fixture;
@@ -201,7 +208,11 @@ describe('closing a position whose price was never updated', () => {
     const realized = realizedPnlOnClose(created, 71);
     const closedAt = new Date();
     expect(
-      await closeLongPosition(carol.ctx, created.id, { sellPrice: 71, realizedPnl: realized, closedAt }),
+      await closeLongPosition(carol.ctx, created.id, {
+        sellPrice: 71,
+        realizedPnl: realized,
+        closedAt,
+      }),
     ).toBe(true);
 
     const closed = await getLongPosition(carol.ctx, created.id)!;
@@ -262,5 +273,88 @@ describe('closing a position whose price was never updated', () => {
     const stored = await getLongPosition(carol.ctx, created.id);
     expect(stored!.currentPrice).toBe(45);
     expect(stored!.realizedPnl).toBeCloseTo(300, 6);
+  });
+});
+
+/**
+ * The journal on a holding.
+ *
+ * Same five columns as a synced trade, same tenant scoping, and — the part worth a test
+ * rather than a read — the same *vocabulary*. A strategy typed on a long-term position has to
+ * be suggested when writing up a day trade and the other way round, or the two books quietly
+ * grow two spellings of one idea and the by-strategy breakdown stops meaning anything. That
+ * is the whole reason `listJournalVocabulary` exists, and it read only one table until this.
+ */
+describe('the journal on a long position', () => {
+  it('saves the five fields and reads them back', async () => {
+    const created = await seedPosition(alice, { symbol: 'JRNL' });
+
+    const saved = await updateLongPositionJournal(alice.ctx, created.id, {
+      note: 'Bought the thesis, not the candle.',
+      tags: ['conviction', 'Conviction', ' thesis '],
+      rating: 4,
+      mood: 'calm',
+      strategy: 'Long-term hold',
+    });
+    expect(saved).toBe(true);
+
+    const stored = await getLongPosition(alice.ctx, created.id);
+    expect(stored!.journal.note).toBe('Bought the thesis, not the candle.');
+    expect(stored!.journal.rating).toBe(4);
+    expect(stored!.journal.mood).toBe('calm');
+    expect(stored!.journal.strategy).toBe('Long-term hold');
+    // Stored as given: the case-insensitive dedupe belongs to the action that parses the
+    // comma-separated field, not to the column.
+    expect(stored!.journal.tags).toEqual(['conviction', 'Conviction', ' thesis ']);
+  });
+
+  it('will not write to another tenant’s holding', async () => {
+    const created = await seedPosition(bob, { symbol: 'NOTYOURS' });
+
+    // The same shape as every other cross-tenant test here: an id that exists, asked for by
+    // a context that does not own it, answers exactly as a missing row does.
+    const written = await updateLongPositionJournal(crossTenantContext(alice, bob), created.id, {
+      note: 'should not land',
+      tags: [],
+      rating: 5,
+      mood: null,
+      strategy: null,
+    });
+    expect(written).toBe(false);
+
+    const stored = await getLongPosition(bob.ctx, created.id);
+    expect(stored!.journal.note).toBeNull();
+    expect(stored!.journal.rating).toBeNull();
+  });
+
+  it('offers what was typed on a holding when writing up a trade', async () => {
+    const created = await seedPosition(alice, { symbol: 'VOCAB' });
+    await updateLongPositionJournal(alice.ctx, created.id, {
+      note: null,
+      tags: ['macro-thesis'],
+      rating: null,
+      mood: 'patient',
+      strategy: 'Position build',
+    });
+
+    const vocabulary = await listJournalVocabulary(alice.ctx);
+    expect(vocabulary.strategies).toContain('Position build');
+    expect(vocabulary.moods).toContain('patient');
+    expect(vocabulary.tags).toContain('macro-thesis');
+  });
+
+  it('keeps one trader’s vocabulary out of another’s suggestions', async () => {
+    const created = await seedPosition(bob, { symbol: 'PRIVATE' });
+    await updateLongPositionJournal(bob.ctx, created.id, {
+      note: null,
+      tags: ['bobs-only-tag'],
+      rating: null,
+      mood: null,
+      strategy: 'Bobs only strategy',
+    });
+
+    const vocabulary = await listJournalVocabulary(alice.ctx);
+    expect(vocabulary.strategies).not.toContain('Bobs only strategy');
+    expect(vocabulary.tags).not.toContain('bobs-only-tag');
   });
 });
