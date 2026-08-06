@@ -3,7 +3,12 @@
 import { useTransition } from 'react';
 import type { Locale } from '@/i18n/config';
 import { CURRENCY_SYMBOL, SUPPORTED_CURRENCIES, type Currency } from '@/lib/money/currency';
-import { setDisplayCurrencyAction, setLocaleAction, setThemeAction } from '@/app/actions/preferences';
+import {
+  setAutoSyncAction,
+  setDisplayCurrencyAction,
+  setLocaleAction,
+  setThemeAction,
+} from '@/app/actions/preferences';
 import { THEMES, type Theme } from '@/lib/theme';
 
 /** The prototype's segmented toggle. */
@@ -95,6 +100,35 @@ export function CurrencyChoice({ current }: { current: Currency }) {
       value={current}
       disabled={pending}
       onChange={(next) => startTransition(() => setDisplayCurrencyAction(next))}
+    />
+  );
+}
+
+/**
+ * Whether a login pulls from the broker on its own.
+ *
+ * Off by default, which is why the "off" label carries the reason: a trader who never opens
+ * this card should still understand, when they notice the refresh button is the only thing
+ * that updates anything, that this is deliberate and where it is decided.
+ */
+export function AutoSyncChoice({
+  current,
+  labels,
+}: {
+  current: boolean;
+  labels: { on: string; off: string };
+}) {
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <Toggle
+      options={[
+        ['off', labels.off],
+        ['on', labels.on],
+      ]}
+      value={current ? 'on' : 'off'}
+      disabled={pending}
+      onChange={(next) => startTransition(() => setAutoSyncAction(next === 'on'))}
     />
   );
 }

@@ -53,6 +53,7 @@ export async function getUser(ctx: TenantContext): Promise<TenantUser | null> {
       locale: true,
       displayCurrency: true,
       theme: true,
+      autoSyncOnLogin: true,
       lastLoginAt: true,
     },
   });
@@ -63,6 +64,7 @@ export async function getUser(ctx: TenantContext): Promise<TenantUser | null> {
         locale: row.locale,
         displayCurrency: row.displayCurrency,
         theme: row.theme,
+        autoSyncOnLogin: row.autoSyncOnLogin,
         lastLoginAt: row.lastLoginAt,
       }
     : null;
@@ -70,7 +72,12 @@ export async function getUser(ctx: TenantContext): Promise<TenantUser | null> {
 
 export async function updateUserPreferences(
   ctx: TenantContext,
-  data: { locale?: Locale; displayCurrency?: string; theme?: 'dark' | 'light' | 'system' },
+  data: {
+    locale?: Locale;
+    displayCurrency?: string;
+    theme?: 'dark' | 'light' | 'system';
+    autoSyncOnLogin?: boolean;
+  },
 ): Promise<void> {
   assertContext(ctx);
   await prisma.user.updateMany({

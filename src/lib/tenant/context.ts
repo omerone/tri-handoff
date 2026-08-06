@@ -31,6 +31,11 @@ export type TenantUser = {
   readonly locale: Locale;
   readonly displayCurrency: string;
   readonly theme: 'dark' | 'light' | 'system';
+  /**
+   * Whether a login should pull from the broker on its own. Off by default — the refresh
+   * button is the only thing that spends money unless this is deliberately turned on.
+   */
+  readonly autoSyncOnLogin: boolean;
   /** Drives "sync on every login" — see components/shell/sync-status.tsx. */
   readonly lastLoginAt: Date | null;
 };

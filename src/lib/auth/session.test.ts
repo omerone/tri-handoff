@@ -90,6 +90,7 @@ function record(overrides: Partial<SessionRecord> = {}): SessionRecord {
     email: 'alice@example.test',
     locale: 'he',
     displayCurrency: 'ILS',
+    autoSyncOnLogin: false,
     theme: 'dark',
     lastLoginAt: null,
     tenantName: TENANT.name,
@@ -129,8 +130,11 @@ describe('getSession', () => {
       locale: 'he',
       displayCurrency: 'ILS',
       theme: 'dark',
-      // Carried on the session so the shell can tell a login has happened since the last
-      // sync without a second query — see components/shell/sync-status.tsx.
+      // Carried on the session so the shell can decide, without a second query, whether a
+      // login-triggered sync is owed — see components/shell/sync-status.tsx. Both of these
+      // feed that one decision, which is the only thing on the app's critical path that
+      // spends money at the broker.
+      autoSyncOnLogin: false,
       lastLoginAt: null,
     });
     expect(session?.ctx).toMatchObject({ tenantId: TENANT.id, userId: 'user-1' });

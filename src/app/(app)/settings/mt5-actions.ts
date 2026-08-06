@@ -174,7 +174,26 @@ export async function disconnectMt5Action(): Promise<void> {
 }
 
 export type RefreshResult =
-  | { status: 'success'; imported: number }
+  /**
+   * Both counts, because the pill reports what the press actually bought. `imported` alone
+   * reads as "nothing happened" on a refresh that corrected the commission and swap on a
+   * dozen trades the broker settled late — which is exactly what the two-day overlap window
+   * exists to catch.
+   */
+  | {
+      status: 'success';
+      imported: number;
+      updated: number;
+      /**
+       * What to show on the pill, already translated.
+       *
+       * Formatted here rather than templated on the client: the counts only exist after the
+       * sync, and next-intl's formatting — plurals, digit shaping, the lot — belongs on the
+       * server side of the boundary. A client doing `.replace('{imported}', …)` is a client
+       * quietly reimplementing a message formatter.
+       */
+      note: string;
+    }
   | { status: 'skipped' }
   | { status: 'rate-limited' }
   | { status: 'error' };
@@ -198,7 +217,18 @@ export async function refreshSyncAction(automatic = false): Promise<RefreshResul
   const result = await syncMt5(session.ctx, automatic ? 'login' : 'manual');
   revalidatePath('/', 'layout');
 
-  if (result.status === 'success') return { status: 'success', imported: result.imported };
+  if (result.status === 'success') {
+    const tSync = await getTranslations('sync');
+    return {
+      status: 'success',
+      imported: result.imported,
+      updated: result.updated,
+      note:
+        result.imported === 0 && result.updated === 0
+          ? tSync('upToDate')
+          : tSync('pulled', { imported: result.imported, updated: result.updated }),
+    };
+  }
   if (result.status === 'skipped') return { status: 'skipped' };
   return { status: 'error' };
 }

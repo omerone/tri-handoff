@@ -54,6 +54,7 @@ export const getSession = cache(async (): Promise<TenantSession | null> => {
       locale: record.locale,
       displayCurrency: record.displayCurrency,
       theme: record.theme,
+      autoSyncOnLogin: record.autoSyncOnLogin,
       lastLoginAt: record.lastLoginAt,
     },
     ctx: makeTenantContext(record.tenantId, record.userId),

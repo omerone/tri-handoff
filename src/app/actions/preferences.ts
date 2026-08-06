@@ -68,3 +68,18 @@ export async function setDisplayCurrencyAction(next: string): Promise<void> {
   await updateUserPreferences(session.ctx, { displayCurrency: next });
   revalidatePath('/', 'layout');
 }
+
+/**
+ * Whether signing in should pull from the broker on its own.
+ *
+ * Off by default and changed only from settings. It is a preference rather than a constant
+ * because the right answer depends on what the trader is paying per call: somebody on a flat
+ * plan wants the data waiting for them, and somebody metered wants to decide each time.
+ */
+export async function setAutoSyncAction(next: boolean): Promise<void> {
+  const session = await getSession();
+  if (!session) return;
+
+  await updateUserPreferences(session.ctx, { autoSyncOnLogin: next });
+  revalidatePath('/', 'layout');
+}

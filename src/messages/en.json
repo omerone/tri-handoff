@@ -39,7 +39,9 @@
     "imported": "{count} trades imported",
     "tooSoon": "Give it a moment before refreshing again",
     "upToDate": "Up to date",
-    "importedNone": "No new trades"
+    "importedNone": "No new trades",
+    "stale": "Synced {hours}h ago",
+    "pulled": "{imported} new · {updated} updated"
   },
   "auth": {
     "signInTitle": "Sign in to TRi",
@@ -451,7 +453,12 @@
     "replaceTitle": "This will delete the trade book",
     "replaceBody": "Account {toLogin} is not the connected one ({fromLogin}). The stored history belongs to the previous account, so {trades} trades will be deleted. There is no way to restore them from here.",
     "replaceConfirm": "I understand — delete and connect",
-    "replaceCancel": "Cancel"
+    "replaceCancel": "Cancel",
+    "autoSync": "Sync automatically on sign-in",
+    "autoSyncOn": "On",
+    "autoSyncOff": "Off",
+    "autoSyncOnNote": "Every sign-in pulls from the broker without you pressing anything. Convenient — but on a provider that charges per call it is a cost every time you open the dashboard.",
+    "autoSyncOffNote": "Only the refresh button in the header pulls from the broker. Nothing else costs anything. Once the last sync is more than 12 hours old, the button reports how long ago it was instead of the time of day."
   },
   "calendar": {
     "weekdays": [

@@ -77,20 +77,32 @@ model User {
   /// tolerates any shape — this column outlives the code that wrote it.
   dashboardLayout Json?  @map("dashboard_layout")
 
+  /// Whether signing in should pull from the broker on its own.
+  ///
+  /// SPEC §3.3 asked for a sync on every login, and that is what this used to do
+  /// unconditionally. A metered provider turns it into a bill the trader never asked for: a
+  /// week of checking the dashboard twice a day is fourteen syncs nobody pressed a button
+  /// for, each one a broker round trip plus a symbol-spec and candle fetch.
+  ///
+  /// Off by default, so the refresh button in the header is the only thing that spends money
+  /// unless someone deliberately turns this back on. Defaulting the other way would mean the
+  /// saving arrives only for people who go looking for a setting.
+  autoSyncOnLogin Boolean @default(false) @map("auto_sync_on_login")
+
   /// TOTP shared secret, encrypted with ENCRYPTION_KEY like the MT5 investor password.
   /// Present but unconfirmed while someone is part-way through setting 2FA up; the pair
   /// (secret, confirmedAt) is what distinguishes "abandoned the wizard" from "2FA is on".
-  totpSecret      String?   @map("totp_secret")
+  totpSecret        String?   @map("totp_secret")
   /// When the first correct code was entered. NULL means 2FA is off, whatever the secret says.
-  totpConfirmedAt DateTime? @map("totp_confirmed_at")
+  totpConfirmedAt   DateTime? @map("totp_confirmed_at")
   /// The last time step a code was accepted for. Every code at or below it is refused, which
   /// is what makes a code single-use rather than valid for its whole ninety-second window.
   /// See `verifyTotp`. An Int holds a 30-second step until the year 4000.
-  totpLastStep    Int?      @map("totp_last_step")
+  totpLastStep      Int?      @map("totp_last_step")
   /// SHA-256 of each *unused* recovery code. A code is spent by dropping its hash, so the
   /// length of this array is also how many are left — there is no second column to disagree
   /// with it. Empty when 2FA is off.
-  totpRecoveryCodes String[] @default([]) @map("totp_recovery_codes")
+  totpRecoveryCodes String[]  @default([]) @map("totp_recovery_codes")
 
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -150,13 +162,11 @@ model PasswordResetToken {
 
 /**
  * The gap between "the password was right" and "the second factor was right".
- *
  * A row here, rather than a signed cookie carrying the user id, for the same reason sessions
  * are rows: it can be revoked, it can be counted, and the thing in the browser is an opaque
  * token that means nothing on its own. It also gives the attempt counter somewhere to live —
  * a six-digit code is guessable in a million tries, so the challenge has to die long before
  * anyone gets near that, and a cookie cannot count its own failures.
- *
  * Deliberately *not* a session with a flag. A half-authenticated session that `getSession`
  * had to remember to reject is one forgotten check away from being a whole one.
  */
@@ -256,18 +266,15 @@ model Mt5Account {
 
 /**
  * What the broker said the account was worth, each time it was asked.
- *
  * `mt5_accounts` carries `balance` and `equity` as two columns that the sync overwrites, so
  * the product knew what the account is worth now and had no way to say what it was worth in
  * March. The equity curve on the dashboard is built from the *trades* instead — which is the
  * right curve for judging trading, and deliberately excludes deposits and withdrawals — but
  * it means nothing in the product ever showed the account's actual balance over time, and a
  * trader asking "what was I at in March" had nowhere to look.
- *
  * One row per sync, deduplicated to one per day by `@@unique`: a trader who signs in six
  * times on Tuesday wants one point for Tuesday, not six, and the sync is the only writer so
  * the upsert cannot race with anything but itself.
- *
  * `equity` is nullable because it is a live figure — balance plus open profit — and a
  * provider that reports only the settled balance should leave a gap rather than a number
  * that looks like a flat day.
@@ -281,7 +288,7 @@ model AccountSnapshot {
   /// The precise instant of the sync is `createdAt`.
   at DateTime
 
-  balance  Decimal @db.Decimal(20, 8)
+  balance  Decimal  @db.Decimal(20, 8)
   equity   Decimal? @db.Decimal(20, 8)
   /// The account's own currency at the time. Kept per row: a trader who changes broker
   /// account mid-history would otherwise have two currencies on one chart with no way to see

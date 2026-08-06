@@ -6,6 +6,7 @@ import {
   newestCloseAt,
   readCredentialCiphertext,
   recordSnapshot,
+  ticketsWithExcursions,
   recordSyncFailure,
   recordSyncSuccess,
   startSyncLog,
@@ -73,7 +74,8 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
       provider.fetchDeals(credentials, since ? { since } : {}),
     ]);
 
-    const trades = await toTradeRecords(deals, account, credentials);
+    // A backfill recomputes the excursions it already has; every other trigger trusts them.
+    const trades = await toTradeRecords(ctx, deals, account, credentials, trigger === 'backfill');
     const { imported, updated } = await upsertTrades(ctx, trades);
 
     await recordSyncSuccess(ctx, {
@@ -128,19 +130,22 @@ async function incrementalCursor(ctx: TenantContext): Promise<Date | null> {
 }
 
 async function toTradeRecords(
+  ctx: TenantContext,
   deals: Mt5Deal[],
   account: Mt5AccountState,
   credentials: Mt5Credentials,
+  recomputeAll: boolean,
 ): Promise<TradeUpsert[]> {
   const provider = mt5Provider();
 
   const symbols = [...new Set(deals.filter((d) => d.symbol).map((d) => d.symbol))];
   const overrides = await fetchSpecOverrides(provider, credentials, symbols);
   const quoteRates = await fetchQuoteRates(provider, credentials, symbols, account.currency, overrides);
-  const excursions = await fetchExcursions(provider, credentials, deals, {
+  const excursions = await fetchExcursions(ctx, provider, credentials, deals, {
     accountCurrency: account.currency,
     quoteRates,
     overrides,
+    recomputeAll,
   });
 
   return deals.map((deal) => {
@@ -203,6 +208,7 @@ const EXCURSION_BUDGET = 200;
  * than having it wiped.
  */
 async function fetchExcursions(
+  ctx: TenantContext,
   provider: ReturnType<typeof mt5Provider>,
   credentials: Mt5Credentials,
   deals: Mt5Deal[],
@@ -210,21 +216,50 @@ async function fetchExcursions(
     accountCurrency: string;
     quoteRates: Record<string, number>;
     overrides: Map<string, SymbolSpec>;
+    /** A backfill recomputes everything; see below. */
+    recomputeAll: boolean;
   },
 ): Promise<Map<string, Excursion>> {
   const result = new Map<string, Excursion>();
   if (!provider.fetchBars) return result;
 
-  const candidates = deals
-    .filter((deal) => deal.kind === 'trade' && deal.closeAt !== null && deal.symbol)
+  const closed = deals.filter((deal) => deal.kind === 'trade' && deal.closeAt !== null && deal.symbol);
+
+  /*
+   * Trades that already have an answer are not asked about again.
+   *
+   * This is the whole cost of the feature in normal use. Every incremental sync re-reads a
+   * two-day overlap window — deliberately, because brokers settle commission and swap late —
+   * so without this, pressing refresh three times in an afternoon fetched candles three times
+   * for every trade closed in the last two days. On a metered provider that is the same
+   * request billed over and over for an answer that cannot have changed: a closed trade's
+   * high and low are history, and history does not move.
+   *
+   * A backfill is the exception and the escape hatch. It means "read this account from the
+   * beginning", so it recomputes rather than trusting what is stored — which is also the way
+   * back if the excursion arithmetic is ever corrected and the old figures need replacing.
+   */
+  const known = context.recomputeAll
+    ? new Set<string>()
+    : await ticketsWithExcursions(
+        ctx,
+        closed.map((deal) => deal.ticket),
+      );
+
+  const pending = closed.filter((deal) => !known.has(deal.ticket));
+
+  const candidates = pending
     .sort((a, b) => (b.closeAt?.getTime() ?? 0) - (a.closeAt?.getTime() ?? 0))
     .slice(0, EXCURSION_BUDGET);
 
-  if (candidates.length < deals.filter((d) => d.kind === 'trade').length) {
+  if (candidates.length < pending.length) {
     console.warn(
-      `[mt5] excursions computed for the newest ${candidates.length} trades; the rest keep ` +
-        'whatever they already had',
+      `[mt5] excursions computed for the newest ${candidates.length} of ${pending.length} ` +
+        'trades that still need them; the rest keep whatever they already had',
     );
+  }
+  if (known.size > 0) {
+    console.warn(`[mt5] skipped ${known.size} trades that already have an excursion`);
   }
 
   for (const deal of candidates) {

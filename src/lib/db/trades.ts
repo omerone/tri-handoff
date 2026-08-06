@@ -209,6 +209,41 @@ export async function upsertTrades(
   return { imported, updated: trades.length - imported };
 }
 
+/**
+ * Which of these tickets already have both excursion figures stored.
+ *
+ * The sync asks before spending anything on price history. A closed trade's high and low are
+ * history and history does not move, so re-fetching candles for a trade that already has an
+ * answer is the same request billed again for the same number — and the two-day overlap
+ * window means every refresh would otherwise do exactly that for everything closed recently.
+ *
+ * Both columns, not either: they are written together, and a row with one of them is a row
+ * whose computation was interrupted and should be tried again rather than trusted.
+ *
+ * The `in` list is bounded by the sync's own page size, and an empty one short-circuits
+ * rather than issuing a query that can only return nothing.
+ */
+export async function ticketsWithExcursions(
+  ctx: TenantContext,
+  tickets: readonly string[],
+): Promise<Set<string>> {
+  assertContext(ctx);
+  if (tickets.length === 0) return new Set();
+
+  const rows = await prisma.trade.findMany({
+    where: {
+      userId: ctx.userId,
+      user: { tenantId: ctx.tenantId },
+      ticket: { in: [...tickets] },
+      mae: { not: null },
+      mfe: { not: null },
+    },
+    select: { ticket: true },
+  });
+
+  return new Set(rows.map((row) => row.ticket));
+}
+
 export type TradeFilter = {
   assetClass?: AssetClass;
   direction?: Direction;

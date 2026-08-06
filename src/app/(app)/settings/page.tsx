@@ -1,6 +1,6 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
-import { CurrencyChoice, LanguageChoice, ThemeChoice } from './choices';
+import { AutoSyncChoice, CurrencyChoice, LanguageChoice, ThemeChoice } from './choices';
 import { SignOutButton } from '@/components/shell/sign-out-button';
 import { asTheme } from '@/lib/theme';
 import { Mt5Card, type ConnectedAccount } from './mt5-card';
@@ -147,6 +147,20 @@ export default async function SettingsPage() {
             disableBody: tTwoFactor('disableBody'),
           }}
         />
+      </Card>
+
+      {/*
+        Directly under the broker card, because it is a fact about the broker connection and
+        about what it costs — not a display preference like the three below it.
+      */}
+      <Card title={t('autoSync')}>
+        <AutoSyncChoice
+          current={session.user.autoSyncOnLogin}
+          labels={{ on: t('autoSyncOn'), off: t('autoSyncOff') }}
+        />
+        <p className="text-dim mt-3 text-xs leading-relaxed">
+          {session.user.autoSyncOnLogin ? t('autoSyncOnNote') : t('autoSyncOffNote')}
+        </p>
       </Card>
 
       <Card title={t('language')}>
