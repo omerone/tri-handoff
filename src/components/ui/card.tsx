@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Info } from 'lucide-react';
 
 /**
  * The surface every panel in the app sits on: 18px radius, thin hairline border, calm
@@ -13,19 +14,45 @@ export function Card({
   action,
   children,
   pad = true,
+  info,
+  infoLabel,
   className = '',
 }: {
   title?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
   pad?: boolean;
+  /**
+   * What this panel is answering, in full sentences — see `info-layer.tsx`.
+   *
+   * The same mark the KPI tiles carry, in the same place relative to what it explains. A
+   * chart title has room for four words and most of these panels answer a question that takes
+   * a paragraph: "by hour opened" does not say that it is the finest cut on the page and has
+   * to be read against the trade counts, and a reader who does not know that reads two trades
+   * in an hour as a pattern.
+   */
+  info?: string;
+  /** Usually the title; separate because a title can be a node rather than a string. */
+  infoLabel?: string;
   className?: string;
 }) {
   return (
     <div className={`border-line bg-surface rounded-[18px] border ${className}`}>
       {(title || action) && (
         <div className="flex items-center justify-between gap-2 px-4 pt-2.5 pb-1">
-          <div className="text-dim text-xs font-semibold tracking-[0.3px]">{title}</div>
+          <div className="text-dim flex min-w-0 items-center gap-1 text-xs font-semibold tracking-[0.3px]">
+            <span className="min-w-0">{title}</span>
+            {info ? (
+              <button
+                type="button"
+                data-info={info}
+                aria-label={infoLabel ?? (typeof title === 'string' ? title : '')}
+                className="text-dim/50 hover:text-text focus-visible:text-text -m-1 shrink-0 p-1 leading-none"
+              >
+                <Info size={12} aria-hidden />
+              </button>
+            ) : null}
+          </div>
           {action}
         </div>
       )}

@@ -213,11 +213,16 @@ export default async function AnalyticsPage({
 
   const weekdayLabel = (key: string) => weekdayNames[Number(key)] ?? key;
 
-  const charts: { title: string; data: BreakdownDatum[] }[] = [
-    { title: t('analytics.byWeekday'), data: toData(byWeekday(book.trades), weekdayLabel) },
+  const charts: { title: string; data: BreakdownDatum[]; info: string }[] = [
+    {
+      title: t('analytics.byWeekday'),
+      data: toData(byWeekday(book.trades), weekdayLabel),
+      info: t('analytics.info.byWeekday'),
+    },
     {
       title: t('analytics.bySession'),
       data: toData(bySession(book.trades), (key) => t(`enum.session.${key}`)),
+      info: t('analytics.info.bySession'),
     },
     {
       title: t('analytics.byClass'),
@@ -226,10 +231,12 @@ export default async function AnalyticsPage({
         byAssetClass(book.trades).filter((b) => b.metrics.count > 0),
         (key) => t(`enum.assetClass.${key}`),
       ),
+      info: t('analytics.info.byClass'),
     },
     {
       title: t('analytics.byDirection'),
       data: toData(byDirection(book.trades), (key) => t(`enum.direction.${key}`)),
+      info: t('analytics.info.byDirection'),
     },
   ];
 
@@ -267,7 +274,12 @@ export default async function AnalyticsPage({
   const strategyData = hasStrategies
     ? toData(strategies, (key) => (key === UNLABELLED ? t('journal.unlabelled') : key))
     : [];
-  if (hasStrategies) charts.push({ title: t('journal.byStrategy'), data: strategyData });
+  if (hasStrategies)
+    charts.push({
+      title: t('journal.byStrategy'),
+      data: strategyData,
+      info: t('analytics.info.byStrategy'),
+    });
   /*
    * By hour and by instrument — both computed since the first release, neither ever drawn.
    *
@@ -288,9 +300,24 @@ export default async function AnalyticsPage({
   const symbolData = toData(shownSymbols, (key) => key);
   const symbolsOmitted = allSymbols.length - shownSymbols.length;
 
-  if (ratingData.length > 0) charts.push({ title: t('analytics.byRating'), data: ratingData });
-  if (moodData.length > 0) charts.push({ title: t('analytics.byMood'), data: moodData });
-  if (hourData.length > 0) charts.push({ title: t('analytics.byHour'), data: hourData });
+  if (ratingData.length > 0)
+    charts.push({
+      title: t('analytics.byRating'),
+      data: ratingData,
+      info: t('analytics.info.byRating'),
+    });
+  if (moodData.length > 0)
+    charts.push({
+      title: t('analytics.byMood'),
+      data: moodData,
+      info: t('analytics.info.byMood'),
+    });
+  if (hourData.length > 0)
+    charts.push({
+      title: t('analytics.byHour'),
+      data: hourData,
+      info: t('analytics.info.byHour'),
+    });
   if (symbolData.length > 0) {
     charts.push({
       title:
@@ -298,6 +325,7 @@ export default async function AnalyticsPage({
           ? `${t('analytics.bySymbol')} · ${t('analytics.symbolsCapped', { shown: shownSymbols.length, total: allSymbols.length })}`
           : t('analytics.bySymbol'),
       data: symbolData,
+      info: t('analytics.info.bySymbol'),
     });
   }
 
@@ -316,7 +344,7 @@ export default async function AnalyticsPage({
 
   return (
     <div className="flex flex-col gap-3">
-      <Card title={t('analytics.insights')}>
+      <Card title={t('analytics.insights')} info={t('analytics.info.insights')}>
         {insights.length === 0 ? (
           <EmptyState>{t('analytics.noData')}</EmptyState>
         ) : (
@@ -366,7 +394,7 @@ export default async function AnalyticsPage({
       */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {charts.map((chart) => (
-          <Card key={chart.title} title={chart.title}>
+          <Card key={chart.title} title={chart.title} info={chart.info} infoLabel={chart.title}>
             <BreakdownChart data={chart.data} rtl={rtl} display={display} />
           </Card>
         ))}
@@ -428,7 +456,7 @@ export default async function AnalyticsPage({
         stops a short card stretching but nothing fills the row it leaves behind. A void that
         size reads as something having failed to load.
       */}
-      <Card title={t('analytics.holdTimes')}>
+      <Card title={t('analytics.holdTimes')} info={t('analytics.info.holdTimes')}>
         <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
           <div>
             <div className="text-dim text-[11px] font-semibold">{t('analytics.holdWinners')}</div>
@@ -456,21 +484,24 @@ export default async function AnalyticsPage({
         What the book paid to exist. Both columns have been on every trade since the first
         sync and were readable one trade at a time; nothing added them up.
       */}
-      <Card title={t('analytics.costs')}>
+      <Card title={t('analytics.costs')} info={t('analytics.info.costs')}>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <KPI
             label={t('analytics.costsTotal')}
+            info={t('analytics.info.costsTotal')}
             value={money(costs.total)}
             tone={costs.total > 0 ? 'neg' : 'neutral'}
             sub={t('analytics.costsPerTrade', { amount: money(costs.perTrade) })}
           />
           <KPI
             label={t('analytics.costsCommission')}
+            info={t('analytics.info.costsCommission')}
             value={money(costs.commission)}
             sub={t('analytics.costsSwap', { amount: money(costs.swap) })}
           />
           <KPI
             label={t('analytics.costsShare')}
+            info={t('analytics.info.costsShare')}
             value={
               costs.shareOfGross === null ? '—' : `${formatNumber(costs.shareOfGross, locale, 1)}%`
             }
@@ -479,6 +510,7 @@ export default async function AnalyticsPage({
           />
           <KPI
             label={t('analytics.costsTurned')}
+            info={t('analytics.info.costsTurned')}
             value={formatNumber(costs.turnedLosing, locale)}
             tone={costs.turnedLosing > 0 ? 'neg' : 'neutral'}
             sub={t('analytics.costsTurnedNote')}
@@ -523,10 +555,11 @@ export default async function AnalyticsPage({
         these four describe how it was done, and they are what separates an edge from a run
         of luck.
       */}
-      <Card title={t('analytics.consistency')}>
+      <Card title={t('analytics.consistency')} info={t('analytics.info.consistency')}>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <KPI
             label={t('analytics.riskSpread')}
+            info={t('analytics.info.riskSpread')}
             value={risk.variation === null ? '—' : formatNumber(risk.variation, locale, 2)}
             tone={risk.variation === null ? 'neutral' : risk.variation <= 0.25 ? 'pos' : 'neg'}
             sub={t('analytics.riskInBand', {
@@ -536,6 +569,7 @@ export default async function AnalyticsPage({
           />
           <KPI
             label={t('analytics.riskTypical')}
+            info={t('analytics.info.riskTypical')}
             value={risk.covered === 0 ? '—' : money(risk.median)}
             sub={
               risk.covered === 0
@@ -545,6 +579,7 @@ export default async function AnalyticsPage({
           />
           <KPI
             label={t('analytics.topShare')}
+            info={t('analytics.info.topShare')}
             value={spread.topShare === null ? '—' : `${formatNumber(spread.topShare, locale, 0)}%`}
             tone={spread.restsOnOneTrade ? 'neg' : 'neutral'}
             sub={
@@ -558,6 +593,7 @@ export default async function AnalyticsPage({
           />
           <KPI
             label={t('analytics.underwater')}
+            info={t('analytics.info.underwater')}
             value={t('analytics.days', { count: spell.longestDays })}
             tone={spell.ongoing ? 'neg' : 'neutral'}
             sub={spell.ongoing ? t('analytics.underwaterNow') : t('analytics.underwaterPast')}
@@ -580,6 +616,7 @@ export default async function AnalyticsPage({
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <KPI
               label={t('analytics.heat')}
+              info={t('analytics.info.heat')}
               value={
                 excursions.winnerHeat === null
                   ? '—'
@@ -590,6 +627,7 @@ export default async function AnalyticsPage({
             />
             <KPI
               label={t('analytics.capture')}
+              info={t('analytics.info.capture')}
               value={
                 excursions.capture === null
                   ? '—'
@@ -600,6 +638,7 @@ export default async function AnalyticsPage({
             />
             <KPI
               label={t('analytics.excursionCoverage')}
+              info={t('analytics.info.excursionCoverage')}
               value={`${formatNumber(excursions.coveragePercent, locale, 0)}%`}
               sub={t('analytics.excursionCovered', {
                 covered: excursions.covered,
@@ -633,7 +672,7 @@ export default async function AnalyticsPage({
         single selected window; this one puts the windows side by side.
       */}
       {grid.length > 0 ? (
-        <Card title={t('analytics.byPeriod')} pad={false}>
+        <Card title={t('analytics.byPeriod')} pad={false} info={t('analytics.info.byPeriod')}>
           <div className="px-4 pt-1 pb-4">
             <ReturnsGrid
               grid={grid}
@@ -663,7 +702,7 @@ export default async function AnalyticsPage({
         </Card>
       ) : null}
 
-      <Card title={t('analytics.heatmap')}>
+      <Card title={t('analytics.heatmap')} info={t('analytics.info.heatmap')}>
         <div className="overflow-x-auto">
           <div
             className="grid gap-1.5"

@@ -20,6 +20,16 @@ import { prisma } from './prisma';
  * in — a page cannot accidentally serialise it into the HTML, because it never has it.
  */
 
+/**
+ * How many broker accounts one trader may connect.
+ *
+ * Two, because that is what the product offers and says on the screen: a day account and a
+ * swing account, kept as separate books. Enforced here as well as drawn there — a limit that
+ * only exists in the markup is a limit until the first person opens two tabs, and each account
+ * past the first is a real monthly charge on somebody's card.
+ */
+export const MAX_MT5_ACCOUNTS = 2;
+
 export type Mt5AccountView = {
   id: string;
   login: string;
@@ -112,6 +122,14 @@ export const getMt5Account = cache(
   },
 );
 
+/** Thrown rather than returned, so a caller cannot forget to check for it. */
+export class Mt5AccountLimitError extends Error {
+  constructor() {
+    super(`A trader may connect at most ${MAX_MT5_ACCOUNTS} MT5 accounts.`);
+    this.name = 'Mt5AccountLimitError';
+  }
+}
+
 export async function connectMt5Account(
   ctx: TenantContext,
   data: {
@@ -134,6 +152,19 @@ export async function connectMt5Account(
    * one — so the same login at the same server is the same account and gets updated, and
    * anything else is a new row.
    */
+  // Counted before the write, and only a *new* account is refused: reconnecting one of the
+  // two — a changed password, a re-run of the wizard — must keep working at the limit.
+  const existing = await prisma.mt5Account.findMany({
+    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    select: { login: true, server: true },
+  });
+  const isNew = !existing.some(
+    (account) => account.login === data.login && account.server === data.server,
+  );
+  if (isNew && existing.length >= MAX_MT5_ACCOUNTS) {
+    throw new Mt5AccountLimitError();
+  }
+
   const row = await prisma.mt5Account.upsert({
     where: {
       userId_login_server: { userId: ctx.userId, login: data.login, server: data.server },

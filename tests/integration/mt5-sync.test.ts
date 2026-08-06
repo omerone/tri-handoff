@@ -6,6 +6,7 @@ import {
   latestSyncLog,
   listCashFlow,
   listMt5Accounts,
+  Mt5AccountLimitError,
   listClosedTrades,
   readCredentialCiphertexts,
   recentSyncLogs,
@@ -310,5 +311,42 @@ describe('credentials at rest', () => {
     const account = await getMt5Account(alice.ctx);
     expect(JSON.stringify(account)).not.toContain(INVESTOR_PASSWORD);
     expect(Object.keys(account ?? {})).not.toContain('investorPwEncrypted');
+  });
+});
+
+describe('the two-account limit', () => {
+  /**
+   * The screen offers two slots and says so. The database has to agree, because a limit that
+   * only exists in the markup is a limit until someone opens two tabs — and every account past
+   * the first is a real monthly charge on somebody's card.
+   */
+  it('refuses a third account', async () => {
+    const grace = await createTenantFixture();
+    await connect(grace, '91919191');
+    await connect(grace, '92929292');
+
+    await expect(connect(grace, '93939393')).rejects.toThrow(Mt5AccountLimitError);
+    expect(await listMt5Accounts(grace.ctx)).toHaveLength(2);
+  });
+
+  it('still lets either of the two be reconnected', async () => {
+    // A changed investor password, or simply running the wizard again. Counting the write
+    // rather than the account would refuse exactly the person trying to fix their connection.
+    const henry = await createTenantFixture();
+    await connect(henry, '94949494');
+    await connect(henry, '95959595');
+
+    await expect(connect(henry, '94949494')).resolves.toBeUndefined();
+    expect(await listMt5Accounts(henry.ctx)).toHaveLength(2);
+  });
+
+  it('counts per trader, not across the platform', async () => {
+    const ivan = await createTenantFixture();
+    const judy = await createTenantFixture();
+    await connect(ivan, '96969696');
+    await connect(ivan, '97979797');
+
+    await expect(connect(judy, '98989898')).resolves.toBeUndefined();
+    expect(await listMt5Accounts(judy.ctx)).toHaveLength(1);
   });
 });

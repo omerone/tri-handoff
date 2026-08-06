@@ -204,7 +204,35 @@
     "ratingStars": "{count} stars",
     "byHour": "By hour opened",
     "bySymbol": "By instrument",
-    "symbolsCapped": "Showing the {shown} largest of {total} instruments"
+    "symbolsCapped": "Showing the {shown} largest of {total} instruments",
+    "info": {
+      "costsTotal": "Commission plus swap across every closed trade in the period, and what that averages per trade. It is money that left the account whatever the market did, and it is the one cost a trader controls by trading less often rather than by trading better.",
+      "costsCommission": "The broker's fee alone, with overnight swap shown separately underneath. Splitting them matters because they answer different questions: commission is the price of taking a trade, swap is the price of holding one.",
+      "costsShare": "What those costs came to as a share of gross profit — the profit before they were taken. Above about 20% the strategy is paying more to the broker than most edges can carry, and cutting trade frequency does more than improving entries.",
+      "costsTurned": "How many trades closed in profit before costs and in loss after them. Each one is a trade that was read correctly and still lost money, which is a sizing and frequency problem rather than an analysis problem.",
+      "riskSpread": "How much the money risked per trade varies, as a fraction of the typical risk. Near zero means every trade is sized the same; a high number means the account's result is being decided by which few trades happened to be large, not by the edge.",
+      "riskTypical": "The median risk per trade, with the middle half of trades shown as a range beside it. The median rather than the average, because one oversized trade drags an average somewhere no trade actually was.",
+      "topShare": "How much of the profit the single best trade accounts for, and what the total looks like without it. If one trade carries most of a good period, the period is not evidence of an edge yet.",
+      "underwater": "The longest stretch the account spent below a previous peak before making a new one. Drawdown says how deep it went; this says how long it took to get out, which is what decides whether a strategy is one a person can keep running.",
+      "heat": "How far winning trades went against you before they came good, measured against the stop distance. A high figure means winners routinely go most of the way to the stop first — the trades work, but the entries are early and the stop is doing more work than intended.",
+      "capture": "How much of the move that was available was actually taken: the profit at close against the best price the trade ever saw. Money left on the table is not a loss, but a low figure means exits are the cheapest thing left to improve.",
+      "excursionCoverage": "How many trades have the excursion figures the two numbers above are computed from. They need candle data the provider fetches per trade, so a low figure means those two are describing a subset rather than the book.",
+      "insights": "The categories with the best average RR, out of those with at least five closed trades. The floor matters: three winning trades in a category is not a finding, and without a minimum this panel would report whichever category happened to have one good week.",
+      "byWeekday": "Profit and loss grouped by the day the trade closed, with the average RR and win rate under each. A day that loses consistently is usually a calendar problem — an economic release, a session you trade tired — rather than a market one.",
+      "bySession": "The same figures grouped by the session the trade was opened in: Asia, London or New York. Instruments behave differently by session, and a strategy that works in one often does not survive being run in another.",
+      "byDirection": "Long trades against short ones. A large gap between them usually means the strategy is really a bet on direction rather than the setup it describes — worth knowing before a market that has been trending stops.",
+      "byHour": "Profit and loss by the hour the trade was opened, in your own time zone. It is the finest cut on this page, so read it with the trade counts beside it: an hour with two trades is not a pattern.",
+      "bySymbol": "Profit and loss by instrument, largest first, capped at twelve so the chart stays readable. The title says how many were left out; nothing is hidden, it is simply not drawn.",
+      "holdTimes": "How long winners were held against how long losers were. Winners held for longer is the ratio you want. The other way round is the most common shape in a losing book: profits cut early, losses given room to come back.",
+      "byPeriod": "Each month measured against the balance it opened with, so percentages compare across years — 2,000 is 10% on a 20,000 account and 2.5% on an 80,000 one. A blank month is one with no trading.",
+      "heatmap": "Every combination of weekday and session, coloured by profit. It answers when a plan works rather than whether it works, and the two questions have different answers often enough to be worth separating.",
+      "consistency": "Four figures about how the trading was done rather than what it returned. They are what separates an edge from a run of luck, and they are the ones that go wrong first when discipline slips.",
+      "costs": "What the book paid to exist. Both columns have been on every trade since the first sync and were readable one trade at a time; this adds them up.",
+      "byClass": "Profit and loss by asset class — forex, indices, crypto, commodities, stocks. Classes with no trades in the period are left out rather than drawn as empty bars, so the chart shows what was traded rather than what could have been.",
+      "byStrategy": "Profit and loss by the strategy you tagged each trade with, from the journal. It is only as good as the tagging: a strategy that is really three setups under one name will average them together and say nothing.",
+      "byRating": "Profit and loss by the score you gave the trade yourself. The interesting shape is a mismatch — five-star trades that lose, or one-star trades that win — because that is where the judgement and the outcome disagree, and one of the two is wrong.",
+      "byMood": "Profit and loss by the mood recorded on the trade. Fewer traders keep this than mean to, and it is the one column here that can catch a pattern no price data contains."
+    }
   },
   "enum": {
     "session": {
@@ -484,7 +512,10 @@
     "addAnother": "Connect another account",
     "twoAccounts": "You can connect two accounts — a day account and a swing account, say. Their books stay apart.",
     "slotEmpty": "Second account",
-    "preferences": "Preferences"
+    "preferences": "Preferences",
+    "firstAccount": "First account",
+    "secondAccount": "Second account",
+    "accountLimit": "You can connect up to two MT5 accounts. Disconnect one before adding another."
   },
   "calendar": {
     "weekdays": [

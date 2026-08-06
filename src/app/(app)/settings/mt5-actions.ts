@@ -8,6 +8,7 @@ import { limitKey, LIMITS } from '@/lib/auth/limits';
 import { encryptSecret } from '@/lib/crypto/secretbox';
 import {
   connectMt5Account,
+  Mt5AccountLimitError,
   consumeRateLimit,
   countSyncedTrades,
   deleteAllSnapshots,
@@ -143,12 +144,20 @@ export async function connectMt5Action(
     };
   }
 
-  await connectMt5Account(session.ctx, {
-    login: credentials.login,
-    server: credentials.server,
-    investorPwEncrypted: encryptSecret(credentials.investorPassword),
-    accountCurrency: verified.account.currency,
-  });
+  try {
+    await connectMt5Account(session.ctx, {
+      login: credentials.login,
+      server: credentials.server,
+      investorPwEncrypted: encryptSecret(credentials.investorPassword),
+      accountCurrency: verified.account.currency,
+    });
+  } catch (error) {
+    // The screen draws exactly two slots, so this is unreachable from the UI — which is the
+    // reason to handle it rather than to skip it. An unreachable path that throws is a server
+    // action returning a stack trace the first time the assumption stops holding.
+    if (error instanceof Mt5AccountLimitError) return { error: t('accountLimit') };
+    throw error;
+  }
 
   // Confirmed above: a different account number means the stored history is another book's.
   // The balance history goes with it — a chart that steps from one account's equity to
