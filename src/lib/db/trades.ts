@@ -267,6 +267,13 @@ export type TradeFilter = {
   to?: Date;
   /** Free text, matched across the symbol and everything the trader wrote. See `textSearch`. */
   query?: string;
+  /**
+   * One broker account, when the trader wants to read one book rather than both.
+   *
+   * `'manual'` selects the trades they typed, which have no account — the string rather than
+   * `null` because an absent field already means "no filter", and the two must not collide.
+   */
+  mt5AccountId?: string | 'manual';
 };
 
 /**
@@ -324,6 +331,11 @@ function whereClause(
     ...(filter.symbol ? { symbol: filter.symbol } : {}),
     ...(filter.strategy ? { strategy: filter.strategy } : {}),
     ...(filter.tag ? { tags: { has: filter.tag } } : {}),
+    ...(filter.mt5AccountId === undefined
+      ? {}
+      : filter.mt5AccountId === 'manual'
+        ? { mt5AccountId: null }
+        : { mt5AccountId: filter.mt5AccountId }),
     ...(filter.query ? { OR: textSearch(filter.query) } : {}),
     ...(Object.keys(closeAt).length > 0 ? { closeAt } : {}),
   };

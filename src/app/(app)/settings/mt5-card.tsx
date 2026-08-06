@@ -9,6 +9,8 @@ import { disconnectMt5Action } from './mt5-actions';
 /** `login`, `server`, `connect` and `investorWarning` come from `WizardLabels` — both halves
     of this card name the same things, and the wizard needs them too. */
 export type Mt5CardLabels = WizardLabels & {
+  /** Opens the wizard again under a list that already has an account in it. */
+  addAnother: string;
   disconnect: string;
   disconnectConfirm: string;
   investor: string;
@@ -19,22 +21,49 @@ export type Mt5CardLabels = WizardLabels & {
 };
 
 export type ConnectedAccount = {
+  id: string;
   login: string;
   server: string;
+  /** What the trader calls it — "Day", "Swing". Null until they name it. */
+  label: string | null;
   status: string;
   lastSync: string | null;
   balance: string | null;
   equity: string | null;
 };
 
+/**
+ * Every connected broker account, and a way to add one more.
+ *
+ * A trader can run a day account and a swing account, and the journal keeps them apart — so
+ * this card lists them rather than describing "the" account. The wizard stays on screen under
+ * the list instead of disappearing once one is connected, because the second account is
+ * exactly as ordinary as the first and hiding the way to add it made it look unsupported.
+ */
 export function Mt5Card({
-  account,
+  accounts,
   labels,
 }: {
-  account: ConnectedAccount | null;
+  accounts: readonly ConnectedAccount[];
   labels: Mt5CardLabels;
 }) {
-  return account ? <Connected account={account} labels={labels} /> : <Mt5ConnectWizard labels={labels} />;
+  if (accounts.length === 0) return <Mt5ConnectWizard labels={labels} />;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {accounts.map((account) => (
+        <Connected key={account.id} account={account} labels={labels} />
+      ))}
+      <details className="border-line border-t pt-3">
+        <summary className="text-dim hover:text-fg cursor-pointer text-xs">
+          {labels.addAnother}
+        </summary>
+        <div className="pt-3">
+          <Mt5ConnectWizard labels={labels} />
+        </div>
+      </details>
+    </div>
+  );
 }
 
 function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5CardLabels }) {
@@ -50,6 +79,9 @@ function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5
           <div>
             <div className="text-sm font-bold">
               <Num>#{account.login}</Num>
+              {account.label ? (
+                <span className="text-dim ms-2 text-[11px] font-normal">{account.label}</span>
+              ) : null}
             </div>
             <div className="text-dim text-[11px]">
               {labels.server}: {account.server}
@@ -90,7 +122,9 @@ function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5
           onClick={() => {
             if (!window.confirm(labels.disconnectConfirm)) return;
             startTransition(() => {
-              void disconnectMt5Action();
+              // Named, not implied: with two accounts connected, "disconnect" without an id
+              // would take both and the confirmation only asked about one.
+              void disconnectMt5Action(account.id);
             });
           }}
           className="border-line bg-raised text-dim hover:text-neg rounded-[10px] border px-3 py-2 text-xs disabled:opacity-60"

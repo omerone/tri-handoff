@@ -167,9 +167,11 @@ export async function connectMt5Action(
   };
 }
 
-export async function disconnectMt5Action(): Promise<void> {
+export async function disconnectMt5Action(mt5AccountId?: string): Promise<void> {
   const session = await requireSession();
-  await disconnectMt5Account(session.ctx);
+  // The id names one account. Omitted — which nothing in the UI does any more — it clears
+  // them all, which is what account deletion wants.
+  await disconnectMt5Account(session.ctx, mt5AccountId);
   revalidatePath('/', 'layout');
 }
 

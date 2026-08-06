@@ -458,7 +458,8 @@
     "autoSyncOn": "On",
     "autoSyncOff": "Off",
     "autoSyncOnNote": "Every sign-in pulls from the broker without you pressing anything. Convenient — but on a provider that charges per call it is a cost every time you open the dashboard.",
-    "autoSyncOffNote": "Only the refresh button in the header pulls from the broker. Nothing else costs anything. Once the last sync is more than 12 hours old, the button reports how long ago it was instead of the time of day."
+    "autoSyncOffNote": "Only the refresh button in the header pulls from the broker. Nothing else costs anything. Once the last sync is more than 12 hours old, the button reports how long ago it was instead of the time of day.",
+    "addAnother": "Connect another account"
   },
   "calendar": {
     "weekdays": [
@@ -600,5 +601,13 @@
     "invalid": "Something is missing or one of the fields is not valid.",
     "invalidDate": "That date is not valid.",
     "openAfterClose": "The open date is later than the close date."
+  },
+  "trades": {
+    "source": {
+      "mt5": "MT5",
+      "manual": "Manual",
+      "holding": "Holding",
+      "label": "Source"
+    }
   }
 }

@@ -387,3 +387,89 @@ describe('submitting the same trade twice', () => {
     expect(row.note).toBe('held through the news');
   });
 });
+
+describe('reading one account at a time', () => {
+  /**
+   * The reason two accounts were worth the migration.
+   *
+   * A trader running a day account and a swing account wants each book's numbers on their own;
+   * merged, every figure is the average of two strategies and describes neither. The filter is
+   * what makes the separation reachable, and `'manual'` selects the rows that belong to no
+   * broker at all — a distinct answer from "no filter", which is why it is a string and not a
+   * null.
+   */
+  it('narrows to one broker account, and to what was typed', async () => {
+    const iris = await createTenantFixture();
+    const day = await testDb.mt5Account.create({
+      data: {
+        userId: iris.userId,
+        login: '61616161',
+        server: 'MetaQuotes-Demo',
+        label: 'Day',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        status: 'connected',
+      },
+      select: { id: true },
+    });
+    const swing = await testDb.mt5Account.create({
+      data: {
+        userId: iris.userId,
+        login: '62626262',
+        server: 'MetaQuotes-Demo',
+        label: 'Swing',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        status: 'connected',
+      },
+      select: { id: true },
+    });
+
+    await upsertTrades(iris.ctx, day.id, [synced('7100', { profit: 10 })]);
+    await upsertTrades(iris.ctx, swing.id, [
+      synced('7200', { profit: 20 }),
+      synced('7300', { profit: 30 }),
+    ]);
+    await createManualTrade(iris.ctx, manual({ symbol: 'TYPED', profit: 40 }));
+
+    expect(await listClosedTrades(iris.ctx)).toHaveLength(4);
+    expect(await listClosedTrades(iris.ctx, { mt5AccountId: day.id })).toHaveLength(1);
+    expect(await listClosedTrades(iris.ctx, { mt5AccountId: swing.id })).toHaveLength(2);
+
+    const typed = await listClosedTrades(iris.ctx, { mt5AccountId: 'manual' });
+    expect(typed).toHaveLength(1);
+    expect(typed[0]!.symbol).toBe('TYPED');
+  });
+
+  it('lets both accounts hold the same broker ticket without one erasing the other', async () => {
+    // Two brokers issuing the same position id was the failure the old (user, ticket) key
+    // could not survive: the second import landed on the first's row and the book quietly
+    // lost a trade.
+    const jack = await createTenantFixture();
+    const first = await testDb.mt5Account.create({
+      data: {
+        userId: jack.userId,
+        login: '71717171',
+        server: 'BrokerA-Live',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        status: 'connected',
+      },
+      select: { id: true },
+    });
+    const second = await testDb.mt5Account.create({
+      data: {
+        userId: jack.userId,
+        login: '72727272',
+        server: 'BrokerB-Live',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        status: 'connected',
+      },
+      select: { id: true },
+    });
+
+    await upsertTrades(jack.ctx, first.id, [synced('999', { profit: 111 })]);
+    await upsertTrades(jack.ctx, second.id, [synced('999', { profit: 222 })]);
+
+    const book = await listClosedTrades(jack.ctx);
+    expect(book).toHaveLength(2);
+    expect(book.reduce((sum, trade) => sum + trade.profit, 0)).toBe(333);
+  });
+});

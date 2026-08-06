@@ -2,6 +2,7 @@ import 'server-only';
 import type { AssetClass, Direction } from '@/lib/mt5/types';
 import type { TpTiming } from '@/lib/review/types';
 import type { StoredLongPosition } from '@/lib/db';
+import { isManualTicket } from '@/lib/db/manual-trades';
 import type { TradeRecord } from '@/lib/db/trades';
 import { getFxRate, hasRate } from '@/lib/money/fx';
 import { classifySymbol } from '@/lib/mt5/symbols';
@@ -38,6 +39,16 @@ export type TableRow = {
   closeAt: Date | null;
   /** Drives the summary split: positions count toward money, never toward R. */
   isPosition: boolean;
+  /**
+   * Where the row came from, so the table can say so.
+   *
+   * A journal that mixes what the broker sent with what the trader typed is the whole design
+   * — the analytics, the calendar and the R-strip are meant not to care. A person reading the
+   * table does care: "is this figure the broker's or mine?" is the first question asked of a
+   * number that looks wrong, and until now the only way to answer it was to know that manual
+   * tickets start with `manual:`.
+   */
+  source: 'mt5' | 'manual' | 'holding';
   /** Whether anything has been written about this row; always false for a holding. */
   journalled: boolean;
   strategy: string | null;
@@ -94,6 +105,7 @@ function tradeRow(trade: TradeRecord): TableRow {
     profitInOwnCurrency: null,
     closeAt: trade.closeAt,
     isPosition: false,
+    source: isManualTicket(trade.ticket) ? 'manual' : 'mt5',
     journalled: Boolean(
       trade.note || trade.tags.length > 0 || trade.rating || trade.mood || trade.strategy,
     ),
@@ -152,6 +164,8 @@ async function positionRows(
       profitInOwnCurrency: rate === undefined ? { amount: realized, currency } : null,
       closeAt: position.closedAt,
       isPosition: true,
+      // A holding is always something the trader entered; no broker sends these.
+      source: 'holding',
       journalled: false,
       strategy: null,
       rating: null,

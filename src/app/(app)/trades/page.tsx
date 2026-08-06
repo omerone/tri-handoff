@@ -378,7 +378,21 @@ export default async function TradesPage({
                       </span>
                     </td>
                     <td className="text-dim px-3.5 py-2.5 text-xs">
-                      {t(`enum.style.${trade.style}`)}
+                      <span className="flex items-center gap-1.5">
+                        {t(`enum.style.${trade.style}`)}
+                        {/*
+                          Where the figure came from. The journal deliberately mixes the
+                          broker's rows with the trader's own, and every calculation is meant
+                          not to care — but the first question asked of a number that looks
+                          wrong is "is this mine or the broker's?", and until this chip the
+                          only way to answer it was to know that manual tickets start with
+                          `manual:`. Dim for MT5, because that is the common case and a badge
+                          on every row is no badge at all.
+                        */}
+                        <Chip tone={trade.source === 'mt5' ? 'dim' : 'brand'}>
+                          {t(`trades.source.${trade.source}`)}
+                        </Chip>
+                      </span>
                     </td>
                     <td className="px-3.5 py-2.5 text-xs">
                       <Num>{trade.risk === null ? '—' : money(trade.risk)}</Num>

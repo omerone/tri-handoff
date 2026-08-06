@@ -6,7 +6,7 @@ import { asTheme } from '@/lib/theme';
 import { Mt5Card, type ConnectedAccount } from './mt5-card';
 import { TwoFactorCard } from './two-factor-card';
 import { requireSession } from '@/lib/auth/session';
-import { getMt5Account } from '@/lib/db';
+import { listMt5Accounts } from '@/lib/db';
 import { getTwoFactorState } from '@/lib/db/two-factor';
 import type { Locale } from '@/i18n/config';
 import { asCurrency, formatMoney } from '@/lib/money/currency';
@@ -21,8 +21,8 @@ export default async function SettingsPage() {
   const tWizard = await getTranslations('settings.wizard');
 
   const tTwoFactor = await getTranslations('settings.twoFactor');
-  const [account, twoFactor] = await Promise.all([
-    getMt5Account(session.ctx),
+  const [accounts, twoFactor] = await Promise.all([
+    listMt5Accounts(session.ctx),
     getTwoFactorState(session.ctx.userId),
   ]);
 
@@ -30,33 +30,36 @@ export default async function SettingsPage() {
   // user reads the rest of the app in. Showing them in the account currency is the honest
   // choice here: this card is about the broker connection, and converting would invite the
   // question of which rate and when.
-  const money = (value: number | null): string | null =>
-    value === null || !account?.accountCurrency
+  // Per account, because two accounts can be denominated differently and one shared formatter
+  // would render the second one's balance in the first one's currency.
+  const money = (value: number | null, currency: string | null): string | null =>
+    value === null || !currency
       ? null
-      : `${formatMoney(value, asCurrency(account.accountCurrency, 'USD'), locale, { decimals: 2 })}`;
+      : `${formatMoney(value, asCurrency(currency, 'USD'), locale, { decimals: 2 })}`;
 
-  const connected: ConnectedAccount | null = account
-    ? {
-        login: account.login,
-        server: account.server,
-        status: account.status,
-        lastSync: account.lastSyncAt ? formatDateTimeAt(account.lastSyncAt) : null,
-        balance: money(account.balance),
-        equity: money(account.equity),
-      }
-    : null;
+  const connected: ConnectedAccount[] = accounts.map((account) => ({
+    id: account.id,
+    login: account.login,
+    server: account.server,
+    label: account.label,
+    status: account.status,
+    lastSync: account.lastSyncAt ? formatDateTimeAt(account.lastSyncAt) : null,
+    balance: money(account.balance, account.accountCurrency),
+    equity: money(account.equity, account.accountCurrency),
+  }));
 
   return (
     <div className="flex max-w-xl flex-col gap-4">
       {/* "Connected MT5 account" is a lie while the wizard is still asking for the details. */}
-      <Card title={connected ? t('mt5') : tWizard('title')}>
+      <Card title={connected.length > 0 ? t('mt5') : tWizard('title')}>
         <Mt5Card
-          account={connected}
+          accounts={connected}
           labels={{
             login: t('login'),
             server: t('server'),
             connect: t('connect'),
             disconnect: t('disconnect'),
+            addAnother: t('addAnother'),
             disconnectConfirm: t('disconnectConfirm'),
             investor: t('investor'),
             investorWarning: t('investorWarning'),
