@@ -71,6 +71,13 @@ export type RowFilter = {
    */
   strategy?: string;
   tag?: string;
+  /**
+   * The free-text box. The deals were already narrowed by it in SQL — see `textSearch` in
+   * db/trades.ts — so this only has to decide the holdings, and a holding has none of the
+   * fields that search looks in except its symbol. Matching it against the note or the
+   * strategy of a *deal* is not something a holding can lose or win; it simply has neither.
+   */
+  query?: string;
 };
 
 function tradeRow(trade: TradeRecord): TableRow {
@@ -160,6 +167,7 @@ function matches(row: TableRow, filter: RowFilter): boolean {
   if (filter.assetClass && row.assetClass !== filter.assetClass) return false;
   if (filter.direction && row.direction !== filter.direction) return false;
   if (filter.style && row.style !== filter.style) return false;
+  if (filter.query && !row.symbol.toLowerCase().includes(filter.query.toLowerCase())) return false;
   return true;
 }
 

@@ -198,7 +198,41 @@ export type TradeFilter = {
   tag?: string;
   from?: Date;
   to?: Date;
+  /** Free text, matched across the symbol and everything the trader wrote. See `textSearch`. */
+  query?: string;
 };
+
+/**
+ * What a free-text search looks in.
+ *
+ * The dropdowns beside the box answer "which trades are of this kind"; this answers "where did
+ * I write that", which is the question a journal exists for and the one the table could not
+ * answer at all — four thousand characters of note were reachable only by opening the trade
+ * they were written on.
+ *
+ * `symbol` is in the list because it is what a trader types first and the dropdowns have no
+ * entry for it: asset class narrows to "forex", not to EURUSD.
+ *
+ * Tags match exactly while the text fields match loosely. Postgres array containment has no
+ * case-insensitive form in Prisma's query API, and the alternative — dropping to raw SQL for
+ * one predicate — would take this function out of the type checker's reach for the sake of a
+ * value the trader picks from a dropdown two inches to the left. It is a real difference, so
+ * it is written down rather than smoothed over.
+ *
+ * No index answers `contains`; every one of these is a scan. Both list queries cap at 5000
+ * rows per trader, which is the ceiling this stays fast under — a book that outgrows it wants
+ * `pg_trgm` and a GIN index, not a bigger `take`.
+ */
+function textSearch(query: string): Prisma.TradeWhereInput[] {
+  const contains = { contains: query, mode: 'insensitive' } as const;
+  return [
+    { symbol: contains },
+    { strategy: contains },
+    { note: contains },
+    { mood: contains },
+    { tags: { has: query } },
+  ];
+}
 
 function whereClause(
   ctx: TenantContext,
@@ -223,6 +257,7 @@ function whereClause(
     ...(filter.symbol ? { symbol: filter.symbol } : {}),
     ...(filter.strategy ? { strategy: filter.strategy } : {}),
     ...(filter.tag ? { tags: { has: filter.tag } } : {}),
+    ...(filter.query ? { OR: textSearch(filter.query) } : {}),
     ...(Object.keys(closeAt).length > 0 ? { closeAt } : {}),
   };
 }

@@ -18,6 +18,7 @@ import { displayMoney } from '@/lib/money/display';
 import { TradeFilters } from './filters';
 import { summarize, toRows, type RowStyle, type TableRow } from './rows';
 import { ReviewControl, type ReviewLabels } from './review-control';
+import { TradeSearch } from './search-field';
 import { Pager } from './pager';
 
 const PAGE_SIZE = 40;
@@ -34,9 +35,20 @@ type SearchParams = {
   style?: string;
   strategy?: string;
   tag?: string;
+  q?: string;
   page?: string;
   range?: string;
 };
+
+/**
+ * Longest search accepted, in characters.
+ *
+ * The predicate is five `contains` scans wide and the box is reachable by anyone signed in,
+ * so the one input that decides how much work it is worth is the length of the needle. Two
+ * hundred is longer than any note excerpt someone would paste in and short enough that a
+ * pathological value cannot be pasted in either.
+ */
+const MAX_QUERY_LENGTH = 200;
 
 /**
  * The trades table.
@@ -63,6 +75,7 @@ export default async function TradesPage({
   // `long` is a row style with no column in `trades`, so it never reaches the deal query —
   // `toRows` uses it to drop deals and keep holdings instead.
   const rowStyle = isRowStyle(params.style) ? params.style : undefined;
+  const query = (params.q ?? '').trim().slice(0, MAX_QUERY_LENGTH);
   const filter: TradeFilter = {
     ...toTradeFilter(range),
     ...(isAssetClass(params.class) ? { assetClass: params.class } : {}),
@@ -70,6 +83,7 @@ export default async function TradesPage({
     ...(rowStyle && rowStyle !== 'long' ? { style: rowStyle } : {}),
     ...(params.strategy ? { strategy: params.strategy } : {}),
     ...(params.tag ? { tag: params.tag } : {}),
+    ...(query ? { query } : {}),
   };
 
   const page = Math.max(1, Number(params.page) || 1);
@@ -103,6 +117,7 @@ export default async function TradesPage({
       ...(rowStyle ? { style: rowStyle } : {}),
       ...(params.strategy ? { strategy: params.strategy } : {}),
       ...(params.tag ? { tag: params.tag } : {}),
+      ...(query ? { query } : {}),
     },
   });
   const summary = summarize(allRows);
@@ -147,6 +162,11 @@ export default async function TradesPage({
     <div className="flex flex-col gap-4">
       <Card title={t('table.filter')}>
         <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
+          <TradeSearch
+            label={t('table.search')}
+            placeholder={t('table.searchHint')}
+            clear={t('table.searchClear')}
+          />
           <TradeFilters
             current={{
               class: params.class ?? 'all',
@@ -189,7 +209,14 @@ export default async function TradesPage({
 
       <Card pad={false}>
         {rows.length === 0 ? (
-          <EmptyState>{t('table.empty')}</EmptyState>
+          /*
+            A search that matched nothing is a different statement from a window with no
+            trades in it, and the fix is different too — clear the box, rather than widen the
+            date range. The message names the term so it is obvious *what* found nothing.
+          */
+          <EmptyState>
+            {query ? t('table.emptySearch', { query }) : t('table.empty')}
+          </EmptyState>
         ) : (
           <>
             {/*
