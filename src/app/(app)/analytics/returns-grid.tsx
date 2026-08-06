@@ -37,6 +37,28 @@ export function ReturnsGrid({
 }) {
   const align = rtl ? 'text-right' : 'text-left';
 
+  /*
+   * Percentages are the headline and money the caption — unless there are no percentages at
+   * all, which happens when the account has no recorded deposit to measure against (see
+   * `monthlyReturns`). A grid whose every headline is an em dash tells the reader nothing;
+   * when there is no base, the money *is* the answer and gets the large type.
+   */
+  const measured = grid.some(
+    (row) => row.total.percent !== null || row.months.some((month) => month?.percent != null),
+  );
+
+  const headline = (period: { net: number; percent: number | null }) =>
+    measured
+      ? period.percent === null
+        ? '—'
+        : formatPercent(period.percent)
+      : money(period.net, { signed: true });
+
+  const caption = (period: { net: number; percent: number | null }) =>
+    measured ? money(period.net, { signed: true }) : null;
+
+  const tone = (net: number) => (net > 0 ? 'text-pos' : net < 0 ? 'text-neg' : 'text-dim');
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[12px]" style={{ minWidth: 720 }}>
@@ -72,31 +94,27 @@ export function ReturnsGrid({
                     className="px-1 py-2 text-center"
                     data-tip={labels.cellTitle(month)}
                   >
-                    <div
-                      className={`font-bold ${month.net > 0 ? 'text-pos' : month.net < 0 ? 'text-neg' : 'text-dim'}`}
-                    >
-                      <Num>{month.percent === null ? '—' : formatPercent(month.percent)}</Num>
+                    <div className={`font-bold ${tone(month.net)}`}>
+                      <Num>{headline(month)}</Num>
                     </div>
-                    <div className="text-dim text-[10px]">
-                      <Num>{money(month.net, { signed: true })}</Num>
-                    </div>
+                    {caption(month) === null ? null : (
+                      <div className="text-dim text-[10px]">
+                        <Num>{caption(month)}</Num>
+                      </div>
+                    )}
                   </td>
                 ),
               )}
 
               <td className="border-line bg-raised/40 border-s px-2 py-2 text-center">
-                <div
-                  className={`font-extrabold ${
-                    row.total.net > 0 ? 'text-pos' : row.total.net < 0 ? 'text-neg' : 'text-dim'
-                  }`}
-                >
-                  <Num>
-                    {row.total.percent === null ? '—' : formatPercent(row.total.percent)}
-                  </Num>
+                <div className={`font-extrabold ${tone(row.total.net)}`}>
+                  <Num>{headline(row.total)}</Num>
                 </div>
-                <div className="text-dim text-[10px]">
-                  <Num>{money(row.total.net, { signed: true })}</Num>
-                </div>
+                {caption(row.total) === null ? null : (
+                  <div className="text-dim text-[10px]">
+                    <Num>{caption(row.total)}</Num>
+                  </div>
+                )}
               </td>
             </tr>
           ))}

@@ -86,10 +86,26 @@ export function monthlyReturns(
   // Chronological, so the running balance below means what it says.
   const ordered = [...months.values()].sort((a, b) => a.key.localeCompare(b.key));
 
+  /*
+   * No usable starting balance means no percentages at all, for any month.
+   *
+   * Not just for the first one. The running balance is the first month's base plus everything
+   * earned since, so if the base is zero the second month is measured against the first
+   * month's profit — and a book with no recorded deposit reported +1,014% for August because
+   * July had made ₪2,119. Every figure after the first is derived from a number that was
+   * never real, and a four-digit percentage sitting next to a year total of "—" is the
+   * incoherence that gives it away.
+   *
+   * An account with no `balance` deal in its history is exactly this case: nothing tells us
+   * what was wired in, so there is nothing to be a percentage of. The money column is
+   * unaffected and still answers what each month made.
+   */
+  const measurable = startBalance > 0;
+
   let balance = startBalance;
   for (const period of ordered) {
     period.openingBalance = balance;
-    period.percent = balance > 0 ? (period.net / balance) * 100 : null;
+    period.percent = measurable && balance > 0 ? (period.net / balance) * 100 : null;
     period.winRate = period.trades > 0 ? (period.wins / period.trades) * 100 : 0;
     balance += period.net;
   }

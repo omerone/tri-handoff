@@ -622,8 +622,16 @@ export default async function AnalyticsPage({
                   `${t('kpi.tradesCount', { count: period.trades })} · ${formatNumber(period.winRate, locale, 0)}%`,
               }}
             />
+            {/*
+              Two notes, because the grid has two modes. With a known opening balance the
+              percentages are the point and the note explains how they compound; without one
+              there are no percentages to explain, and saying so — and why — is more use than
+              a paragraph about a column that is not on screen.
+            */}
             <p className="text-dim mt-3 text-[11px] leading-relaxed">
-              {t('analytics.byPeriodNote')}
+              {months.some((month) => month.percent !== null)
+                ? t('analytics.byPeriodNote')
+                : t('analytics.byPeriodNoBase')}
             </p>
           </div>
         </Card>

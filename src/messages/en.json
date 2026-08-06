@@ -161,6 +161,7 @@
     "daysCount": "{count, plural, one {# day} other {# days}}",
     "byPeriod": "Returns by period",
     "byPeriodNote": "Each month is measured against the balance it opened with, so the percentages compare across years. The same 2,000 is 10% on a 20,000 account and 2.5% on an 80,000 one. A blank month is one with no trading.",
+    "byPeriodNoBase": "This account has no deposit in its history, so there is no opening balance to measure against — the table shows money only. Percentages appear once a sync brings the balance movements over from the broker. A blank month is one with no trading.",
     "year": "Year",
     "yearTotal": "Total",
     "heat": "Heat — MAE of winners",

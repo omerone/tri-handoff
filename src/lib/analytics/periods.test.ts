@@ -83,6 +83,29 @@ describe('monthlyReturns', () => {
     expect(months[0]!.net).toBe(500);
   });
 
+  it('gives no month a percentage when the account never recorded a deposit', () => {
+    /*
+     * Seen on production: an account with no `balance` deal has an opening balance of zero,
+     * so the first month correctly had no percentage — and the second was then measured
+     * against the first month's *profit*, reporting +1,014% beside a year total of "—".
+     * Every base after the first is derived from a number that was never real.
+     */
+    const months = monthlyReturns(
+      [closed('2026-07-15', 2119), closed('2026-08-15', 21_488)],
+      0,
+    );
+
+    expect(months.map((m) => m.percent)).toEqual([null, null]);
+    // The money is untouched: what each month made is still a fact.
+    expect(months.map((m) => m.net)).toEqual([2119, 21_488]);
+    expect(yearlyReturns(months)[0]!.percent).toBeNull();
+  });
+
+  it('still measures normally once there is a real deposit to measure against', () => {
+    const months = monthlyReturns([closed('2026-07-15', 1000)], 10_000);
+    expect(months[0]!.percent).toBeCloseTo(10, 10);
+  });
+
   it('skips months with no trades without disturbing the running balance', () => {
     const months = monthlyReturns([closed('2026-01-15', 1000), closed('2026-05-15', 500)], 10_000);
     expect(months.map((m) => m.key)).toEqual(['2026-01', '2026-05']);
