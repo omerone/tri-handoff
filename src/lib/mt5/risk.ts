@@ -1,20 +1,31 @@
 import { findSymbolSpec, type SymbolSpec } from './symbols';
-import type { Mt5Deal } from './types';
+import type { Direction, Mt5Deal } from './types';
 
 /**
  * RISK AND RR — the rule, in one place.
  *
- *   risk = |entry price − stop loss| × contract size × volume × (quote → account rate)
+ *   risk = (entry price − stop loss, on the losing side) × contract size × volume × rate
  *   rr   = net profit / risk
  *
  * where net profit is the broker's `profit` with commission and swap already applied, since
  * that is the money that actually moved.
+ *
+ * **The stop has a side, not just a distance.** A long's stop sits *below* its entry and a
+ * short's *above* it; that is what makes it a stop. A stop on the other side is not a small
+ * risk, it is no risk — the position could not lose from there, because the exit was already
+ * in profit. Measuring it as `|entry − stop|` was this file's original mistake and it does
+ * not produce a slightly wrong number, it produces a spectacular one: a real trade in this
+ * journal was a long on USOIL entered at 69.298 whose stop had been trailed up to 69.303, and
+ * the absolute distance of half a cent turned $854 of profit into **213.66R**. That trade was
+ * the only one of forty-eight carrying a stop at all, so 213.66R was the R the whole account
+ * was reported at.
  *
  * **When there is no RR.** `rr` is null — not zero, not omitted quietly — whenever any input
  * is missing or nonsensical:
  *
  *   - the position carried no stop loss, so there was no defined risk to measure against;
  *   - the stop loss sat exactly at the entry, giving zero risk and an infinite ratio;
+ *   - the stop had been moved past the entry, locking in profit rather than defining a loss;
  *   - the symbol has no contract specification, so "contract size" would be a guess;
  *   - the symbol is quoted in a currency we cannot convert to the account currency.
  *
@@ -31,6 +42,11 @@ export type RiskInputs = {
   volume: number;
   entryPrice: number;
   stopLoss: number | null;
+  /**
+   * Which way the position faced — required, because it is what decides whether the stop is
+   * below the entry or above it, and therefore whether it defines a loss at all.
+   */
+  direction: Direction;
   /** Currency the account is denominated in — what risk must be expressed in. */
   accountCurrency: string;
   /**
@@ -44,7 +60,16 @@ export type RiskInputs = {
 
 export type RiskResult =
   | { risk: number; reason: null }
-  | { risk: null; reason: 'no-stop-loss' | 'zero-distance' | 'unknown-symbol' | 'unconvertible' };
+  | {
+      risk: null;
+      reason:
+        | 'no-stop-loss'
+        | 'zero-distance'
+        /** The stop was past the entry: the exit was in profit, so nothing was at risk. */
+        | 'stop-beyond-entry'
+        | 'unknown-symbol'
+        | 'unconvertible';
+    };
 
 /**
  * Converts one unit of the symbol's quote currency into the account currency.
@@ -84,10 +109,17 @@ export function computeRisk(inputs: RiskInputs): RiskResult {
   const spec = inputs.spec ?? findSymbolSpec(inputs.symbol);
   if (!spec) return { risk: null, reason: 'unknown-symbol' };
 
-  const distance = Math.abs(inputs.entryPrice - inputs.stopLoss);
-  if (!(distance > 0) || !(inputs.volume > 0)) {
-    return { risk: null, reason: 'zero-distance' };
-  }
+  // Signed by the side the position faced: a long loses as the price falls, so its stop must
+  // be below the entry, and a short's above. Equal is the exact-breakeven case and is caught
+  // by the same comparison.
+  const distance =
+    inputs.direction === 'long'
+      ? inputs.entryPrice - inputs.stopLoss
+      : inputs.stopLoss - inputs.entryPrice;
+
+  if (!(inputs.volume > 0)) return { risk: null, reason: 'zero-distance' };
+  if (distance === 0) return { risk: null, reason: 'zero-distance' };
+  if (!(distance > 0)) return { risk: null, reason: 'stop-beyond-entry' };
 
   const rate = quoteToAccountRate(spec, inputs.entryPrice, inputs.accountCurrency, inputs.quoteRates);
   if (rate === null) return { risk: null, reason: 'unconvertible' };
@@ -119,6 +151,7 @@ export function computeRr(
     volume: deal.volume,
     entryPrice: deal.entryPrice,
     stopLoss: deal.stopLoss,
+    direction: deal.direction,
     accountCurrency: context.accountCurrency,
     quoteRates: context.quoteRates,
     spec: context.spec,

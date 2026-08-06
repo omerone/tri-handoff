@@ -37,6 +37,7 @@ describe('computeRisk', () => {
       entryPrice: 1.1,
       stopLoss: 1.09,
       accountCurrency: 'USD',
+      direction: 'long',
     });
     expect(result.risk).toBeCloseTo(1000, 6);
   });
@@ -48,6 +49,7 @@ describe('computeRisk', () => {
       entryPrice: 1.1,
       stopLoss: 1.09,
       accountCurrency: 'USD',
+      direction: 'long',
     }).risk!;
     const tenth = computeRisk({
       symbol: 'EURUSD',
@@ -55,6 +57,7 @@ describe('computeRisk', () => {
       entryPrice: 1.1,
       stopLoss: 1.09,
       accountCurrency: 'USD',
+      direction: 'long',
     }).risk!;
     expect(tenth).toBeCloseTo(base / 10, 6);
   });
@@ -67,6 +70,7 @@ describe('computeRisk', () => {
       entryPrice: 2350,
       stopLoss: 2340,
       accountCurrency: 'USD',
+      direction: 'long',
     });
     expect(gold.risk).toBeCloseTo(1000, 6);
   });
@@ -78,6 +82,7 @@ describe('computeRisk', () => {
       entryPrice: 1.1,
       stopLoss: 1.09,
       accountCurrency: 'USD',
+      direction: 'long',
     });
     const short = computeRisk({
       symbol: 'EURUSD',
@@ -85,6 +90,7 @@ describe('computeRisk', () => {
       entryPrice: 1.1,
       stopLoss: 1.11,
       accountCurrency: 'USD',
+      direction: 'short',
     });
     expect(short.risk).toBeCloseTo(long.risk!, 6);
   });
@@ -93,6 +99,7 @@ describe('computeRisk', () => {
     it('converts a pair quoted in a third currency using the account rate', () => {
       // GER40 is quoted in euros; 100 points on one contract is €100 = $108.
       const result = computeRisk({
+        direction: 'long',
         symbol: 'GER40',
         volume: 1,
         entryPrice: 18_500,
@@ -105,6 +112,7 @@ describe('computeRisk', () => {
 
     it('accepts the rate quoted the other way round', () => {
       const direct = computeRisk({
+        direction: 'long',
         symbol: 'GER40',
         volume: 1,
         entryPrice: 18_500,
@@ -113,6 +121,7 @@ describe('computeRisk', () => {
         quoteRates: { EURUSD: 1.08 },
       });
       const inverse = computeRisk({
+        direction: 'long',
         symbol: 'GER40',
         volume: 1,
         entryPrice: 18_500,
@@ -132,7 +141,8 @@ describe('computeRisk', () => {
         entryPrice: 152,
         stopLoss: 151,
         accountCurrency: 'USD',
-      });
+        direction: 'long',
+    });
       expect(result.risk).toBeCloseTo(100_000 / 152, 4);
     });
 
@@ -143,7 +153,8 @@ describe('computeRisk', () => {
         entryPrice: 18_500,
         stopLoss: 18_400,
         accountCurrency: 'USD',
-      });
+        direction: 'long',
+    });
       expect(result).toEqual({ risk: null, reason: 'unconvertible' });
     });
   });
@@ -152,6 +163,7 @@ describe('computeRisk', () => {
     it('has no risk without a stop loss', () => {
       expect(
         computeRisk({
+        direction: 'long',
           symbol: 'EURUSD',
           volume: 1,
           entryPrice: 1.1,
@@ -169,7 +181,8 @@ describe('computeRisk', () => {
           entryPrice: 1.1,
           stopLoss: 1.1,
           accountCurrency: 'USD',
-        }).reason,
+          direction: 'long',
+    }).reason,
       ).toBe('zero-distance');
     });
 
@@ -183,7 +196,8 @@ describe('computeRisk', () => {
           entryPrice: 100,
           stopLoss: 99,
           accountCurrency: 'USD',
-        }),
+          direction: 'long',
+    }),
       ).toEqual({ risk: null, reason: 'unknown-symbol' });
     });
 
@@ -195,13 +209,15 @@ describe('computeRisk', () => {
           entryPrice: 1.1,
           stopLoss: 1.09,
           accountCurrency: 'USD',
-        }).risk,
+          direction: 'long',
+    }).risk,
       ).toBeNull();
     });
 
     it('ignores a non-finite stop loss', () => {
       expect(
         computeRisk({
+        direction: 'long',
           symbol: 'EURUSD',
           volume: 1,
           entryPrice: 1.1,
@@ -286,6 +302,7 @@ describe('stopDistanceForRisk', () => {
       entryPrice: 1.1,
       stopLoss: 1.1 - distance,
       accountCurrency: 'USD',
+      direction: 'long',
     });
     expect(round.risk).toBeCloseTo(750, 6);
   });
@@ -308,6 +325,7 @@ describe('stopDistanceForRisk', () => {
       stopLoss: 18_500 - distance,
       accountCurrency: 'USD',
       quoteRates,
+      direction: 'long',
     });
     expect(round.risk).toBeCloseTo(500, 6);
   });
@@ -321,5 +339,80 @@ describe('stopDistanceForRisk', () => {
         accountCurrency: 'USD',
       }),
     ).toBeNull();
+  });
+});
+
+describe('a stop on the wrong side of the entry', () => {
+  /**
+   * The trade that produced this rule, with its real numbers.
+   *
+   * A long on USOIL entered at 69.298 and closed for $854.62, with the stop trailed up to
+   * 69.303 — five thousandths *above* the entry. Read as an absolute distance that is a risk
+   * of four dollars and an RR of 213.66. It was the only one of forty-eight trades carrying a
+   * stop at all, so 213.66R was the figure the whole account was reported at, on screen, to a
+   * client.
+   */
+  const usoil = () =>
+    deal({
+      symbol: 'USOIL',
+      direction: 'long',
+      volume: 0.8,
+      entryPrice: 69.298,
+      stopLoss: 69.303,
+      exitPrice: 70.37,
+      profit: 854.62,
+      commission: 0,
+      swap: 0,
+    });
+
+  it('is not a risk, and yields no RR', () => {
+    const result = computeRr(usoil(), { accountCurrency: 'USD' });
+
+    expect(result.risk).toBeNull();
+    expect(result.rr).toBeNull();
+    expect(result.reason).toBe('stop-beyond-entry');
+  });
+
+  it('is reported as its own reason, so coverage can say why', () => {
+    // Distinct from 'no-stop-loss': the trader did set a stop. Collapsing the two would tell
+    // them to start using stops on a trade where they used one and moved it to breakeven.
+    const short = computeRisk({
+      symbol: 'EURUSD',
+      volume: 1,
+      entryPrice: 1.1,
+      stopLoss: 1.09,
+      direction: 'short',
+      accountCurrency: 'USD',
+    });
+    expect(short.reason).toBe('stop-beyond-entry');
+  });
+
+  it('still measures a stop that sits on the losing side, however close', () => {
+    // Not a threshold rule: a two-pip stop is a small risk, not an absent one, and inventing a
+    // minimum would quietly delete the tightest trades from the RR average.
+    const tight = computeRisk({
+      symbol: 'EURUSD',
+      volume: 1,
+      entryPrice: 1.1,
+      stopLoss: 1.0998,
+      direction: 'long',
+      accountCurrency: 'USD',
+    });
+    expect(tight.risk).toBeCloseTo(20, 6);
+  });
+
+  it('treats an exact breakeven stop as zero distance rather than a negative one', () => {
+    for (const direction of ['long', 'short'] as const) {
+      const result = computeRisk({
+        symbol: 'EURUSD',
+        volume: 1,
+        entryPrice: 1.1,
+        stopLoss: 1.1,
+        direction,
+        accountCurrency: 'USD',
+      });
+      expect(result.risk).toBeNull();
+      expect(result.reason).toBe('zero-distance');
+    }
   });
 });

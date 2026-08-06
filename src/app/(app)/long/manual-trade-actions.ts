@@ -7,6 +7,7 @@ import { requireSession } from '@/lib/auth/session';
 import { createManualTrade, deleteManualTrade, getMt5Account } from '@/lib/db';
 import { computeRisk } from '@/lib/mt5/risk';
 import { classifySymbol, normalizeSymbol } from '@/lib/mt5/symbols';
+import type { Direction } from '@/lib/mt5/types';
 
 export type ManualTradeFormState = { error?: string; notice?: string };
 
@@ -88,6 +89,8 @@ function riskOf(
     entryPrice: number | null;
     stopLoss: number | null;
     risk: number | null;
+    /** Which way the position faced — what decides whether the stop defines a loss at all. */
+    direction: Direction;
   },
   accountCurrency: string,
 ): number | null {
@@ -97,6 +100,7 @@ function riskOf(
       volume: input.volume,
       entryPrice: input.entryPrice,
       stopLoss: input.stopLoss,
+      direction: input.direction,
       accountCurrency,
     });
     if (derived.risk !== null) return derived.risk;
@@ -137,6 +141,7 @@ export async function createManualTradeAction(
       entryPrice: input.entryPrice,
       stopLoss: input.stopLoss,
       risk: input.risk,
+      direction: input.direction,
     },
     accountCurrency,
   );

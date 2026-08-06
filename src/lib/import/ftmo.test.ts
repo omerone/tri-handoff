@@ -83,13 +83,26 @@ describe('parseFtmoCsv, against a real FTMO MetriX export', () => {
     expect(btc.rr).toBeNull();
   });
 
-  it('computes risk and RR through computeRr when the row carries a stop', () => {
+  /**
+   * The stop is carried through, and it still yields no risk — because of where it sits.
+   *
+   * This row is a **sell** at 2401.44 with its stop at 2395, which is *below* the entry: for a
+   * short that is not a loss, it is a locked-in profit, and the position closed at 2394.24
+   * just past it. `computeRisk` signs the distance by the side the position faced, so this is
+   * `stop-beyond-entry` rather than a 64.40 risk and a 1.10 RR.
+   *
+   * That this appears in a real twenty-seven-row export, and again on the live FTMO account
+   * where a trailed USOIL stop produced a headline of 213.66R, is the whole argument for the
+   * rule: trailing a stop to breakeven is ordinary trading, and measuring it as `|entry − stop|`
+   * turns the most disciplined exits into the most spectacular R multiples.
+   */
+  it('gives no RR to a stop that had been trailed past the entry', () => {
     const eth = trades[1] as TradeUpsert;
     expect(eth.stopLoss).toBe(2395);
     expect(eth.takeProfit).toBe(2383);
-    // |2401.44 − 2395| × contract size 1 × 10 lots × 1 (USD-quoted on a USD account).
-    expect(eth.risk).toBeCloseTo(64.4, 6);
-    expect(eth.rr).toBeCloseTo(71.04 / 64.4, 6);
+    expect(eth.direction).toBe('short');
+    expect(eth.risk).toBeNull();
+    expect(eth.rr).toBeNull();
   });
 
   it('reports how it read the file', () => {

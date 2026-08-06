@@ -105,6 +105,12 @@ function distanceToMoney(deal: Mt5Deal, price: number, context: ExcursionContext
     volume: deal.volume,
     entryPrice: deal.entryPrice,
     stopLoss: price,
+    // This caller wants a *magnitude*, not a risk: an excursion is measured in both
+    // directions, favourable and adverse alike. `computeRisk` now signs the distance by the
+    // position's side and refuses a stop on the profitable one, so the side passed here is
+    // chosen to keep the distance positive rather than to describe the trade. Passing
+    // `deal.direction` instead would silently return null for every favourable excursion.
+    direction: price < deal.entryPrice ? 'long' : 'short',
     accountCurrency: context.accountCurrency,
     quoteRates: context.quoteRates,
     spec: context.spec,
