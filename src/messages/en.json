@@ -99,7 +99,20 @@
     "streakWins": "{count} in a row",
     "streakLosses": "{count} in a row",
     "streakNone": "No streak",
-    "longestRuns": "Longest: {wins} wins · {losses} losses"
+    "longestRuns": "Longest: {wins} wins · {losses} losses",
+    "info": {
+      "balance": "What the broker says the account is worth right now, including open positions. It is the only figure here that is not computed from your trades — it comes straight from the last sync, so its age is the age of that sync.",
+      "netPnl": "Every closed trade in the selected period added up, after commission and swap. Open positions are not in it: an unrealised gain is not money until the trade is closed, and counting it makes a losing month look flat.",
+      "winRate": "How many trades closed in profit, out of how many closed at all. On its own it says almost nothing — a 25% win rate is excellent if the winners are four times the size of the losers, and ruinous if they are not. Read it beside the average RR.",
+      "avgRR": "The average trade measured in units of its own risk. A trade that risked ₪500 and made ₪700 is 1.4R. It is the figure that makes trades of different sizes comparable, and the one worth improving: raising it lifts every month at once. Only trades with a stop loss can be measured this way — the caption says how many that is.",
+      "profitFactor": "Gross profit divided by gross loss. Above 1.0 the account makes money, below it loses. 1.5 is a solid edge; anything above 2.0 over a large number of trades is rare. Unlike net P&L it does not care how big the account is, so it can be compared across periods.",
+      "maxDD": "The deepest fall from a peak in the balance to the low that followed it, before a new peak. It is the loss you would have had to sit through, which is the number that decides whether a strategy is one you can actually run — most are abandoned in a drawdown, not in a loss.",
+      "maxProfit": "The largest climb from a trough to a peak: the same curve read the other way up. Not the biggest winning trade and not the total profit, but the best stretch the account put together.",
+      "expectancy": "What one trade is worth on average, wins and losses together. It is the figure position sizing is built on: multiply it by how many trades you take a month and you have the month, and if it is negative no amount of trading fixes it.",
+      "avgWin": "The average size of a winning trade, after costs. Worth reading directly against the average loss — the ratio between the two, together with the win rate, is the whole arithmetic of whether the account grows.",
+      "avgLoss": "The average size of a losing trade, after costs. If it is larger than the average win, the win rate has to be above 50% just to break even.",
+      "streak": "How many trades in a row closed the same way, and the longest runs on record. A streak is not a signal about the next trade — trades are close to independent — but a long losing run is when position sizing and discipline are actually tested."
+    }
   },
   "dash": {
     "rStrip": "Last {days} days (R)",

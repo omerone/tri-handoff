@@ -604,3 +604,44 @@ describe('getManualTrade', () => {
     expect(await getManualTrade(bob.ctx, mine)).toBeNull();
   });
 });
+
+describe('after a broker is disconnected', () => {
+  /**
+   * The regression this exists to prevent, found in production.
+   *
+   * Disconnecting a broker keeps the trades on purpose — they are the trader's journal, not
+   * the broker's — and the foreign key is `ON DELETE SET NULL`, so every one of them ends up
+   * with no account. Reading "no account" as "the trader typed this" reclassified a whole
+   * imported history as hand-entered the moment somebody pressed disconnect. Forty-nine synced
+   * trades, silently, with the badge on each row still correctly saying MT5 and the filter
+   * disagreeing with it.
+   */
+  it('does not start calling the broker\'s trades hand-typed', async () => {
+    const kate = await createTenantFixture();
+    const account = await testDb.mt5Account.create({
+      data: {
+        userId: kate.userId,
+        login: '81818181',
+        server: 'MetaQuotes-Demo',
+        investorPwEncrypted: 'v1.test.ciphertext',
+        status: 'connected',
+      },
+      select: { id: true },
+    });
+
+    await upsertTrades(kate.ctx, account.id, [synced('8100'), synced('8200')]);
+    await createManualTrade(kate.ctx, manual({ symbol: 'TYPED' }));
+
+    // Disconnecting orphans the synced rows: the column is nulled, the tickets are not.
+    await testDb.mt5Account.delete({ where: { id: account.id } });
+    const orphaned = await testDb.trade.findMany({
+      where: { userId: kate.userId, ticket: { in: ['8100', '8200'] } },
+      select: { mt5AccountId: true },
+    });
+    expect(orphaned.every((row) => row.mt5AccountId === null)).toBe(true);
+
+    const typed = await listClosedTrades(kate.ctx, { mt5AccountId: 'manual' });
+    expect(typed).toHaveLength(1);
+    expect(typed[0]!.symbol).toBe('TYPED');
+  });
+});

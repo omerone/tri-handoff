@@ -7,6 +7,7 @@ import { LOCALE_DIR } from '@/i18n/config';
 import { resolveLocale } from '@/i18n/request';
 import { resolveTheme, THEME_COOKIE } from '@/lib/theme';
 import { getSession } from '@/lib/auth/session';
+import { InfoLayer } from '@/components/ui/info-layer';
 import { TooltipLayer } from '@/components/ui/tooltip';
 import './globals.css';
 
@@ -65,6 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           a page that was added later.
         */}
         <TooltipLayer />
+        <InfoLayer />
       </body>
     </html>
   );

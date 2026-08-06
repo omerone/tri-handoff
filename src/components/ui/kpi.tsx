@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Info } from 'lucide-react';
 
 export type Tone = 'pos' | 'neg' | 'neutral';
 
@@ -43,16 +44,55 @@ export function KPI({
   sub,
   tone = 'neutral',
   title,
+  info,
+  infoLabel,
 }: {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
   tone?: Tone;
   title?: string;
+  /**
+   * What this figure actually means, in full sentences — see `info-layer.tsx`.
+   *
+   * A KPI label has room for two or three words, and most of these are terms of art: a profit
+   * factor of 0.83 says something precise and says nothing at all to somebody who has not met
+   * the term. The alternative to a mark you can press is a label long enough to explain
+   * itself, which is a label that no longer fits.
+   */
+  info?: string;
+  /** Usually the label; separate so the panel can name the figure in full. */
+  infoLabel?: string;
 }) {
   return (
     <div className="border-line bg-surface rounded-[18px] border px-4 py-3" data-tip={title}>
-      <div className="text-dim text-xs">{label}</div>
+      {/*
+        Two shapes, and the plain one is not an optimisation.
+
+        A tile with no explanation renders exactly what it always did: the label as the only
+        thing in its div. The moment that became a `<span>` inside a flex row, `div:text-is(…)`
+        stopped matching it — and seven tests across the finance and long screens, which find
+        a tile by its label because there is nothing else stable to find it by, went red on a
+        change to a screen they do not test. Markup nobody needs is still markup somebody
+        depends on.
+      */}
+      {info ? (
+        <div className="text-dim flex items-center gap-1 text-xs">
+          <span className="min-w-0">{label}</span>
+          <button
+            type="button"
+            data-info={info}
+            aria-label={infoLabel ?? label}
+            /* A button, not an icon with a click handler: this opens something, and the
+               keyboard and the screen reader both already know what a button is. */
+            className="text-dim/50 hover:text-text focus-visible:text-text -m-1 shrink-0 p-1 leading-none"
+          >
+            <Info size={12} aria-hidden />
+          </button>
+        </div>
+      ) : (
+        <div className="text-dim text-xs">{label}</div>
+      )}
       {/*
         The figure scales with the tile rather than overflowing it: a seven-figure balance at
         a fixed 22px does not fit two-up on a 320px screen, and this is the one number on the

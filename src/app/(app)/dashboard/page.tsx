@@ -7,7 +7,14 @@ import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { EquityChart } from '@/components/charts/equity-chart';
 import { RStrip } from '@/components/charts/r-strip';
 import { requireSession } from '@/lib/auth/session';
-import { computeMetrics, equityCurve, maxDrawdown, maxRunUp, recentDailyR, streaks } from '@/lib/analytics';
+import {
+  computeMetrics,
+  equityCurve,
+  maxDrawdown,
+  maxRunUp,
+  recentDailyR,
+  streaks,
+} from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { toTradeFilter } from '@/lib/time/range';
@@ -102,6 +109,7 @@ export default async function DashboardPage({
     balance: (
       <KPI
         label={t('kpi.balance')}
+        info={t('kpi.info.balance')}
         value={money(balance)}
         sub={t('kpi.tradesCount', { count: metrics.count })}
       />
@@ -109,6 +117,7 @@ export default async function DashboardPage({
     netPnl: (
       <KPI
         label={t('kpi.netPnl')}
+        info={t('kpi.info.netPnl')}
         value={money(metrics.net, { signed: true })}
         tone={metrics.net >= 0 ? 'pos' : 'neg'}
       />
@@ -116,6 +125,7 @@ export default async function DashboardPage({
     winRate: (
       <KPI
         label={t('kpi.winRate')}
+        info={t('kpi.info.winRate')}
         value={formatPercent(metrics.winRate, locale)}
         sub={`${metrics.wins}/${metrics.count}`}
       />
@@ -123,6 +133,7 @@ export default async function DashboardPage({
     avgRr: (
       <KPI
         label={t('kpi.avgRR')}
+        info={t('kpi.info.avgRR')}
         value={metrics.avgRr === null ? '—' : `${formatNumber(metrics.avgRr, locale, 2)}R`}
         tone={(metrics.avgRr ?? 0) >= 0 ? 'pos' : 'neg'}
         // RR is the client's headline metric, so how much of the book it actually covers
@@ -133,6 +144,7 @@ export default async function DashboardPage({
     profitFactor: (
       <KPI
         label={t('kpi.profitFactor')}
+        info={t('kpi.info.profitFactor')}
         value={
           Number.isFinite(metrics.profitFactor)
             ? formatNumber(metrics.profitFactor, locale, 2)
@@ -143,6 +155,7 @@ export default async function DashboardPage({
     maxDd: (
       <KPI
         label={t('kpi.maxDD')}
+        info={t('kpi.info.maxDD')}
         value={money(-drawdown.maxDrawdown)}
         tone="neg"
         /*
@@ -162,52 +175,67 @@ export default async function DashboardPage({
     maxProfit: (
       <KPI
         label={t('kpi.maxProfit')}
+        info={t('kpi.info.maxProfit')}
         value={money(runUp.maxRunUp, { signed: true })}
         tone="pos"
         // Same reasoning as the drawdown above.
         sub={runUp.maxRunUpPercent > 0 ? formatPercent(runUp.maxRunUpPercent, locale) : undefined}
       />
     ),
-    streak: (
-      /*
-       * The run the book is on, and the worst and best it has been on.
-       *
-       * A profit factor cannot say this: eight wins and four losses is the same ratio whether
-       * the losses were spread out or arrived in a row on one afternoon, and only the second
-       * is the one that makes someone double their size to win it back.
-       */
-      <KPI
-        label={t('kpi.streak')}
-        value={
-          run.current === 0
-            ? t('kpi.streakNone')
-            : run.current > 0
-              ? t('kpi.streakWins', { count: run.current })
-              : t('kpi.streakLosses', { count: -run.current })
-        }
-        tone={run.current === 0 ? 'neutral' : run.current > 0 ? 'pos' : 'neg'}
-        sub={t('kpi.longestRuns', { wins: run.longestWin, losses: run.longestLoss })}
-      />
-    ),
-    expectancy: (
-      /*
-       * What the average trade is worth, which is the figure position sizing is actually
-       * built on. It has been computed on every dashboard load since the first release, and
-       * both translations were already written — only the tile was missing.
-       */
-      <KPI
-        label={t('kpi.expectancy')}
-        value={money(metrics.expectancy, { signed: true })}
-        tone={metrics.expectancy >= 0 ? 'pos' : 'neg'}
-        sub={t('kpi.tradesCount', { count: metrics.count })}
-      />
-    ),
+    streak:
+      (
+        /*
+         * The run the book is on, and the worst and best it has been on.
+         *
+         * A profit factor cannot say this: eight wins and four losses is the same ratio whether
+         * the losses were spread out or arrived in a row on one afternoon, and only the second
+         * is the one that makes someone double their size to win it back.
+         */
+        <KPI
+          label={t('kpi.streak')}
+          info={t('kpi.info.streak')}
+          value={
+            run.current === 0
+              ? t('kpi.streakNone')
+              : run.current > 0
+                ? t('kpi.streakWins', { count: run.current })
+                : t('kpi.streakLosses', { count: -run.current })
+          }
+          tone={run.current === 0 ? 'neutral' : run.current > 0 ? 'pos' : 'neg'}
+          sub={t('kpi.longestRuns', { wins: run.longestWin, losses: run.longestLoss })}
+        />
+      ),
+    expectancy:
+      (
+        /*
+         * What the average trade is worth, which is the figure position sizing is actually
+         * built on. It has been computed on every dashboard load since the first release, and
+         * both translations were already written — only the tile was missing.
+         */
+        <KPI
+          label={t('kpi.expectancy')}
+          info={t('kpi.info.expectancy')}
+          value={money(metrics.expectancy, { signed: true })}
+          tone={metrics.expectancy >= 0 ? 'pos' : 'neg'}
+          sub={t('kpi.tradesCount', { count: metrics.count })}
+        />
+      ),
     avgWin: (
-      <KPI label={t('kpi.avgWin')} value={money(metrics.avgWin)} tone="pos" />
+      <KPI
+        label={t('kpi.avgWin')}
+        value={money(metrics.avgWin)}
+        tone="pos"
+        info={t('kpi.info.avgWin')}
+      />
     ),
     avgLoss: (
       // Stored as a positive magnitude; shown negative, because it is money leaving.
-      <KPI label={t('kpi.avgLoss')} value={money(-Math.abs(metrics.avgLoss))} tone="neg" />
+      <KPI
+        label={t('kpi.avgLoss')}
+        value={money(-Math.abs(metrics.avgLoss))}
+        tone="neg"
+        info={t('kpi.info.avgLoss')}
+      />
     ),
     rStrip: (
       // Collapsible, because this is the one panel whose narrow layout is a list rather than a
@@ -259,7 +287,7 @@ export default async function DashboardPage({
         />
       </Card>
     ),
-    balanceHistory: (
+    balanceHistory:
       /*
         Only once there is more than one point. A single reading is a dot, and a chart of one
         dot claims to show a trend it cannot — the card stays out of the way until the account
@@ -281,8 +309,7 @@ export default async function DashboardPage({
             {t('dash.balanceHistoryNote')}
           </p>
         </Card>
-      ) : null
-    ),
+      ) : null,
     recent: (
       <Card title={t('dash.recent')}>
         <div className="flex flex-col gap-2">
@@ -343,15 +370,12 @@ export default async function DashboardPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <DashboardGrid
-        initial={layout}
-        widgets={widgets}
-        names={names}
-        rtl={rtl}
-      />
+      <DashboardGrid initial={layout} widgets={widgets} names={names} rtl={rtl} />
 
       {!converted ? (
-        <p className="text-warn text-xs">{t('kpi.fxUnavailable', { currency: book.accountCurrency })}</p>
+        <p className="text-warn text-xs">
+          {t('kpi.fxUnavailable', { currency: book.accountCurrency })}
+        </p>
       ) : null}
     </div>
   );

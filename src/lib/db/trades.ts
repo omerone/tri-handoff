@@ -1,4 +1,5 @@
 import 'server-only';
+import { MANUAL_ONLY } from './manual-trades';
 import type { Prisma } from '@prisma/client';
 import type { TenantContext } from '@/lib/tenant/context';
 import type { AssetClass, DealKind, Direction, TradeStyle } from '@/lib/mt5/types';
@@ -270,8 +271,15 @@ export type TradeFilter = {
   /**
    * One broker account, when the trader wants to read one book rather than both.
    *
-   * `'manual'` selects the trades they typed, which have no account — the string rather than
-   * `null` because an absent field already means "no filter", and the two must not collide.
+   * `'manual'` selects the trades they typed — the string rather than `null` because an absent
+   * field already means "no filter", and the two must not collide.
+   *
+   * **"Typed" is the ticket namespace, not a null account.** Disconnecting a broker keeps the
+   * trades on purpose and the foreign key is `ON DELETE SET NULL`, so a real broker trade ends
+   * up with no account the moment its connection is removed. Reading null as "the trader typed
+   * this" would then quietly reclassify a whole imported history as hand-entered — which is
+   * exactly what happened here: one press of disconnect left forty-nine synced trades with a
+   * null account. The prefix survives that, because it is on the row itself.
    */
   mt5AccountId?: string | 'manual';
 };
@@ -334,7 +342,7 @@ function whereClause(
     ...(filter.mt5AccountId === undefined
       ? {}
       : filter.mt5AccountId === 'manual'
-        ? { mt5AccountId: null }
+        ? MANUAL_ONLY
         : { mt5AccountId: filter.mt5AccountId }),
     ...(filter.query ? { OR: textSearch(filter.query) } : {}),
     ...(Object.keys(closeAt).length > 0 ? { closeAt } : {}),
