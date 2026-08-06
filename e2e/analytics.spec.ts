@@ -194,7 +194,7 @@ test.describe('dashboard', () => {
         response.request().headers()['next-action'] !== undefined,
     );
     await page.getByRole('button', { name: /^Move Account balance,/ }).press('ArrowRight');
-    // Exact, or this also matches "Long Trades".
+    // Exact, so it is the Trades tab rather than any other nav item containing the word.
     await page.getByRole('link', { name: 'Trades', exact: true }).click(); // inside the window
     await written;
 
