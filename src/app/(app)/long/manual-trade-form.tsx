@@ -152,9 +152,18 @@ export function ManualTradeForm({
         <div className={open ? 'mt-3' : 'hidden'}>
           <p className="text-dim mb-2 text-[11px] leading-relaxed">{labels.moreHint}</p>
           <div className="flex flex-wrap items-end gap-2">
+            {/*
+              Empty by default, not today — and this section being kept mounted is exactly why
+              it matters. A pre-filled open date submits whether or not anyone opened the fold,
+              so defaulting it to today rejected every trade closed before today with "the open
+              date is later than the close date", naming a field the user could not see. That
+              is the ordinary case for a journal: you write a trade down after you took it.
+              Left empty, the action falls back to the close date, which is right for a day
+              trade and honest for a swing one until someone says otherwise.
+            */}
             <DateField
               name="openDate"
-              defaultValue={defaultDate}
+              defaultValue=""
               label={labels.openDate}
               className={`${field} w-40`}
             />
