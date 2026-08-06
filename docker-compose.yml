@@ -67,7 +67,16 @@ services:
       PORT: '3000'
       HOSTNAME: '0.0.0.0'
     ports:
-      - '0.0.0.0:3000:3000'
+      # Loopback only. `0.0.0.0` here put the app itself on the public internet beside the
+      # proxy, and everything that makes a request trustworthy is a header the proxy writes:
+      # nginx overwrites X-Real-IP with the socket peer and X-Forwarded-Host with the real
+      # host, and the app reads both. Reached directly on this port the caller wrote them,
+      # which means a fresh rate-limit bucket per request and a free choice of which tenant —
+      # and of whether the request looks like it arrived on the operator's hostname.
+      #
+      # `HOSTNAME: 0.0.0.0` above is unrelated and correct: that is the interface the server
+      # binds *inside* the container, where reaching it still means going through this line.
+      - '127.0.0.1:3000:3000'
     # For local development with AWS Secrets Manager emulator:
     # Uncomment the volumes section and start LocalStack
     # volumes:

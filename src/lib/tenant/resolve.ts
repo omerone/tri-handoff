@@ -11,9 +11,15 @@ import { normalizeDomain } from './domain';
  * The host is derived here from the proxy headers rather than read from the `x-tri-host`
  * that the middleware sets. The middleware still strips and rewrites that header, but a
  * matcher gap would leave it under the caller's control on the affected route, and the
- * tenant boundary must not depend on a regex being exhaustive. `x-forwarded-host` is
- * trustworthy for the opposite reason: Caddy overwrites it, and the app container is only
- * `expose`d, never published, so nothing else can reach it.
+ * tenant boundary must not depend on a regex being exhaustive.
+ *
+ * `x-forwarded-host` is trustworthy only because the proxy in front overwrites it and the app
+ * is not reachable around that proxy. Both halves have to hold, and both had stopped holding:
+ * the nginx in production forwarded the client's own header untouched, and the app container
+ * was published on 0.0.0.0:3000 beside it. Either one alone lets the caller name their own
+ * tenant and claim to have arrived on the operator's hostname. This is the one comment in the
+ * file that is a deployment invariant rather than a description of the code, so it is worth
+ * re-reading against `docker-compose.yml` and the live proxy config rather than trusting.
  */
 
 export const getRequestHost = cache(async (): Promise<string> => {
