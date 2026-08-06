@@ -1,6 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
-import type { Mt5Status } from '@prisma/client';
+import type { Mt5Status, TradeStyle } from '@prisma/client';
 import type { TenantContext } from '@/lib/tenant/context';
 import { MAX_MT5_ACCOUNTS } from '@/lib/mt5/types';
 import { assertContext } from './context';
@@ -29,6 +29,7 @@ export type Mt5AccountView = {
   login: string;
   server: string;
   label: string | null;
+  purpose: TradeStyle | null;
   status: Mt5Status;
   lastSyncAt: Date | null;
   accountCurrency: string | null;
@@ -42,6 +43,7 @@ const VIEW_FIELDS = {
   login: true,
   server: true,
   label: true,
+  purpose: true,
   status: true,
   lastSyncAt: true,
   accountCurrency: true,
@@ -55,6 +57,7 @@ function toView(row: {
   login: string;
   server: string;
   label: string | null;
+  purpose: TradeStyle | null;
   status: Mt5Status;
   lastSyncAt: Date | null;
   accountCurrency: string | null;
@@ -67,6 +70,7 @@ function toView(row: {
     login: row.login,
     server: row.server,
     label: row.label,
+    purpose: row.purpose,
     status: row.status,
     lastSyncAt: row.lastSyncAt,
     accountCurrency: row.accountCurrency,
@@ -129,6 +133,8 @@ export async function connectMt5Account(
     accountCurrency?: string;
     /** What the trader calls this one. Undefined leaves an existing label alone. */
     label?: string | null;
+    /** What the account is for, which decides the style of everything it imports. */
+    purpose?: TradeStyle | null;
   },
 ): Promise<Mt5AccountView> {
   assertContext(ctx);
@@ -164,6 +170,7 @@ export async function connectMt5Account(
       login: data.login,
       server: data.server,
       label: data.label ?? null,
+      purpose: data.purpose ?? null,
       investorPwEncrypted: data.investorPwEncrypted,
       accountCurrency: data.accountCurrency ?? null,
       status: 'connected',
@@ -173,6 +180,7 @@ export async function connectMt5Account(
       accountCurrency: data.accountCurrency ?? null,
       status: 'connected',
       ...(data.label === undefined ? {} : { label: data.label }),
+      ...(data.purpose === undefined ? {} : { purpose: data.purpose }),
     },
     select: VIEW_FIELDS,
   });
@@ -190,6 +198,7 @@ export async function readCredentialCiphertexts(ctx: TenantContext): Promise<
     server: string;
     investorPwEncrypted: string;
     providerAccountId: string | null;
+    purpose: TradeStyle | null;
   }[]
 > {
   assertContext(ctx);
@@ -202,6 +211,7 @@ export async function readCredentialCiphertexts(ctx: TenantContext): Promise<
       server: true,
       investorPwEncrypted: true,
       providerAccountId: true,
+      purpose: true,
     },
   });
 }

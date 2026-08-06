@@ -350,3 +350,73 @@ describe('the two-account limit', () => {
     expect(await listMt5Accounts(judy.ctx)).toHaveLength(1);
   });
 });
+
+describe('what an account is for', () => {
+  /**
+   * The reason a trader keeps two accounts, and therefore the reason the calendar cannot have
+   * the last word.
+   *
+   * `styleOf` derives day or swing from whether a position opened and closed on one calendar
+   * day, which is the only evidence there is when nobody has said otherwise. Once someone
+   * declares "this account is my swing book", deriving it again from the timestamps contradicts
+   * them: a swing closed inside one session is still a swing, and filing it under day trades
+   * splits one strategy across both breakdowns — exactly what having two accounts was meant to
+   * stop, and what every screen that groups by style would then get wrong.
+   */
+  it('overrides the calendar for everything the account imports', async () => {
+    const nina = await createTenantFixture();
+    await connectMt5Account(nina.ctx, {
+      login: '21212121',
+      server: 'MetaQuotes-Demo',
+      investorPwEncrypted: encryptSecret(INVESTOR_PASSWORD),
+      accountCurrency: 'USD',
+      purpose: 'swing',
+    });
+
+    await syncMt5(nina.ctx, 'backfill');
+
+    const trades = await listClosedTrades(nina.ctx);
+    expect(trades.length).toBeGreaterThan(0);
+    // The mock book contains same-day trades; on the calendar rule some would be `day`.
+    expect(generateMockDeals().deals.some((deal) => deal.closeAt && sameZonedDay(deal.openAt, deal.closeAt))).toBe(true);
+    expect(trades.every((trade) => trade.style === 'swing')).toBe(true);
+  });
+
+  it('keeps the calendar rule for an account that never said', async () => {
+    const oscar = await createTenantFixture();
+    await connect(oscar, '22222222');
+
+    await syncMt5(oscar.ctx, 'backfill');
+
+    const trades = await listClosedTrades(oscar.ctx);
+    for (const trade of trades) {
+      expect(trade.style).toBe(sameZonedDay(trade.openAt, trade.closeAt!) ? 'day' : 'swing');
+    }
+  });
+
+  it('sends two accounts to two books', async () => {
+    const pete = await createTenantFixture();
+    await connectMt5Account(pete.ctx, {
+      login: '23232323',
+      server: 'MetaQuotes-Demo',
+      investorPwEncrypted: encryptSecret(INVESTOR_PASSWORD),
+      accountCurrency: 'USD',
+      purpose: 'swing',
+    });
+    await connectMt5Account(pete.ctx, {
+      login: '24242424',
+      server: 'MetaQuotes-Demo',
+      investorPwEncrypted: encryptSecret(INVESTOR_PASSWORD),
+      accountCurrency: 'USD',
+      purpose: 'day',
+    });
+
+    await syncMt5(pete.ctx, 'backfill');
+
+    const trades = await listClosedTrades(pete.ctx);
+    // Every screen that groups by style — the statistics, the tabs, the breakdowns — reads
+    // this column, so getting it right here is what makes all of them right at once.
+    expect(trades.some((trade) => trade.style === 'swing')).toBe(true);
+    expect(trades.some((trade) => trade.style === 'day')).toBe(true);
+  });
+});

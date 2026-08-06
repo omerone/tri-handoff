@@ -513,9 +513,9 @@
     "twoAccounts": "You can connect two accounts — a day account and a swing account, say. Their books stay apart.",
     "slotEmpty": "Second account",
     "preferences": "Preferences",
-    "firstAccount": "First account",
-    "secondAccount": "Second account",
-    "accountLimit": "You can connect up to two MT5 accounts. Disconnect one before adding another."
+    "accountLimit": "You can connect up to two MT5 accounts. Disconnect one before adding another.",
+    "swingAccount": "Swing account",
+    "dayAccount": "Day-trading account"
   },
   "calendar": {
     "weekdays": [

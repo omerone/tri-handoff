@@ -11,8 +11,8 @@ import { disconnectMt5Action } from './mt5-actions';
     of this card name the same things, and the wizard needs them too. */
 export type Mt5CardLabels = WizardLabels & {
   /** Slot titles, so two identical wizards are not two identical invitations. */
-  firstAccount: string;
-  secondAccount: string;
+  swingAccount: string;
+  dayAccount: string;
   slotEmpty: string;
   disconnect: string;
   disconnectConfirm: string;
@@ -57,6 +57,15 @@ export function Mt5Card({
   // Positional, and deliberately not sorted by anything: an account keeps the slot it was
   // connected into, so the card a trader learned to read does not move when the other one is
   // disconnected. `listMt5Accounts` orders by creation for the same reason.
+  /*
+   * Slot one is the swing book and slot two the day book.
+   *
+   * Fixed rather than chosen, because the split is the reason there are two slots and a
+   * dropdown asking which is which would invite a trader to connect two swing accounts and
+   * then wonder why the day tab is empty. What each account is for decides the style of
+   * everything it imports — see `styleOf` in the sync.
+   */
+  const PURPOSES = ['swing', 'day'] as const;
   const slots = Array.from({ length: MAX_MT5_ACCOUNTS }, (_, index) => accounts[index] ?? null);
 
   return (
@@ -77,7 +86,7 @@ export function Mt5Card({
         >
           <header className="flex items-baseline justify-between gap-2">
             <h3 className="text-xs font-semibold">
-              {index === 0 ? labels.firstAccount : labels.secondAccount}
+              {index === 0 ? labels.swingAccount : labels.dayAccount}
             </h3>
             {account?.label ? <span className="text-dim text-[11px]">{account.label}</span> : null}
           </header>
@@ -85,7 +94,7 @@ export function Mt5Card({
           {account ? (
             <Connected account={account} labels={labels} />
           ) : (
-            <Mt5ConnectWizard labels={labels} />
+            <Mt5ConnectWizard labels={labels} purpose={PURPOSES[index]} />
           )}
         </section>
       ))}

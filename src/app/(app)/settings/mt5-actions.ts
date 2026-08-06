@@ -43,6 +43,13 @@ const connectSchema = z.object({
   login: z.string().trim().min(1).max(40),
   server: z.string().trim().min(1).max(120),
   investorPassword: z.string().min(1).max(200),
+  /**
+   * Which book this connection feeds, from the slot the wizard sits in.
+   *
+   * Optional so an older client, or a form posted without it, still connects — the account
+   * simply keeps the calendar rule for its trades instead of overriding it.
+   */
+  purpose: z.enum(['day', 'swing']).nullish(),
 });
 
 type Translate = Awaited<ReturnType<typeof getTranslations<'settings'>>>;
@@ -91,6 +98,7 @@ export async function connectMt5Action(
     login: formData.get('login'),
     server: formData.get('server'),
     investorPassword: formData.get('investorPassword'),
+    purpose: formData.get('purpose'),
   });
   if (!parsed.success) return { error: t('connectInvalid') };
 
@@ -150,6 +158,7 @@ export async function connectMt5Action(
       server: credentials.server,
       investorPwEncrypted: encryptSecret(credentials.investorPassword),
       accountCurrency: verified.account.currency,
+      purpose: parsed.data.purpose ?? null,
     });
   } catch (error) {
     // The screen draws exactly two slots, so this is unreachable from the UI — which is the

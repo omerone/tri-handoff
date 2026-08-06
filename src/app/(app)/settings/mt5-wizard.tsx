@@ -86,8 +86,17 @@ export interface WizardLabels {
 
 export function Mt5ConnectWizard({
   labels,
+  purpose,
 }: {
   labels: WizardLabels;
+  /**
+   * What the slot this wizard sits in is for.
+   *
+   * Not a label: it decides the style of every trade the account imports, so a swing closed
+   * inside one session stays a swing instead of being filed under day trades by the clock.
+   * Submitted with the credentials, because it is a property of the connection being made.
+   */
+  purpose?: 'day' | 'swing';
 }) {
   const [step, setStep] = useState<Step>('welcome');
   const [formData, setFormData] = useState({
@@ -126,6 +135,7 @@ export function Mt5ConnectWizard({
       formDataObj.append('login', formData.login || '');
       formDataObj.append('server', formData.server || '');
       formDataObj.append('investorPassword', formData.investorPassword || '');
+      if (purpose) formDataObj.append('purpose', purpose);
 
       const result = await connectMt5Action({}, formDataObj);
       setState(result);
@@ -142,6 +152,7 @@ export function Mt5ConnectWizard({
     body.append('server', formData.server || '');
     body.append('investorPassword', formData.investorPassword || '');
     body.append('confirmReplace', 'yes');
+    if (purpose) body.append('purpose', purpose);
 
     const result = await connectMt5Action({}, body);
     setState(result);

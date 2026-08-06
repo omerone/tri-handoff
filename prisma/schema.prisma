@@ -242,6 +242,18 @@ model Mt5Account {
   /// account connected before there was anything to call it.
   label String?
 
+  /// What this account is *for*, and therefore what its trades are.
+  ///
+  /// The trader runs one account for swings and one for day trades — that is the reason there
+  /// are two, not a note about them. So it decides the style of everything the account
+  /// imports, overriding the calendar rule in `styleOf`: a swing closed inside one session is
+  /// still a swing to the person who took it, and labelling it `day` because the clock says so
+  /// contradicts the account it came from and splits one strategy across both breakdowns.
+  ///
+  /// Null for an account connected without saying, which keeps the calendar rule — the only
+  /// evidence there is when nobody has told us anything.
+  purpose TradeStyle?
+
   /// AES-256-GCM ciphertext of the **investor (read-only)** password, encoded as
   /// iv:authTag:ciphertext in base64. Never logged, never sent to the client, and never
   /// returned by a repository — only src/lib/mt5 decrypts it.

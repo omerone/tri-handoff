@@ -20,7 +20,13 @@ import { computeExcursion, NO_EXCURSION, type Excursion } from './excursion';
 import { mt5Provider } from './index';
 import { computeRr } from './risk';
 import { classifySymbol, findSymbolSpec, type SymbolSpec } from './symbols';
-import type { Mt5AccountState, Mt5Credentials, Mt5Deal, SymbolSpecOverride } from './types';
+import type {
+  Mt5AccountState,
+  Mt5Credentials,
+  Mt5Deal,
+  SymbolSpecOverride,
+  TradeStyle,
+} from './types';
 
 /**
  * The sync.
@@ -112,6 +118,8 @@ async function syncOneAccount(
     server: string;
     investorPwEncrypted: string;
     providerAccountId: string | null;
+    /** What the account is for; null keeps the calendar rule. See `styleOf`. */
+    purpose: TradeStyle | null;
   },
 ): Promise<{ imported: number; updated: number; currency: string }> {
   try {
@@ -137,7 +145,14 @@ async function syncOneAccount(
     ]);
 
     // A backfill recomputes the excursions it already has; every other trigger trusts them.
-    const trades = await toTradeRecords(ctx, deals, account, credentials, trigger === 'backfill');
+    const trades = await toTradeRecords(
+      ctx,
+      stored.purpose,
+      deals,
+      account,
+      credentials,
+      trigger === 'backfill',
+    );
     const { imported, updated } = await upsertTrades(ctx, stored.id, trades);
 
     await recordSyncSuccess(ctx, stored.id, {
@@ -208,6 +223,7 @@ async function incrementalCursor(ctx: TenantContext, mt5AccountId: string): Prom
 
 async function toTradeRecords(
   ctx: TenantContext,
+  purpose: TradeStyle | null,
   deals: Mt5Deal[],
   account: Mt5AccountState,
   credentials: Mt5Credentials,
@@ -240,7 +256,7 @@ async function toTradeRecords(
       symbol: deal.symbol,
       assetClass: classifySymbol(deal.symbol),
       direction: deal.direction,
-      style: styleOf(deal),
+      style: styleOf(deal, purpose),
       openAt: deal.openAt,
       closeAt: deal.closeAt,
       volume: deal.volume,
@@ -375,7 +391,14 @@ async function fetchExcursions(
  * describes their own book, and it is what keeps a day trade on a single square of the
  * calendar.
  */
-function styleOf(deal: Mt5Deal): 'day' | 'swing' {
+function styleOf(deal: Mt5Deal, purpose: TradeStyle | null): 'day' | 'swing' {
+  // What the account is for beats what the clock says. A trader who keeps one account for
+  // swings and another for day trades has already answered this question, and answering it
+  // again from the timestamps contradicts them: a swing closed inside one session is still a
+  // swing, and filing it under `day` splits one strategy across both breakdowns — which is
+  // exactly what having two accounts was meant to stop.
+  if (purpose !== null) return purpose;
+
   if (!deal.closeAt) return 'day';
   return sameZonedDay(deal.openAt, deal.closeAt) ? 'day' : 'swing';
 }
