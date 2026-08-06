@@ -105,11 +105,24 @@ jobs:
           # is passed here is ignored and `tri-deploy` runs instead. It pulls this
           # commit, rebuilds, health-checks the result and rolls back on failure,
           # exiting non-zero if the site did not come up — which fails this job.
+          #
+          # `ServerAliveInterval` is what makes that last sentence true. `tri-deploy`
+          # sends the whole Docker build to its own log file on the server, so this
+          # channel carries no traffic for the two minutes the build takes, and an
+          # idle connection gets dropped. The client then exits non-zero while the
+          # server carries on and finishes the deploy perfectly well — which is how
+          # this job spent an evening reporting failures over deploys that had all
+          # succeeded, one of them nine seconds after the job gave up on it. A red
+          # pipeline that is lying is worse than no pipeline: nobody reads the next
+          # failure. Fifteen seconds apart, twenty tolerated, is five minutes of
+          # silence before the connection is genuinely considered dead.
           ssh -i ~/.ssh/deploy_key \
               -o IdentitiesOnly=yes \
               -o PasswordAuthentication=no \
               -o StrictHostKeyChecking=yes \
               -o ConnectTimeout=30 \
+              -o ServerAliveInterval=15 \
+              -o ServerAliveCountMax=20 \
               "$USER@$HOST" deploy
 
       - name: Confirm production is serving this commit
