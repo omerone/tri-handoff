@@ -319,12 +319,30 @@ test.describe('trades table', () => {
 });
 
 test.describe('analytics', () => {
+  /*
+   * These read what a panel *contains*, and on a phone every panel on this screen is folded
+   * shut until it is tapped — fifteen charts stacked open was six screens of scrolling to
+   * reach the last one. So the content assertions run at a desktop width, where the panels
+   * are open and there is no disclosure to press. That the folding itself works, in both
+   * directions, is `analytics-folding.spec.ts`.
+   */
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+  });
+
   test('renders every breakdown and a full heatmap', async ({ page }) => {
     await page.goto('/analytics');
 
-    await expect(page.getByText('Where you are most profitable')).toBeVisible();
-    for (const title of ['P&L by weekday', 'By trading session', 'By asset class', 'By direction']) {
-      await expect(page.getByText(title, { exact: true })).toBeVisible();
+    // `.first()`: a folding card renders its title twice — once in the wide header and once
+    // in the phone's disclosure button — and CSS decides which is on screen, not the DOM.
+    await expect(page.getByText('Where you are most profitable').first()).toBeVisible();
+    for (const title of [
+      'P&L by weekday',
+      'By trading session',
+      'By asset class',
+      'By direction',
+    ]) {
+      await expect(page.getByText(title, { exact: true }).first()).toBeVisible();
     }
 
     // 5 weekdays × 3 sessions, always present so a gap reads as a gap.
@@ -384,7 +402,8 @@ test.describe('Hebrew', () => {
     // Intl prefixes a negative number with U+200E in Hebrew — an invisible mark that pins the
     // sign to the left. It is correct and belongs there; it is just not a character, so it is
     // stripped before checking where the sign actually sits.
-    const withoutBidiMarks = (value: string) => value.replace(/[\u200e\u200f\u2066-\u2069]/g, '').trim();
+    const withoutBidiMarks = (value: string) =>
+      value.replace(/[\u200e\u200f\u2066-\u2069]/g, '').trim();
 
     const signed = numbers.map(withoutBidiMarks).filter((value) => /[+-]/.test(value));
     expect(signed.length).toBeGreaterThan(0);
