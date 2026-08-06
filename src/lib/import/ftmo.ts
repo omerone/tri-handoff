@@ -350,6 +350,11 @@ export function readFtmoCsv(text: string, options: FtmoParseOptions = {}): FtmoP
       profit: deal.profit + deal.commission + deal.swap,
       risk,
       rr,
+      // A CSV export carries results, not price history, so there is nothing to measure an
+      // excursion from. Null is the honest answer and keeps these rows out of the MAE and MFE
+      // aggregates rather than dragging them toward zero.
+      mae: null,
+      mfe: null,
     } satisfies TradeUpsert;
   });
 

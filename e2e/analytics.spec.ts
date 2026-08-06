@@ -101,7 +101,7 @@ test.describe('dashboard', () => {
     const before = await order();
     expect(before[0]).toBe('balance');
 
-    const handle = page.getByRole('button', { name: /^Move Account balance/ });
+    const handle = page.getByRole('button', { name: /^Move Account balance,/ });
     await expect(handle).toBeVisible();
 
     // Two nudges with the keyboard. The drag has nothing to fall back on for anyone not using
@@ -114,7 +114,9 @@ test.describe('dashboard', () => {
     // below the breakpoint the control is not offered at all rather than offered and inert.
     // An enabled button that changes a readout and saves while the card in front of the user
     // does not move is worse than no button.
-    const widen = page.getByRole('button', { name: /^Widen Account balance/ });
+    // Exact: the "Account balance over time" panel's own widen button starts with the same
+    // words, and a prefix match resolves to both.
+    const widen = page.getByRole('button', { name: 'Widen Account balance', exact: true });
     const wide = (page.viewportSize()?.width ?? 0) >= 1024;
     if (wide) await widen.click();
     else await expect(widen).toHaveCount(0);
@@ -191,7 +193,7 @@ test.describe('dashboard', () => {
         response.request().method() === 'POST' &&
         response.request().headers()['next-action'] !== undefined,
     );
-    await page.getByRole('button', { name: /^Move Account balance/ }).press('ArrowRight');
+    await page.getByRole('button', { name: /^Move Account balance,/ }).press('ArrowRight');
     // Exact, or this also matches "Long Trades".
     await page.getByRole('link', { name: 'Trades', exact: true }).click(); // inside the window
     await written;

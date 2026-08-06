@@ -38,6 +38,10 @@ export type TradeRecord = {
   profit: number;
   risk: number | null;
   rr: number | null;
+  /** Worst move against the entry while open, in account currency. Null when unknown. */
+  mae: number | null;
+  /** Best move in favour of the entry while open. Null when unknown. */
+  mfe: number | null;
   note: string | null;
   tags: string[];
   rating: number | null;
@@ -81,6 +85,8 @@ type TradeRow = {
   profit: Prisma.Decimal;
   risk: Prisma.Decimal | null;
   rr: Prisma.Decimal | null;
+  mae: Prisma.Decimal | null;
+  mfe: Prisma.Decimal | null;
   note: string | null;
   tags: string[];
   rating: number | null;
@@ -111,6 +117,8 @@ function toRecord(row: TradeRow): TradeRecord {
     profit: Number(row.profit),
     risk: num(row.risk),
     rr: num(row.rr),
+    mae: num(row.mae),
+    mfe: num(row.mfe),
     note: row.note,
     tags: row.tags,
     rating: row.rating,
@@ -167,6 +175,17 @@ export async function upsertTrades(
     profit: trade.profit,
     risk: trade.risk,
     rr: trade.rr,
+    /*
+     * Only written when a value was computed.
+     *
+     * The excursion pass is budgeted and every one of its failures is a no-op — a provider
+     * with no candle endpoint, a symbol with no history, a request that timed out. Writing
+     * `null` on those would erase a figure an earlier sync had successfully worked out, so an
+     * older trade that fell outside this run's budget would lose its MAE every time anyone
+     * pressed refresh. Absent means "nothing new to say", not "there is nothing".
+     */
+    ...(trade.mae === null ? {} : { mae: trade.mae }),
+    ...(trade.mfe === null ? {} : { mfe: trade.mfe }),
   });
 
   // Chunked so a full backfill of a long-lived account doesn't build one enormous

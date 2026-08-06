@@ -30,6 +30,8 @@ function trade(overrides: Partial<TradeUpsert> & { ticket: string }): TradeUpser
     assetClass: 'forex',
     direction: 'long',
     style: 'day',
+    mae: null,
+    mfe: null,
     openAt: at('2026-01-05T08:00:00Z'),
     closeAt: at('2026-01-05T12:00:00Z'),
     volume: 1,

@@ -26,6 +26,8 @@ function trade(over: Partial<AnalyticsTrade> = {}): AnalyticsTrade {
     commission: 0,
     swap: 0,
     volume: 1,
+    mae: null,
+    mfe: null,
     risk: null,
     rr: null,
     strategy: null,

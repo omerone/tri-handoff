@@ -47,6 +47,16 @@ export const WIDGETS = {
   rStrip: { kind: 'panel', span: 12 },
   equity: { kind: 'panel', span: 8 },
   recent: { kind: 'panel', span: 4 },
+  /**
+   * The broker's own balance over time, which is not the equity curve above it.
+   *
+   * `equity` is built from the trades and deliberately leaves deposits out — it answers "how
+   * is the trading going". This answers "what is the account worth", which moves when money
+   * is wired in or out and is the figure a trader reconciles against their broker statement.
+   * Both, because the difference between them is exactly the money that was added rather than
+   * earned, and neither can show that on its own.
+   */
+  balanceHistory: { kind: 'panel', span: 12 },
 } as const satisfies Record<string, { kind: WidgetKind; span: Span }>;
 
 export type WidgetId = keyof typeof WIDGETS;

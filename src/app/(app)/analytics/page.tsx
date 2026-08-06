@@ -30,6 +30,7 @@ import { hoursDecimals, learningTotals } from '@/lib/learning/types';
 import { originalTpBreakdown, tpTimingBreakdown } from '@/lib/review/stats';
 import { ORIGINAL_TP_COLOR, TIMING_COLOR, TOPIC_COLOR } from '@/lib/review/colors';
 import { computeCosts, costsBySymbol } from '@/lib/analytics/costs';
+import { computeExcursions } from '@/lib/analytics/excursions';
 import { concentration, dayLoads, riskConsistency, underwater } from '@/lib/analytics/consistency';
 import { equityCurve } from '@/lib/analytics/metrics';
 import { monthGrid, monthlyReturns } from '@/lib/analytics/periods';
@@ -100,6 +101,7 @@ export default async function AnalyticsPage({
   const curve = equityCurve(book.trades, book.openingBalance);
   const spell = underwater(curve, book.openingBalance);
   const loads = dayLoads(book.trades);
+  const excursions = computeExcursions(book.trades);
   const months = monthlyReturns(book.trades, book.openingBalance);
   const grid = monthGrid(months);
 
@@ -542,6 +544,43 @@ export default async function AnalyticsPage({
           the day turns negative, and a per-trade average can never show it — the good trades
           and the bad ones are averaged together.
         */}
+        {/*
+          MAE and MFE, aggregated. Shown only when the provider actually supplied price
+          history: an empty card on a deployment whose broker has no candle endpoint is worse
+          than no card. Coverage rides alongside for the same reason RR coverage does — an
+          average over three trades must not look like one over three hundred.
+        */}
+        {excursions.covered > 0 ? (
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <KPI
+              label={t('analytics.heat')}
+              value={
+                excursions.winnerHeat === null
+                  ? '—'
+                  : `${formatNumber(excursions.winnerHeat * 100, locale, 0)}%`
+              }
+              sub={t('analytics.throughStop', { count: excursions.winnersThroughStop })}
+              title={t('analytics.heatHint')}
+            />
+            <KPI
+              label={t('analytics.capture')}
+              value={
+                excursions.capture === null ? '—' : `${formatNumber(excursions.capture, locale, 0)}%`
+              }
+              sub={t('analytics.leftOnTable', { amount: money(excursions.leftOnTable) })}
+              title={t('analytics.captureHint')}
+            />
+            <KPI
+              label={t('analytics.excursionCoverage')}
+              value={`${formatNumber(excursions.coveragePercent, locale, 0)}%`}
+              sub={t('analytics.excursionCovered', {
+                covered: excursions.covered,
+                total: excursions.total,
+              })}
+            />
+          </div>
+        ) : null}
+
         {loads.length > 1 ? (
           <div className="mt-4">
             <div className="text-dim mb-2 text-[11px] font-semibold">

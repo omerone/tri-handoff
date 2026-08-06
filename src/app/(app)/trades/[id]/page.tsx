@@ -116,6 +116,17 @@ export default async function TradeDetailPage({ params }: { params: Promise<{ id
             <Row label={t('journal.volume')} value={formatNumber(trade.volume, locale, 2)} />
             <Row label={t('journal.commission')} value={money(trade.commission, { decimals: 2 })} />
             <Row label={t('journal.swap')} value={money(trade.swap, { decimals: 2 })} />
+            {/*
+              How far it went either way before it closed. Only shown when there is an answer:
+              a dash on every row of every trade in a deployment whose provider has no candle
+              endpoint is a column that teaches people to stop reading it.
+            */}
+            {trade.mae === null ? null : (
+              <Row label={t('journal.mae')} value={money(trade.mae, { decimals: 2 })} />
+            )}
+            {trade.mfe === null ? null : (
+              <Row label={t('journal.mfe')} value={money(trade.mfe, { decimals: 2 })} />
+            )}
             <Row label={t('journal.ticket')} value={trade.ticket} />
           </dl>
         </Card>

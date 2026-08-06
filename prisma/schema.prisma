@@ -107,6 +107,7 @@ model User {
   longPositions  LongPosition[]
   learning       LearningEntry[]
   syncLogs       SyncLog[]
+  snapshots      AccountSnapshot[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -253,6 +254,49 @@ model Mt5Account {
 // Trades
 // ---------------------------------------------------------------------------
 
+/**
+ * What the broker said the account was worth, each time it was asked.
+ *
+ * `mt5_accounts` carries `balance` and `equity` as two columns that the sync overwrites, so
+ * the product knew what the account is worth now and had no way to say what it was worth in
+ * March. The equity curve on the dashboard is built from the *trades* instead — which is the
+ * right curve for judging trading, and deliberately excludes deposits and withdrawals — but
+ * it means nothing in the product ever showed the account's actual balance over time, and a
+ * trader asking "what was I at in March" had nowhere to look.
+ *
+ * One row per sync, deduplicated to one per day by `@@unique`: a trader who signs in six
+ * times on Tuesday wants one point for Tuesday, not six, and the sync is the only writer so
+ * the upsert cannot race with anything but itself.
+ *
+ * `equity` is nullable because it is a live figure — balance plus open profit — and a
+ * provider that reports only the settled balance should leave a gap rather than a number
+ * that looks like a flat day.
+ */
+model AccountSnapshot {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+
+  /// Midnight of the day, in UTC, so one row per calendar day is enforceable by the index.
+  /// The precise instant of the sync is `createdAt`.
+  at DateTime
+
+  balance  Decimal @db.Decimal(20, 8)
+  equity   Decimal? @db.Decimal(20, 8)
+  /// The account's own currency at the time. Kept per row: a trader who changes broker
+  /// account mid-history would otherwise have two currencies on one chart with no way to see
+  /// it happened.
+  currency String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, at])
+  @@index([userId, at])
+  @@map("account_snapshots")
+}
+
 enum AssetClass {
   forex
   crypto
@@ -329,6 +373,22 @@ model Trade {
   /// rr = profit / risk. NULL exactly when `risk` is NULL — such trades are excluded
   /// from every RR aggregate and counted against RR coverage instead.
   rr   Decimal? @db.Decimal(20, 8)
+
+  /// Maximum adverse excursion: the furthest the position went *against* the entry before it
+  /// closed, in the account currency, as a positive number. Answers "was my stop too tight" —
+  /// a book of winners whose MAE never came near the stop is a book paying for protection it
+  /// does not use, and one where the stop was grazed on every winner is one trade away from
+  /// giving them all back.
+  mae Decimal? @db.Decimal(20, 8)
+  /// Maximum favourable excursion: the furthest it went *for* the entry. Answers "how much
+  /// did I leave on the table" — the gap between MFE and the realised exit is the cost of
+  /// every early close, and it is the number that decides whether a trailing stop would help.
+  ///
+  /// Both are NULL when the price history behind them could not be had: a provider that does
+  /// not supply candles, a symbol with no contract spec, a currency that cannot be converted.
+  /// Null means unknown, and is excluded from the aggregates rather than counted as zero —
+  /// the same rule `risk` and `rr` already follow.
+  mfe Decimal? @db.Decimal(20, 8)
 
   /// Per-trade journal (SPEC §1.1, adopted from tradeReport). Columns land in P1 so no
   /// migration is needed later; the editing UI is milestone 1.9.

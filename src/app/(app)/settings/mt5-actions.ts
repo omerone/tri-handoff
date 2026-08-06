@@ -10,6 +10,7 @@ import {
   connectMt5Account,
   consumeRateLimit,
   countTrades,
+  deleteAllSnapshots,
   deleteAllTrades,
   disconnectMt5Account,
   getMt5Account,
@@ -148,7 +149,12 @@ export async function connectMt5Action(
   });
 
   // Confirmed above: a different account number means the stored history is another book's.
-  if (isDifferentAccount) await deleteAllTrades(session.ctx);
+  // The balance history goes with it — a chart that steps from one account's equity to
+  // another's would read as a deposit or a catastrophe, and it is neither.
+  if (isDifferentAccount) {
+    await deleteAllTrades(session.ctx);
+    await deleteAllSnapshots(session.ctx);
+  }
 
   const result = await syncMt5(session.ctx, 'backfill');
   revalidatePath('/', 'layout');

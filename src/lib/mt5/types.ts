@@ -149,7 +149,33 @@ export interface Mt5Provider {
    * currency (GER40 in euros on a dollar account). Keyed `"<quote><account>"`.
    */
   fetchQuoteRates?(credentials: Mt5Credentials, pairs: string[]): Promise<Record<string, number>>;
+
+  /**
+   * Price history covering a window, for computing MAE and MFE.
+   *
+   * Optional, and the sync treats its absence as "those two columns stay null" rather than as
+   * an error: a provider that cannot supply candles is a provider whose trades have unknown
+   * excursions, which is a fact the UI can state. It must never be the reason a sync fails —
+   * the trades themselves do not depend on it.
+   */
+  fetchBars?(
+    credentials: Mt5Credentials,
+    request: { symbol: string; from: Date; to: Date },
+  ): Promise<PriceBar[]>;
 }
+
+/**
+ * One candle. Only the two extremes are used — the excursion is about how far price reached,
+ * not where it settled — but open and close come along because every provider returns them
+ * and a bar with only a high and a low is hard to sanity-check against a chart.
+ */
+export type PriceBar = {
+  at: Date;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
 
 export type SymbolSpecOverride = {
   symbol: string;

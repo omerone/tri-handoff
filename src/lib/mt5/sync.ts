@@ -5,6 +5,7 @@ import {
   finishSyncLog,
   newestCloseAt,
   readCredentialCiphertext,
+  recordSnapshot,
   recordSyncFailure,
   recordSyncSuccess,
   startSyncLog,
@@ -14,6 +15,7 @@ import {
 } from '@/lib/db';
 import { sameZonedDay } from '@/lib/time/zone';
 import type { TenantContext } from '@/lib/tenant/context';
+import { computeExcursion, NO_EXCURSION, type Excursion } from './excursion';
 import { mt5Provider } from './index';
 import { computeRr } from './risk';
 import { classifySymbol, findSymbolSpec, type SymbolSpec } from './symbols';
@@ -79,6 +81,22 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
       balance: account.balance,
       equity: account.equity,
     });
+    /*
+     * The same two figures again, this time kept rather than overwritten.
+     *
+     * `recordSyncSuccess` writes them onto `mt5_accounts`, where the next sync replaces them
+     * — so the product knew what the account is worth now and could never say what it was
+     * worth in March. One row per day; see db/snapshots.ts for why this is not the same thing
+     * as the equity curve, which is built from trades and ignores deposits on purpose.
+     *
+     * After the trades are stored and after the sync is marked successful, because it is
+     * bookkeeping: it swallows its own failures and must not be able to turn a good sync bad.
+     */
+    await recordSnapshot(ctx, {
+      balance: account.balance,
+      equity: account.equity,
+      currency: account.currency,
+    });
     await finishSyncLog(ctx, logId, { status: 'success', tradesImported: imported, tradesUpdated: updated });
 
     return { status: 'success', imported, updated, accountCurrency: account.currency };
@@ -119,6 +137,11 @@ async function toTradeRecords(
   const symbols = [...new Set(deals.filter((d) => d.symbol).map((d) => d.symbol))];
   const overrides = await fetchSpecOverrides(provider, credentials, symbols);
   const quoteRates = await fetchQuoteRates(provider, credentials, symbols, account.currency, overrides);
+  const excursions = await fetchExcursions(provider, credentials, deals, {
+    accountCurrency: account.currency,
+    quoteRates,
+    overrides,
+  });
 
   return deals.map((deal) => {
     const spec = specFor(deal.symbol, overrides);
@@ -127,6 +150,7 @@ async function toTradeRecords(
       quoteRates,
       spec,
     });
+    const { mae, mfe } = excursions.get(deal.ticket) ?? NO_EXCURSION;
 
     return {
       ticket: deal.ticket,
@@ -148,8 +172,86 @@ async function toTradeRecords(
       profit: deal.profit + deal.commission + deal.swap,
       risk,
       rr,
+      mae,
+      mfe,
     } satisfies TradeUpsert;
   });
+}
+
+/**
+ * How many trades one sync will fetch price history for.
+ *
+ * A backfill can be thousands of deals and each one is a separate request for candles, which
+ * on a metered provider is thousands of calls for a screen nobody is waiting on. The newest
+ * trades are the ones a trader is looking at, so the budget goes to those and the rest keep
+ * their existing values — an incremental sync only ever sees a handful anyway, so in normal
+ * use nothing is skipped at all.
+ */
+const EXCURSION_BUDGET = 200;
+
+/**
+ * MAE and MFE for as many of these deals as the budget allows.
+ *
+ * Every failure here is a no-op. A provider with no `fetchBars`, a symbol the broker has no
+ * history for, a request that times out — all of them leave the two columns null, which the
+ * UI renders as "unknown" and the aggregates exclude. The trades themselves do not depend on
+ * any of it, and a sync that failed because a candle endpoint was slow would be a sync that
+ * lost a day of trading over a statistic.
+ *
+ * The upsert only writes these columns when a value was computed (see `upsertTrades`), so a
+ * trade whose history was unavailable this time keeps whatever it had from last time rather
+ * than having it wiped.
+ */
+async function fetchExcursions(
+  provider: ReturnType<typeof mt5Provider>,
+  credentials: Mt5Credentials,
+  deals: Mt5Deal[],
+  context: {
+    accountCurrency: string;
+    quoteRates: Record<string, number>;
+    overrides: Map<string, SymbolSpec>;
+  },
+): Promise<Map<string, Excursion>> {
+  const result = new Map<string, Excursion>();
+  if (!provider.fetchBars) return result;
+
+  const candidates = deals
+    .filter((deal) => deal.kind === 'trade' && deal.closeAt !== null && deal.symbol)
+    .sort((a, b) => (b.closeAt?.getTime() ?? 0) - (a.closeAt?.getTime() ?? 0))
+    .slice(0, EXCURSION_BUDGET);
+
+  if (candidates.length < deals.filter((d) => d.kind === 'trade').length) {
+    console.warn(
+      `[mt5] excursions computed for the newest ${candidates.length} trades; the rest keep ` +
+        'whatever they already had',
+    );
+  }
+
+  for (const deal of candidates) {
+    try {
+      const bars = await provider.fetchBars(credentials, {
+        symbol: deal.symbol,
+        from: deal.openAt,
+        to: deal.closeAt!,
+      });
+      result.set(
+        deal.ticket,
+        computeExcursion(deal, bars, {
+          accountCurrency: context.accountCurrency,
+          quoteRates: context.quoteRates,
+          spec: specFor(deal.symbol, context.overrides),
+        }),
+      );
+    } catch (error) {
+      // One symbol's history being unavailable says nothing about the next one's.
+      console.warn(
+        `[mt5] no price history for ${deal.symbol}:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  return result;
 }
 
 /**

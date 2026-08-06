@@ -35,6 +35,14 @@ export type AnalyticsTrade = {
   /** Lots. Position sizing over time is a risk-management question, not a P&L one. */
   volume: number;
   risk: number | null;
+  /**
+   * How far the trade went against and in favour of the entry while it was open, in the
+   * account currency — the same unit as `risk`, so the two divide into a ratio that means
+   * something. Null when the price history behind them was not available; see
+   * `lib/mt5/excursion.ts`.
+   */
+  mae: number | null;
+  mfe: number | null;
   /** Null when the trade had no stop loss — excluded from RR aggregates, see risk.ts. */
   rr: number | null;
   /**

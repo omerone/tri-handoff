@@ -11,7 +11,7 @@ import { computeMetrics, equityCurve, maxDrawdown, maxRunUp, recentDailyR, strea
 import { loadBook } from '@/lib/analytics/load';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { toTradeFilter } from '@/lib/time/range';
-import { getDashboardLayout } from '@/lib/db';
+import { getDashboardLayout, listSnapshots } from '@/lib/db';
 import { normalizeLayout, type WidgetId } from '@/lib/dashboard/layout';
 import { DashboardGrid } from './grid';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
@@ -53,7 +53,8 @@ export default async function DashboardPage({
   const rtl = LOCALE_DIR[locale] === 'rtl';
 
   const range = await currentResolvedRange((await searchParams).range);
-  const book = await loadBook(session.ctx, toTradeFilter(range));
+  const window = toTradeFilter(range);
+  const book = await loadBook(session.ctx, window);
   const { money, display, converted } = await displayMoney({
     source: book.accountCurrency,
     display: session.user.displayCurrency,
@@ -71,7 +72,11 @@ export default async function DashboardPage({
     );
   }
 
-  const layout = normalizeLayout(await getDashboardLayout(session.ctx));
+  const [layout, snapshots] = await Promise.all([
+    getDashboardLayout(session.ctx).then(normalizeLayout),
+    // The broker's own balance, one point per day, narrowed by the same window as the book.
+    listSnapshots(session.ctx, { from: window.from, to: window.to }),
+  ]);
 
   const metrics = computeMetrics(book.trades);
   const curve = equityCurve(book.trades, book.openingBalance);
@@ -254,6 +259,30 @@ export default async function DashboardPage({
         />
       </Card>
     ),
+    balanceHistory: (
+      /*
+        Only once there is more than one point. A single reading is a dot, and a chart of one
+        dot claims to show a trend it cannot — the card stays out of the way until the account
+        has been synced on two different days, which is when it starts meaning something.
+      */
+      snapshots.length > 1 ? (
+        <Card title={t('dash.balanceHistory')}>
+          <EquityChart
+            data={snapshots.map((snapshot, index) => ({
+              index: index + 1,
+              balance: snapshot.balance,
+              label: formatDayMonthAt(snapshot.at),
+            }))}
+            startBalance={snapshots[0]!.balance}
+            rtl={rtl}
+            display={display}
+          />
+          <p className="text-dim mt-3 text-[11px] leading-relaxed">
+            {t('dash.balanceHistoryNote')}
+          </p>
+        </Card>
+      ) : null
+    ),
     recent: (
       <Card title={t('dash.recent')}>
         <div className="flex flex-col gap-2">
@@ -308,6 +337,7 @@ export default async function DashboardPage({
     avgLoss: t('kpi.avgLoss'),
     rStrip: t('dash.rStrip', { days: stripDays }),
     equity: t('dash.equity'),
+    balanceHistory: t('dash.balanceHistory'),
     recent: t('dash.recent'),
   };
 

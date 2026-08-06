@@ -116,6 +116,13 @@ describe('snapSpan', () => {
 
 describe('moving', () => {
   const layout = DEFAULT_LAYOUT;
+  /*
+   * The ends by position, not by name. These used to name `balance` and `recent`, which meant
+   * adding a widget to the registry broke a test about clamping — the assertion is "the last
+   * one cannot move down", and which widget is last is the registry's business.
+   */
+  const firstId = layout[0]!.id;
+  const lastId = layout[layout.length - 1]!.id;
 
   it('moves a widget to an absolute index', () => {
     expect(ids(reorderWidget(layout, 'recent', 0))[0]).toBe('recent');
@@ -124,8 +131,8 @@ describe('moving', () => {
 
   it('clamps at the ends instead of wrapping around', () => {
     // Holding the left arrow on the first widget should stop, not send it to the bottom.
-    expect(moveWidget(layout, 'balance', -1)).toEqual([...layout]);
-    expect(moveWidget(layout, 'recent', 1)).toEqual([...layout]);
+    expect(moveWidget(layout, firstId, -1)).toEqual([...layout]);
+    expect(moveWidget(layout, lastId, 1)).toEqual([...layout]);
   });
 
   it('never loses or duplicates a widget', () => {
@@ -155,9 +162,9 @@ describe('moving', () => {
     // Identity, not equality: it is what tells the grid there is nothing to save. Without it,
     // an arrow key held against the end of the row re-saves an identical arrangement on every
     // repeat and announces each one.
-    expect(moveWidget(layout, 'balance', -1)).toBe(layout);
-    expect(moveWidget(layout, 'recent', 1)).toBe(layout);
-    expect(reorderWidget(layout, 'balance', 0)).toBe(layout);
+    expect(moveWidget(layout, firstId, -1)).toBe(layout);
+    expect(moveWidget(layout, lastId, 1)).toBe(layout);
+    expect(reorderWidget(layout, firstId, 0)).toBe(layout);
     expect(resizeWidget(layout, 'rStrip', 1)).toBe(layout); // already at the top rung
     expect(resizeWidget(layout, 'balance', -1)).toBe(layout); // already at the bottom rung
   });

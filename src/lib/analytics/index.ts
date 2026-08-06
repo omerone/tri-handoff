@@ -30,6 +30,8 @@ export function toAnalyticsTrades(records: readonly TradeRecord[]): AnalyticsTra
       swap: record.swap,
       volume: record.volume,
       risk: record.risk,
+      mae: record.mae,
+      mfe: record.mfe,
       rr: record.rr,
       strategy: record.strategy,
       rating: record.rating,

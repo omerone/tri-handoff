@@ -37,6 +37,8 @@ function trade(over: {
     commission,
     swap,
     volume: 1,
+    mae: null,
+    mfe: null,
     risk: null,
     rr: null,
     strategy: null,
