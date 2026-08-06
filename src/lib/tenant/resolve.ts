@@ -45,7 +45,11 @@ export const getRequestHost = cache(async (): Promise<string> => {
  *      `localhost.example.com` and `mylocalhost.io` just as happily. Anyone who can point a
  *      hostname at the server picks up the tenant with a substring.
  *   3. **No `vercel.app`.** The same version mapped every `*.vercel.app` host to the demo
- *      tenant, which would put a client's trading book on every preview deployment URL.
+ *      tenant, which would put a client's trading book on every preview deployment URL. The
+ *      project is no longer deployed there at all — `vercel.json`, the `.vercel` link and the
+ *      unused `@vercel/analytics` dependency are gone — but the rule stays written down,
+ *      because the reason it existed was never really about Vercel: any host somebody else
+ *      controls must not resolve to a tenant here.
  *
  * The tenant boundary is the product's central guarantee; a convenience that costs it is not a
  * convenience. `e2e/smoke.spec.ts` asserts the production behaviour.
