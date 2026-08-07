@@ -326,6 +326,34 @@ export class MetaApiProvider implements Mt5Provider {
   }
 
   /**
+   * A client-API read, retried while the terminal finishes coming up.
+   *
+   * There are two MetaApi services here and they do not agree with each other instantly. The
+   * provisioning API is what `waitUntilReady` polls, and it reports `DEPLOYED`/`CONNECTED` a
+   * little before the *client* API will answer for the same account — which until then returns
+   * 504 "not connected to broker yet". Waiting for the first and then reading the second was
+   * still a failed sync, just a slower one.
+   *
+   * So the wait is not finished when provisioning says so; it is finished when a read actually
+   * succeeds. Only 504 is retried, and only until the same deadline the readiness wait uses:
+   * every other status is a real answer about a real problem — bad credentials, a stopped
+   * account, a broker that does not exist — and retrying those would turn a clear error into a
+   * two-minute hang.
+   */
+  private async readWhileWakingUp<T>(url: string): Promise<T> {
+    const deadline = Date.now() + this.readyTimeoutMs;
+    for (;;) {
+      try {
+        return await this.request<T>(url);
+      } catch (error: unknown) {
+        const stillWaking = error instanceof MetaApiError && error.status === 504;
+        if (!stillWaking || Date.now() + this.pollIntervalMs > deadline) throw error;
+        await this.sleep(this.pollIntervalMs);
+      }
+    }
+  }
+
+  /**
    * MetaApi requires the account to be registered with them before it can be read. The id is
    * cached on `mt5_accounts.provider_account_id` so this happens once per client; pass it back
    * in as `credentials.providerAccountId` and none of the provisioning below runs at all.
@@ -600,7 +628,7 @@ export class MetaApiProvider implements Mt5Provider {
 
   async fetchAccountState(credentials: Mt5Credentials): Promise<Mt5AccountState> {
     const accountId = await this.readableAccountId(credentials);
-    const info = await this.request<{
+    const info = await this.readWhileWakingUp<{
       balance: number;
       equity: number;
       currency: string;
@@ -635,7 +663,7 @@ export class MetaApiProvider implements Mt5Provider {
     // *earliest* 1000, which is a backfill that looks like it worked and is not.
     const deals: MetaApiDeal[] = [];
     for (let page = 0; page < DEALS_PAGE_LIMIT; page += 1) {
-      const batch = await this.request<MetaApiDeal[]>(
+      const batch = await this.readWhileWakingUp<MetaApiDeal[]>(
         `${base}?offset=${deals.length}&limit=${DEALS_PAGE_SIZE}`,
       );
       deals.push(...batch);

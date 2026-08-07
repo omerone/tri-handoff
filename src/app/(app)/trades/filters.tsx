@@ -2,11 +2,16 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
+import { MultiFilter } from './multi-filter';
 
 type Option = readonly [string, string];
 
 /**
  * Filters that write to the URL.
+ *
+ * Each one takes several answers, joined by commas — `class=crypto,indices`. A single value is
+ * a list of one, so every link written before this existed still means what it did, including
+ * the `all` sentinel the single-select version used for "no filter".
  *
  * Changing one resets the page number — landing on page 7 of a filter that has two pages
  * would show an empty table and look like "no trades match", which is a different statement.
@@ -15,6 +20,7 @@ export function TradeFilters({
   current,
   options,
 }: {
+  /** Comma-separated, straight from the URL — the component splits them. */
   current: {
     class: string;
     dir: string;
@@ -26,7 +32,9 @@ export function TradeFilters({
   options: {
     all: string;
     allStrategies: string;
-    /** What each dropdown filters by. See `Filter` below for why these are not optional. */
+    /** How a button describes more than one answer: "2 chosen". */
+    chosen: (count: number) => string;
+    /** What each dropdown filters by. See below for why these are not optional. */
     names: {
       class: string;
       direction: string;
@@ -49,10 +57,10 @@ export function TradeFilters({
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
 
-  const update = (name: string, value: string) => {
+  const update = (name: string, values: readonly string[]) => {
     const next = new URLSearchParams(params.toString());
-    if (value === 'all') next.delete(name);
-    else next.set(name, value);
+    if (values.length === 0) next.delete(name);
+    else next.set(name, values.join(','));
     next.delete('page');
 
     const query = next.toString();
@@ -62,10 +70,11 @@ export function TradeFilters({
   /**
    * One dropdown, with its name attached.
    *
-   * The name is visible rather than only an `aria-label`, because three dropdowns all
+   * The name is visible rather than only an `aria-label`, because several dropdowns all
    * reading "All" side by side do not say which is which — on a phone, where they wrap onto
-   * their own row, that is the entire filter bar. The previous `aria-label` was the first
-   * *option's* text, so a screen reader announced the asset-class filter as "Forex".
+   * their own rows, that is the entire filter bar. An earlier version used the first
+   * *option's* text as the label, so a screen reader announced the asset-class filter as
+   * "Forex".
    */
   const Filter = ({
     name,
@@ -80,22 +89,20 @@ export function TradeFilters({
     empty: string;
     items: readonly Option[];
   }) => (
-    <label className="flex min-w-0 flex-col gap-1">
-      <span className="text-dim text-[10px] leading-none">{name}</span>
-      <select
-        value={value}
-        disabled={pending}
-        onChange={(event) => update(param, event.target.value)}
-        className="border-line bg-raised text-text min-h-9 w-full rounded-[10px] border px-2.5 py-1.5 text-xs disabled:opacity-60"
-      >
-        <option value="all">{empty}</option>
-        {items.map(([key, label]) => (
-          <option key={key} value={key}>
-            {label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <MultiFilter
+      name={name}
+      // `all` was the single-select sentinel and may still be sitting in a bookmarked URL.
+      // It means "no filter", which is an empty list.
+      values={value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry !== '' && entry !== 'all')}
+      options={items}
+      empty={empty}
+      summary={options.chosen}
+      disabled={pending}
+      onApply={(next) => update(param, next)}
+    />
   );
 
   return (
@@ -147,8 +154,8 @@ export function TradeFilters({
       ) : null}
 
       {/* Same rule as strategies, and the same reason. The predicate has been in the query
-          since the tags column existed — `tags: { has: ... }` — with nothing in the UI able
-          to set it. */}
+          since the tags column existed — `tags: { hasSome: ... }` — with nothing in the UI
+          able to set it. */}
       {options.tags.length > 0 ? (
         <Filter
           name={options.names.tag}

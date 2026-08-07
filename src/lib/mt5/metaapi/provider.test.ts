@@ -267,6 +267,53 @@ describe('finding an account that already exists', () => {
     expect(calls[1]?.url).toContain('/users/current/accounts/acc-stored/account-information');
   });
 
+  /*
+   * The two MetaApi services do not agree instantly, and that gap was a failed sync.
+   *
+   * `waitUntilReady` polls *provisioning*, which reports DEPLOYED/CONNECTED slightly before the
+   * *client* API will answer for the same account — until then it returns 504 "not connected to
+   * broker yet". Waiting for the first and then reading the second still failed, just later.
+   */
+  it('retries a client read that 504s while the terminal is still coming up', async () => {
+    let reads = 0;
+    const calls = mockFetch((call) => {
+      if (call.url.includes('?query=')) {
+        return { body: [{ _id: 'acc-1', name: accountName(credentials), login: '541171171', server: 'FTMO-Server-4' }] };
+      }
+      if (call.url.includes('account-information')) {
+        reads += 1;
+        // Provisioning already says ready; the client API needs two more beats.
+        if (reads < 3) return { status: 504, body: { message: 'not connected to broker yet' } };
+        return { body: ACCOUNT_INFO };
+      }
+      return { body: READY };
+    });
+
+    const state = await provider().fetchAccountState(credentials);
+
+    expect(state.balance).toBe(10_000);
+    expect(reads).toBe(3);
+    expect(calls.some((call) => call.url.includes('account-information'))).toBe(true);
+  });
+
+  it('gives up on a status that is not 504, rather than hanging on a real error', async () => {
+    let reads = 0;
+    mockFetch((call) => {
+      if (call.url.includes('?query=')) {
+        return { body: [{ _id: 'acc-1', name: accountName(credentials), login: '541171171', server: 'FTMO-Server-4' }] };
+      }
+      if (call.url.includes('account-information')) {
+        reads += 1;
+        return { status: 401, body: { message: 'invalid token' } };
+      }
+      return { body: READY };
+    });
+
+    await expect(provider().fetchAccountState(credentials)).rejects.toThrow();
+    // Once. A wrong token does not become right by asking again for two minutes.
+    expect(reads).toBe(1);
+  });
+
   it('looks the account up once per sync, not once per call', async () => {
     const calls = mockFetch((call) => {
       if (call.url.includes('?query=')) {

@@ -293,7 +293,8 @@
     "sortRrLow": "R — lowest",
     "sortRiskHigh": "Risk — highest",
     "sortRiskLow": "Risk — lowest",
-    "sortSymbol": "Symbol — A to Z"
+    "sortSymbol": "Symbol — A to Z",
+    "chosen": "{count} chosen"
   },
   "finance": {
     "income": "Income",
