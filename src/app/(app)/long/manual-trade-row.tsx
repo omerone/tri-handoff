@@ -211,36 +211,161 @@ export function ManualTradeRow({
     );
   }
 
+  /*
+   * The row's controls, defined once and rendered twice.
+   *
+   * The phone card and the desktop cell need the same three buttons, and a journal link that
+   * drifted from the delete beside it is the kind of bug that only shows up on one screen size.
+   */
+  const actions = (
+    <>
+      <Link
+        href={`/trades/${trade.id}`}
+        aria-label={labels.journal}
+        data-tip={labels.journal}
+        className={`inline-flex p-1 ${trade.journalled ? 'text-brand' : 'text-dim/50 hover:text-text'}`}
+      >
+        <NotebookPen size={14} aria-hidden />
+      </Link>
+
+      {/*
+        Edit and delete only on what the trader typed.
+
+        These tabs list the whole book for their style, so most rows came from a broker.
+        Offering the controls on those would be offering an action the product undoes: the
+        next sync writes the broker's version back over an edit, and puts a deleted row
+        straight back. `deleteManualTrade` already refuses on the server — this is the
+        same rule where the person can see it, rather than a button that appears to work.
+      */}
+      {trade.isManual ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            aria-label={labels.edit}
+            data-tip={labels.edit}
+            className="text-dim/60 hover:text-text inline-flex p-1"
+          >
+            <Pencil size={14} aria-hidden />
+          </button>
+
+          <form action={deleteManualTradeAction} className="inline-flex">
+            <input type="hidden" name="id" value={trade.id} />
+            <button
+              type="submit"
+              aria-label={labels.delete}
+              data-tip={labels.delete}
+              onClick={(event) => {
+                if (!window.confirm(labels.deleteConfirm)) event.preventDefault();
+              }}
+              className="text-dim/60 hover:text-neg inline-flex p-1"
+            >
+              <Trash2 size={14} aria-hidden />
+            </button>
+          </form>
+        </>
+      ) : (
+        // Said rather than left blank: a row with no controls and no reason reads as broken.
+        <span className="text-dim/60 text-[10px] whitespace-nowrap">{labels.synced}</span>
+      )}
+    </>
+  );
+
+  const arrow =
+    trade.direction === 'long' ? (
+      <ArrowUpRight size={13} aria-hidden />
+    ) : (
+      <ArrowDownRight size={13} aria-hidden />
+    );
+
   return (
     <tr className="border-line border-b last:border-b-0">
       <BulkSelectCell rowKey={trade.id} label={trade.symbol} />
-      <td className="text-dim px-3 py-2.5 text-xs whitespace-nowrap">
+
+      {/*
+        The phone card: eight columns folded into two lines.
+        
+        This table used to reach the phone through `tri-stack`, which gives every cell a full
+        line of its own — eight of them here, unlabelled, 239 pixels per trade. Three trades
+        filled the screen on a list whose whole job is to be scanned.
+
+        The same eight values, arranged the way someone actually reads a trade: what and how
+        much it made on the first line, the circumstances on the second. About seventy pixels,
+        so eight trades fit where three did. One cell rather than a second markup tree, so the
+        two layouts cannot drift apart — the note in `globals.css` is right that duplicating an
+        interactive row is how that happens.
+      */}
+      <td className="px-3 py-2.5 md:hidden" colSpan={8}>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-1.5">
+              {/* `dir="ltr"` so a long ticker loses its tail, not the head that names it. */}
+              <span dir="ltr" className="truncate text-[15px] font-bold">
+                {trade.symbol}
+              </span>
+              <Chip>{trade.assetClassLabel}</Chip>
+            </span>
+            <span
+              className={`shrink-0 text-[15px] font-bold ${
+                trade.profitPositive ? 'text-pos' : 'text-neg'
+              }`}
+            >
+              <Num>{trade.profit}</Num>
+            </span>
+          </div>
+
+          <div className="text-dim flex items-center justify-between gap-2 text-[11px]">
+            <span className="flex min-w-0 items-center gap-2">
+              <Num>{trade.closedAt}</Num>
+              <span
+                className={`inline-flex items-center gap-0.5 ${
+                  trade.direction === 'long' ? 'text-pos' : 'text-neg'
+                }`}
+              >
+                {arrow}
+                {trade.directionLabel}
+              </span>
+              {/* Risk is the one figure here that is often absent, so it goes quietly rather
+                  than printing an em dash that costs a column and says nothing. */}
+              {trade.risk === null ? null : <Num>{trade.risk}</Num>}
+            </span>
+
+            <span className="flex shrink-0 items-center gap-1">
+              {trade.rr === null ? null : (
+                <Chip tone={trade.rrPositive ? 'pos' : 'neg'}>
+                  <Num>{trade.rr}</Num>
+                </Chip>
+              )}
+              {actions}
+            </span>
+          </div>
+        </div>
+      </td>
+
+      {/* From `md` up the eight columns are themselves again. */}
+      <td className="text-dim hidden px-3 py-2.5 text-xs whitespace-nowrap md:table-cell">
         <Num>{trade.closedAt}</Num>
       </td>
-      <td className="px-3 py-2.5 font-bold" dir="ltr">
+      <td className="hidden px-3 py-2.5 font-bold md:table-cell" dir="ltr">
         {trade.symbol}
       </td>
-      <td className="px-3 py-2.5">
+      <td className="hidden px-3 py-2.5 md:table-cell">
         <Chip>{trade.assetClassLabel}</Chip>
       </td>
-      <td className="px-3 py-2.5">
+      <td className="hidden px-3 py-2.5 md:table-cell">
         <span
           className={`inline-flex items-center gap-1 text-xs ${
             trade.direction === 'long' ? 'text-pos' : 'text-neg'
           }`}
         >
-          {trade.direction === 'long' ? (
-            <ArrowUpRight size={13} aria-hidden />
-          ) : (
-            <ArrowDownRight size={13} aria-hidden />
-          )}
+          {arrow}
           {trade.directionLabel}
         </span>
       </td>
-      <td className="px-3 py-2.5 text-xs">
+      <td className="hidden px-3 py-2.5 text-xs md:table-cell">
         <Num>{trade.risk ?? '—'}</Num>
       </td>
-      <td className="px-3 py-2.5">
+      <td className="hidden px-3 py-2.5 md:table-cell">
         {/* No stop given, so no R — shown as absent rather than as 0R, which would read as a
             break-even trade. The same rule the trades table follows. */}
         {trade.rr === null ? (
@@ -251,61 +376,15 @@ export function ManualTradeRow({
           </Chip>
         )}
       </td>
-      <td className={`px-3 py-2.5 font-bold ${trade.profitPositive ? 'text-pos' : 'text-neg'}`}>
+      <td
+        className={`hidden px-3 py-2.5 font-bold md:table-cell ${
+          trade.profitPositive ? 'text-pos' : 'text-neg'
+        }`}
+      >
         <Num>{trade.profit}</Num>
       </td>
-      <td className="px-3 py-2.5 text-end">
-        <span className="inline-flex items-center gap-1.5">
-          <Link
-            href={`/trades/${trade.id}`}
-            aria-label={labels.journal}
-            data-tip={labels.journal}
-            className={`inline-flex p-1 ${trade.journalled ? 'text-brand' : 'text-dim/50 hover:text-text'}`}
-          >
-            <NotebookPen size={14} aria-hidden />
-          </Link>
-
-          {/*
-            Edit and delete only on what the trader typed.
-
-            These tabs list the whole book for their style, so most rows came from a broker.
-            Offering the controls on those would be offering an action the product undoes: the
-            next sync writes the broker's version back over an edit, and puts a deleted row
-            straight back. `deleteManualTrade` already refuses on the server — this is the
-            same rule where the person can see it, rather than a button that appears to work.
-          */}
-          {trade.isManual ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                aria-label={labels.edit}
-                data-tip={labels.edit}
-                className="text-dim/60 hover:text-text inline-flex p-1"
-              >
-                <Pencil size={14} aria-hidden />
-              </button>
-
-              <form action={deleteManualTradeAction} className="inline-flex">
-                <input type="hidden" name="id" value={trade.id} />
-                <button
-                  type="submit"
-                  aria-label={labels.delete}
-                  data-tip={labels.delete}
-                  onClick={(event) => {
-                    if (!window.confirm(labels.deleteConfirm)) event.preventDefault();
-                  }}
-                  className="text-dim/60 hover:text-neg inline-flex p-1"
-                >
-                  <Trash2 size={14} aria-hidden />
-                </button>
-              </form>
-            </>
-          ) : (
-            // Said rather than left blank: a row with no controls and no reason reads as broken.
-            <span className="text-dim/60 text-[10px] whitespace-nowrap">{labels.synced}</span>
-          )}
-        </span>
+      <td className="hidden px-3 py-2.5 text-end md:table-cell">
+        <span className="inline-flex items-center gap-1.5">{actions}</span>
       </td>
     </tr>
   );

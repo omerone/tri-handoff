@@ -74,8 +74,12 @@ export function ManualTradeList({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="tri-stack w-full border-collapse text-[13px]">
-            <thead>
+          {/* No `tri-stack`: the row draws its own two-line card below `md` — see the note on
+              that cell. Stacking would give each of the eight cells a line of its own,
+              which is the thing being fixed. */}
+          <table className="w-full border-collapse text-[13px]">
+            {/* Headings belong to the columns, and below `md` there are no columns. */}
+            <thead className="hidden md:table-header-group">
               <tr className="text-dim text-[11px]">
                 <BulkSelectHeaderCell />
                 {headers.map((header, index) => (
