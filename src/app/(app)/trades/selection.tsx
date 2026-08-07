@@ -1,6 +1,6 @@
 'use client';
 
-import { Trash2, X } from 'lucide-react';
+import { CheckSquare, Trash2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
   createContext,
@@ -45,6 +45,17 @@ type SelectionState = {
   /** True when every row on the page is picked — the header box's checked state. */
   allPicked: boolean;
   pending: boolean;
+  /**
+   * Whether the trader has asked to pick rows at all.
+   *
+   * Off until the button is pressed, and the boxes do not exist before then. A tick box on
+   * every row of a table nobody came here to edit reads as something to fill in — it is the
+   * loudest control on a screen whose job is to be read, and it is in the first column, where
+   * the eye starts. Deleting is a thing you occasionally decide to do, so it is a thing you
+   * ask for.
+   */
+  picking: boolean;
+  setPicking: (next: boolean) => void;
 };
 
 const Context = createContext<SelectionState | null>(null);
@@ -61,8 +72,21 @@ export function TradeSelection({
 }) {
   const t = useTranslations('trades');
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [picking, setPickingState] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  /*
+   * Leaving picking mode drops the selection, and the alternative is worse than untidy.
+   *
+   * A ticked row whose box is no longer drawn is a row the trader cannot see they have
+   * chosen; press the button again later and the action bar returns with rows picked from a
+   * decision made minutes ago. Anything still selected has to stay visible or stop existing.
+   */
+  const setPicking = useCallback((next: boolean) => {
+    setPickingState(next);
+    if (!next) setSelected(new Set());
+  }, []);
 
   const toggle = useCallback((key: string) => {
     setSelected((current) => {
@@ -93,8 +117,8 @@ export function TradeSelection({
   }, [allPicked, rows]);
 
   const value = useMemo<SelectionState>(
-    () => ({ selected, toggle, toggleAll, allPicked, pending }),
-    [selected, toggle, toggleAll, allPicked, pending],
+    () => ({ selected, toggle, toggleAll, allPicked, pending, picking, setPicking }),
+    [selected, toggle, toggleAll, allPicked, pending, picking, setPicking],
   );
 
   function remove() {
@@ -174,8 +198,38 @@ function useSelection(): SelectionState {
 
 const box = 'accent-brand size-4 shrink-0 cursor-pointer disabled:opacity-60';
 
+/**
+ * The button that asks for the boxes, and the same button that puts them away.
+ *
+ * Everything below renders nothing at all until this is on — not hidden, absent. A column that
+ * is merely emptied still holds its width and its padding, so the table would keep a blank
+ * gutter down the side reserved for a mode nobody is in.
+ */
+export function SelectionToggle() {
+  const t = useTranslations('trades');
+  const { picking, setPicking, pending } = useSelection();
+  return (
+    <button
+      type="button"
+      onClick={() => setPicking(!picking)}
+      disabled={pending}
+      aria-pressed={picking}
+      className={`rounded-[10px] border px-3 py-1.5 text-xs disabled:opacity-60 ${
+        picking
+          ? 'border-brand/40 bg-brand/10 text-brand font-semibold'
+          : 'border-line text-dim hover:text-text'
+      }`}
+    >
+      <span className="inline-flex items-center gap-1.5">
+        {picking ? <X size={13} aria-hidden /> : <CheckSquare size={13} aria-hidden />}
+        {picking ? t('delete.pickDone') : t('delete.pick')}
+      </span>
+    </button>
+  );
+}
+
 /** One row's tick box, labelled with the row so a screen reader says which one it is. */
-export function RowCheckbox({ label, rowKey }: { label: string; rowKey: string }) {
+function RowCheckbox({ label, rowKey }: { label: string; rowKey: string }) {
   const t = useTranslations('trades');
   const { selected, toggle, pending } = useSelection();
   return (
@@ -191,7 +245,7 @@ export function RowCheckbox({ label, rowKey }: { label: string; rowKey: string }
 }
 
 /** The header box: every row on this page, or none of them. */
-export function SelectAllCheckbox() {
+function SelectAllCheckbox() {
   const t = useTranslations('trades');
   const { allPicked, toggleAll, pending } = useSelection();
   return (
@@ -203,5 +257,53 @@ export function SelectAllCheckbox() {
       aria-label={t('delete.selectAll')}
       className={box}
     />
+  );
+}
+
+/*
+ * The cells, not just their contents.
+ *
+ * Each of these renders the wrapper too, so that turning picking off removes the column rather
+ * than blanking it — and so the header cell and the body cells can never disagree about
+ * whether the column is there, which is the one way a table can end up one cell short of its
+ * own header.
+ */
+
+/** The header cell over the tick boxes. */
+export function SelectAllHeaderCell() {
+  const { picking } = useSelection();
+  if (!picking) return null;
+  return (
+    <th className="border-line w-9 border-b px-3.5 py-2.5">
+      <SelectAllCheckbox />
+    </th>
+  );
+}
+
+/** A row's cell in the table. */
+export function RowCheckboxCell(props: { label: string; rowKey: string }) {
+  const { picking } = useSelection();
+  if (!picking) return null;
+  return (
+    <td className="px-3.5 py-2.5">
+      <RowCheckbox {...props} />
+    </td>
+  );
+}
+
+/**
+ * A row's box in the phone list.
+ *
+ * Outside the row's link, because a control nested inside an anchor is activated by the tap
+ * the anchor also handles — ticking a row would navigate away from the row being ticked. Its
+ * own padding rather than the link's, so the target is a finger wide.
+ */
+export function RowCheckboxSlot(props: { label: string; rowKey: string }) {
+  const { picking } = useSelection();
+  if (!picking) return null;
+  return (
+    <span className="flex shrink-0 items-center self-stretch ps-4 pe-1">
+      <RowCheckbox {...props} />
+    </span>
   );
 }

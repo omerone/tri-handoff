@@ -27,7 +27,9 @@ const base64Bytes = (bytes: number, label: string) =>
         return false;
       }
     },
-    { message: `${label} must be at least ${bytes} bytes of base64 (openssl rand -base64 ${bytes})` },
+    {
+      message: `${label} must be at least ${bytes} bytes of base64 (openssl rand -base64 ${bytes})`,
+    },
   );
 
 const schema = z.object({
@@ -144,11 +146,29 @@ function parseEnv(): Env {
    * every deploy — and the app has already carried invented trades in production once. Failing
    * at boot is the right cost: a deployment that cannot say which broker it talks to should
    * not be answering questions about somebody's money.
+   *
+   * **`E2E_ALLOW_MOCK` is the one way past it, and it exists because the test suite is the one
+   * caller that is production and mock on purpose.** `playwright.config.ts` runs `next start`,
+   * which is a production build by definition, against the mock — that is the whole point of
+   * the suite, and without an escape this guard did not refuse a bad deploy, it refused every
+   * end-to-end run there is. Nothing on the VPS sets it: not `docker-compose.yml`, not
+   * `tri-deploy`, not the workflow. It is checked from `process.env` rather than the parsed
+   * schema so it stays out of the app's own configuration surface, and it announces itself,
+   * because a line in the log is what turns "someone set this on the server" from invisible
+   * into obvious.
    */
+  const e2eMock = process.env.E2E_ALLOW_MOCK === '1';
   if (parsed.data.NODE_ENV === 'production' && parsed.data.MT5_PROVIDER === 'mock') {
-    throw new Error(
-      'MT5_PROVIDER=mock is refused in production: the mock accepts any credentials and ' +
-        'generates trades that never happened. Set MT5_PROVIDER=metaapi with METAAPI_TOKEN.',
+    if (!e2eMock) {
+      throw new Error(
+        'MT5_PROVIDER=mock is refused in production: the mock accepts any credentials and ' +
+          'generates trades that never happened. Set MT5_PROVIDER=metaapi with METAAPI_TOKEN.',
+      );
+    }
+    console.warn(
+      '[env] the mock broker is running against a production build because E2E_ALLOW_MOCK=1. ' +
+        'Every trade and balance this process reports is invented. This must only ever be the ' +
+        'end-to-end suite.',
     );
   }
   if (parsed.data.QUOTES_PROVIDER === 'twelvedata' && !parsed.data.TWELVEDATA_API_KEY) {

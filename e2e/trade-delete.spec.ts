@@ -65,6 +65,11 @@ test('ticks two rows and removes them together', async ({ page }) => {
   const rows = page.locator('tbody tr, li').filter({ hasText: SYMBOL }).filter({ visible: true });
   await expect(rows).toHaveCount(2);
 
+  // Ask for the boxes. They are not drawn until this is pressed — a column of tick boxes on a
+  // table nobody came here to edit is the loudest control on the screen, and the one thing it
+  // does is destructive. See trade-selection.spec.ts for that behaviour on its own.
+  await page.getByRole('button', { name: 'Select' }).click();
+
   await rows.nth(0).locator('input[type="checkbox"]').check();
   await rows.nth(1).locator('input[type="checkbox"]').check();
 

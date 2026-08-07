@@ -689,6 +689,8 @@
       "label": "מקור"
     },
     "delete": {
+      "pick": "בחירה",
+      "pickDone": "סיום בחירה",
       "selected": "{count, plural, one {נבחרה שורה אחת} two {נבחרו שתי שורות} other {נבחרו # שורות}}",
       "selectAll": "בחירת כל השורות בעמוד",
       "selectRow": "בחירת {row}",

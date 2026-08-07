@@ -689,6 +689,8 @@
       "label": "Source"
     },
     "delete": {
+      "pick": "Select",
+      "pickDone": "Done",
       "selected": "{count, plural, one {# row selected} other {# rows selected}}",
       "selectAll": "Select every row on this page",
       "selectRow": "Select {row}",

@@ -50,6 +50,15 @@ export default defineConfig({
   ],
   webServer: {
     command: `npm run build && npm run start -- --port ${PORT}`,
+    /*
+     * The suite is production and mock on purpose, which the boot guard otherwise refuses.
+     *
+     * `next start` is a production build by definition and the whole point of these tests is
+     * to drive one against the mock broker. `src/lib/env.ts` refuses that pairing, correctly —
+     * a deploy that forgot `MT5_PROVIDER` would otherwise serve invented trades — so the one
+     * caller that means it says so here. Nothing on the server sets this.
+     */
+    env: { ...process.env, E2E_ALLOW_MOCK: '1' },
     url: `http://localhost:${PORT}/healthz`,
     // Never reuse. A server left running from an earlier build answers /healthz perfectly
     // well and then serves stale code — the suite hangs on elements that exist in the source

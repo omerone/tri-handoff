@@ -20,7 +20,13 @@ import { summarize, toRows, type RowStyle, type TableRow } from './rows';
 import { ReviewControl, type ReviewLabels } from './review-control';
 import { TradeSearch } from './search-field';
 import { Pager } from './pager';
-import { RowCheckbox, SelectAllCheckbox, TradeSelection } from './selection';
+import {
+  RowCheckboxCell,
+  RowCheckboxSlot,
+  SelectAllHeaderCell,
+  SelectionToggle,
+  TradeSelection,
+} from './selection';
 
 const PAGE_SIZE = 40;
 
@@ -244,6 +250,19 @@ export default async function TradesPage({
             brokerConnected={brokerConnected}
           >
             {/*
+              The one control that is always drawn, and the only one until it is pressed.
+
+              `justify-start`, which is the *reading* start — the right in Hebrew and the left
+              in English. The tick column is the table's first column and sits on that same
+              side, so the boxes appear directly under the button that asked for them. Written
+              as `justify-end` first, which reads as "the far side" and puts the button across
+              the table from the column it reveals in exactly one of the two locales.
+            */}
+            <div className="border-line flex justify-start border-b px-4 py-2">
+              <SelectionToggle />
+            </div>
+
+            {/*
              * On a phone the table is 660 pixels wide inside a 340 pixel scroller, which puts
              * P&L and RR — the two numbers this screen exists for — off the right edge behind
              * a sideways scroll nobody discovers. Below the tablet breakpoint the same rows
@@ -256,94 +275,86 @@ export default async function TradesPage({
                   key={trade.key}
                   className="border-line flex items-start border-b last:border-b-0"
                 >
-                  {/*
-                    Outside the Link, for the same reason the review control below is: a
-                    control nested inside an anchor is activated by a tap the anchor also
-                    handles, so ticking a row would navigate away from the row being ticked.
-                    Its own padding rather than the Link's, so the target is a finger wide.
-                  */}
-                  <span className="flex shrink-0 items-center self-stretch ps-4 pe-1">
-                    <RowCheckbox rowKey={trade.key} label={rowLabel(trade)} />
-                  </span>
+                  <RowCheckboxSlot rowKey={trade.key} label={rowLabel(trade)} />
 
                   <div className="flex min-w-0 flex-1 flex-col">
                     <Link
                       href={trade.href}
                       className="hover:bg-raised/60 flex flex-col gap-1 px-3 py-3"
                     >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="flex min-w-0 items-center gap-2">
-                        {/*
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-2">
+                          {/*
                           `dir="ltr"` so a symbol too long for the row loses its tail rather
                           than its head. Inside the Hebrew layout the ellipsis lands at the
                           logical end, which is the *left* — "XAUUSD.MICRO.LONGNAME" rendered
                           as "…CRO.LONGNAME", hiding the one part that identifies the
                           instrument. A ticker is a left-to-right run, like every number here.
                         */}
-                        <span dir="ltr" className="truncate text-[15px] font-bold">
-                          {trade.symbol}
-                        </span>
-                        <Chip>{t(`enum.assetClass.${trade.assetClass}`)}</Chip>
-                      </span>
-                      <span
-                        className={`shrink-0 text-[15px] font-bold ${
-                          rowSign(trade) ? 'text-pos' : 'text-neg'
-                        }`}
-                      >
-                        <Num>{rowMoney(trade)}</Num>
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`inline-flex items-center gap-1 text-xs ${
-                          trade.direction === 'long' ? 'text-pos' : 'text-neg'
-                        }`}
-                      >
-                        {trade.direction === 'long' ? (
-                          <ArrowUpRight size={13} aria-hidden />
-                        ) : (
-                          <ArrowDownRight size={13} aria-hidden />
-                        )}
-                        {t(`enum.direction.${trade.direction}`)}
-                        <span className="text-dim">· {t(`enum.style.${trade.style}`)}</span>
-                      </span>
-                      {trade.rr === null ? (
-                        <Chip tone="dim">—</Chip>
-                      ) : (
-                        <Chip tone={trade.rr >= 0 ? 'pos' : 'neg'}>
-                          <Num>
-                            {trade.rr >= 0 ? '+' : ''}
-                            {formatNumber(trade.rr, locale, 2)}R
-                          </Num>
-                        </Chip>
-                      )}
-                    </div>
-
-                    <div className="text-dim flex items-center justify-between gap-2 text-[11px]">
-                      <Num>{trade.closeAt ? closedAt(trade.closeAt) : '—'}</Num>
-                      <span className="flex items-center gap-2">
-                        <span>
-                          {t('table.risk')}{' '}
-                          <Num>{trade.risk === null ? '—' : money(trade.risk)}</Num>
-                        </span>
-                        {trade.journalled ? (
-                          <NotebookPen
-                            size={13}
-                            className="text-brand"
-                            aria-label={t('journal.title')}
-                          />
-                        ) : null}
-                        {trade.rating === null ? null : (
-                          <span className="text-dim text-[10px] leading-none" dir="ltr">
-                            {'★'.repeat(trade.rating)}
+                          <span dir="ltr" className="truncate text-[15px] font-bold">
+                            {trade.symbol}
                           </span>
+                          <Chip>{t(`enum.assetClass.${trade.assetClass}`)}</Chip>
+                        </span>
+                        <span
+                          className={`shrink-0 text-[15px] font-bold ${
+                            rowSign(trade) ? 'text-pos' : 'text-neg'
+                          }`}
+                        >
+                          <Num>{rowMoney(trade)}</Num>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1 text-xs ${
+                            trade.direction === 'long' ? 'text-pos' : 'text-neg'
+                          }`}
+                        >
+                          {trade.direction === 'long' ? (
+                            <ArrowUpRight size={13} aria-hidden />
+                          ) : (
+                            <ArrowDownRight size={13} aria-hidden />
+                          )}
+                          {t(`enum.direction.${trade.direction}`)}
+                          <span className="text-dim">· {t(`enum.style.${trade.style}`)}</span>
+                        </span>
+                        {trade.rr === null ? (
+                          <Chip tone="dim">—</Chip>
+                        ) : (
+                          <Chip tone={trade.rr >= 0 ? 'pos' : 'neg'}>
+                            <Num>
+                              {trade.rr >= 0 ? '+' : ''}
+                              {formatNumber(trade.rr, locale, 2)}R
+                            </Num>
+                          </Chip>
                         )}
-                        {trade.mood ? (
-                          <span className="text-dim text-[10px]">{trade.mood}</span>
-                        ) : null}
-                      </span>
-                    </div>
+                      </div>
+
+                      <div className="text-dim flex items-center justify-between gap-2 text-[11px]">
+                        <Num>{trade.closeAt ? closedAt(trade.closeAt) : '—'}</Num>
+                        <span className="flex items-center gap-2">
+                          <span>
+                            {t('table.risk')}{' '}
+                            <Num>{trade.risk === null ? '—' : money(trade.risk)}</Num>
+                          </span>
+                          {trade.journalled ? (
+                            <NotebookPen
+                              size={13}
+                              className="text-brand"
+                              aria-label={t('journal.title')}
+                            />
+                          ) : null}
+                          {trade.rating === null ? null : (
+                            <span className="text-dim text-[10px] leading-none" dir="ltr">
+                              {'★'.repeat(trade.rating)}
+                            </span>
+                          )}
+                          {trade.mood ? (
+                            <span className="text-dim text-[10px]">{trade.mood}</span>
+                          ) : null}
+                        </span>
+                      </div>
                     </Link>
 
                     {/*
@@ -372,9 +383,7 @@ export default async function TradesPage({
                   <tr className="text-dim text-[11px]">
                     {/* Its own cell rather than sharing the date's, so the column stays put
                         when a date wraps and the header box lines up over the row boxes. */}
-                    <th className="border-line w-9 border-b px-3.5 py-2.5">
-                      <SelectAllCheckbox />
-                    </th>
+                    <SelectAllHeaderCell />
                     {[
                       t('table.closed'),
                       t('table.symbol'),
@@ -399,9 +408,7 @@ export default async function TradesPage({
                 <tbody>
                   {rows.map((trade) => (
                     <tr key={trade.key} className="border-line border-b last:border-b-0">
-                      <td className="px-3.5 py-2.5">
-                        <RowCheckbox rowKey={trade.key} label={rowLabel(trade)} />
-                      </td>
+                      <RowCheckboxCell rowKey={trade.key} label={rowLabel(trade)} />
                       <td className="text-dim px-3.5 py-2.5 text-xs whitespace-nowrap">
                         <Num>{trade.closeAt ? closedAt(trade.closeAt) : '—'}</Num>
                       </td>
