@@ -18,11 +18,14 @@ import { PrismaClient } from '@prisma/client';
  */
 
 const SYMBOL = 'E2EMAN';
+/** The closed holding the badge test reads. Its own, for the reason in that test's `beforeAll`. */
+const HOLDING = 'E2EHOLD';
 
 test.afterAll(async () => {
   const prisma = new PrismaClient();
   try {
     await prisma.trade.deleteMany({ where: { symbol: SYMBOL } });
+    await prisma.longPosition.deleteMany({ where: { symbol: HOLDING } });
   } finally {
     await prisma.$disconnect();
   }
@@ -57,11 +60,19 @@ test('records a day trade that closed before today', async ({ page }) => {
   await form.locator('input[name="risk"]').fill('100');
   await form.getByRole('button', { name: 'Add' }).click();
 
-  await expect(form.getByText('The open date is later than the close date.')).toHaveCount(0);
+  /*
+   * Asked of the page, not of the form.
+   *
+   * Below `md` the form is inside a sheet that closes itself once the trade is accepted, so a
+   * locator rooted at the form resolves to nothing the moment the thing under test succeeds —
+   * and every assertion made through it then passes or fails for the wrong reason. The
+   * message either appeared on the screen or it did not; that is a question about the screen.
+   */
+  await expect(page.getByText('The open date is later than the close date.')).toHaveCount(0);
 
-  // The sheet stays up after a submit — deliberately, so several trades can be entered in a
-  // row — and while it is up it is a modal over the page. Reading the row back is a different
-  // job from writing it, so the form is put away first.
+  // A no-op on a wide screen, and on a phone it puts away a sheet that is still up because
+  // the submit was rejected — the assertion above having proved it was not rejected for the
+  // one reason this test is about.
   await closeAddForm(page);
 
   // It landed in the shared book, with the R multiple the typed risk implies.
@@ -70,7 +81,16 @@ test('records a day trade that closed before today', async ({ page }) => {
   // from `md` up and a list of cards below it, each hiding the other, so a locator naming only
   // `tbody tr` resolves to thirteen rows on a phone and every one of them hidden. Both carry
   // the symbol and the multiple, which is the only part this test is about.
-  await page.goto('/trades?range=max');
+  /*
+   * Asked for by name, not looked for in the book.
+   *
+   * The table pages at forty rows and every other spec in the run is adding and removing
+   * trades of its own, so "is it on the first page" is a question about what else ran, not
+   * about whether this trade was recorded. The search box narrows to the one row this test
+   * created — the same move the holding test below makes with `style=long`, and for the same
+   * reason: passing on a developer's machine and failing in a full run is not a test.
+   */
+  await page.goto(`/trades?range=max&q=${SYMBOL}`);
   const entry = page
     .locator('tbody tr, li')
     .filter({ hasText: SYMBOL })
@@ -95,8 +115,52 @@ test('records a day trade that closed before today', async ({ page }) => {
 test.describe('where a row came from', () => {
   test.skip(({ isMobile }) => !!isMobile, 'the badge lives in the table, which a phone replaces');
 
+  /*
+   * A closed holding, created here rather than assumed.
+   *
+   * The seed has no holdings at all, and a holding only reaches the trades table once it is
+   * closed — so this test was reading a row that exists on a developer's machine, where one
+   * was left behind by hand, and nowhere else. A test that depends on data the seed does not
+   * create passes or fails on which database it happens to meet.
+   */
+  test.beforeAll(async () => {
+    const prisma = new PrismaClient();
+    try {
+      const user = await prisma.user.findFirstOrThrow({
+        where: { email: process.env.SEED_EMAIL ?? 'demo@tri.local' },
+        select: { id: true },
+      });
+      await prisma.longPosition.deleteMany({ where: { symbol: HOLDING } });
+      await prisma.longPosition.create({
+        data: {
+          userId: user.id,
+          symbol: HOLDING,
+          qty: 10,
+          buyPrice: 100,
+          buyDate: new Date('2026-06-01T00:00:00.000Z'),
+          currentPrice: 130,
+          valueUpdatedAt: new Date('2026-06-20T00:00:00.000Z'),
+          fees: 0,
+          currency: 'USD',
+          realizedPnl: 300,
+          closedAt: new Date('2026-06-20T00:00:00.000Z'),
+        },
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
   test('says manual entry on a holding, not the word beside it', async ({ page }) => {
-    await page.goto('/trades?range=max');
+    /*
+     * Narrowed to holdings, because the table pages at forty rows.
+     *
+     * The seeded book is ninety-odd trades deep and a holding sorts in among them by close
+     * date, so on an unfiltered table it lands on page two or three — the summary bar counts
+     * it ("1 holding") while no row on screen is one, which is exactly the shape of the
+     * failure. `style=long` is the table's own name for this row kind.
+     */
+    await page.goto('/trades?range=max&style=long');
 
     /*
      * By where the row links, not by the word "Long".
