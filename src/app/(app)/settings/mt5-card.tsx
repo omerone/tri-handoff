@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { Landmark, Shield } from 'lucide-react';
 import { Num } from '@/components/ui/kpi';
 import { Mt5ConnectWizard, type WizardLabels } from './mt5-wizard';
@@ -14,7 +14,11 @@ export type Mt5CardLabels = WizardLabels & {
   dayAccount: string;
   slotEmpty: string;
   disconnect: string;
-  disconnectConfirm: string;
+  disconnectTitle: string;
+  /** What happens to the history when the box below is left alone. */
+  disconnectKeeps: string;
+  disconnectRemoveWarn: string;
+  disconnectCancel: string;
   investor: string;
   lastSync: string;
   balance: string;
@@ -39,6 +43,14 @@ export type ConnectedAccount = {
   lastSync: { date: string; time: string } | null;
   balance: string | null;
   equity: string | null;
+  /**
+   * "Also delete the 92 trades imported from this account", with this account's own count.
+   *
+   * Pre-formatted on the server because it carries a plural, and per-account because the
+   * number is — offering to delete the whole book while disconnecting the slot that holds
+   * nine of it is how someone agrees to lose the rest.
+   */
+  removeDataLabel: string;
 };
 
 /**
@@ -139,6 +151,10 @@ export function Mt5Card({
 
 function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5CardLabels }) {
   const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  // Always starts unticked, including on a second visit to the panel: carrying a previous
+  // answer forward would mean a tick made once could delete a book later.
+  const [removeData, setRemoveData] = useState(false);
 
   return (
     <div className="flex flex-col gap-3">
@@ -201,23 +217,75 @@ function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5
         </div>
       </dl>
 
-      <div>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => {
-            if (!window.confirm(labels.disconnectConfirm)) return;
-            startTransition(() => {
-              // Named, not implied: with two accounts connected, "disconnect" without an id
-              // would take both and the confirmation only asked about one.
-              void disconnectMt5Action(account.id);
-            });
-          }}
-          className="border-line bg-raised text-dim hover:text-neg rounded-[10px] border px-3 py-2 text-xs disabled:opacity-60"
-        >
-          {labels.disconnect}
-        </button>
-      </div>
+      {/*
+        A panel rather than a `confirm()`, because this is a choice and not a yes/no.
+
+        Keeping the trades stays the default — they record what the trader actually did, and
+        unplugging a broker does not unmake a year of it — so the destructive half is a box
+        that has to be ticked. A dialog with two buttons would have made "delete my history"
+        as easy to hit as "no", which for the one irreversible action on this screen is the
+        wrong shape.
+      */}
+      {confirming ? (
+        <div className="border-line bg-raised flex flex-col gap-2 rounded-[10px] border p-3">
+          <p className="text-text text-xs font-semibold">{labels.disconnectTitle}</p>
+
+          <label className="text-dim flex items-start gap-2 text-[11px] leading-relaxed">
+            <input
+              type="checkbox"
+              checked={removeData}
+              onChange={(event) => setRemoveData(event.target.checked)}
+              className="accent-brand mt-0.5 size-3.5 shrink-0 cursor-pointer"
+            />
+            <span>{account.removeDataLabel}</span>
+          </label>
+
+          {/* Only when it applies. A standing "this cannot be undone" beside an action that is
+              usually reversible is how people stop reading the ones that are not. */}
+          <p className={`text-[11px] leading-relaxed ${removeData ? 'text-neg' : 'text-dim'}`}>
+            {removeData ? labels.disconnectRemoveWarn : labels.disconnectKeeps}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                startTransition(() => {
+                  // Named, not implied: with two accounts connected, "disconnect" without an
+                  // id would take both and the panel only asked about one.
+                  void disconnectMt5Action(account.id, { removeData });
+                })
+              }
+              className="bg-neg/10 text-neg border-neg/30 hover:bg-neg/20 rounded-[10px] border px-3 py-2 text-xs font-semibold disabled:opacity-60"
+            >
+              {labels.disconnect}
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                setConfirming(false);
+                setRemoveData(false);
+              }}
+              className="border-line text-dim hover:text-text rounded-[10px] border px-3 py-2 text-xs disabled:opacity-60"
+            >
+              {labels.disconnectCancel}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setConfirming(true)}
+            className="border-line bg-raised text-dim hover:text-neg rounded-[10px] border px-3 py-2 text-xs disabled:opacity-60"
+          >
+            {labels.disconnect}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { asTheme } from '@/lib/theme';
 import { Mt5Card, type ConnectedAccount } from './mt5-card';
 import { TwoFactorCard } from './two-factor-card';
 import { requireSession } from '@/lib/auth/session';
-import { listMt5Accounts } from '@/lib/db';
+import { countSyncedTrades, listMt5Accounts } from '@/lib/db';
 import { getTwoFactorState } from '@/lib/db/two-factor';
 import type { Locale } from '@/i18n/config';
 import { asCurrency, formatMoney } from '@/lib/money/currency';
@@ -38,13 +38,30 @@ export default async function SettingsPage() {
       ? null
       : `${formatMoney(value, asCurrency(currency, 'USD'), locale, { decimals: 2 })}`;
 
-  const connected: ConnectedAccount[] = accounts.map((account) => ({
+  /*
+   * How much history each account owns, so the disconnect panel can name it.
+   *
+   * Counted per account rather than once for the book: two accounts are two books, and
+   * offering to delete "92 trades" while disconnecting the slot that holds nine of them is
+   * how someone agrees to lose the other eighty-three.
+   */
+  const tradeCounts = await Promise.all(
+    accounts.map((account) => countSyncedTrades(session.ctx, account.id)),
+  );
+
+  const connected: ConnectedAccount[] = accounts.map((account, index) => ({
     id: account.id,
     login: account.login,
     server: account.server,
     label: account.label,
     purpose: account.purpose,
     status: account.status,
+    /*
+     * Formatted here, not in the card: it carries a count, and a message with a plural in it
+     * belongs where next-intl can resolve one. The card is per-account, so this cannot live
+     * in the shared label bag beside it.
+     */
+    removeDataLabel: t('disconnectRemoveData', { count: tradeCounts[index] ?? 0 }),
     // Two fields rather than one string: the card has a third of its width for this and needs
     // somewhere to break. Same formatters, same timezone, same result read end to end.
     lastSync: account.lastSyncAt
@@ -82,7 +99,10 @@ export default async function SettingsPage() {
             swingAccount: t('swingAccount'),
             dayAccount: t('dayAccount'),
               slotEmpty: t('slotEmpty'),
-              disconnectConfirm: t('disconnectConfirm'),
+              disconnectTitle: t('disconnectTitle'),
+              disconnectKeeps: t('disconnectKeeps'),
+              disconnectRemoveWarn: t('disconnectRemoveWarn'),
+              disconnectCancel: t('disconnectCancel'),
               investor: t('investor'),
               investorWarning: t('investorWarning'),
               replaceTitle: t('replaceTitle'),

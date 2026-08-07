@@ -218,11 +218,50 @@ export async function connectMt5Action(
   };
 }
 
-export async function disconnectMt5Action(mt5AccountId?: string): Promise<void> {
+/**
+ * Disconnecting, and optionally taking the account's history with it.
+ *
+ * Keeping the trades is still the default and still the right one: they are a record of what
+ * the trader actually did, and a broker being unplugged does not unmake a year of it. But
+ * leaving them is not always what is wanted either — a demo account tried for a week, an
+ * account swapped for another at the same broker, a book somebody is done reading — and until
+ * now the only way to be rid of those rows was to connect a *different* account and let the
+ * replace path delete them, which is a strange thing to have to do.
+ *
+ * Scoped to the one account, like the replace path is: the other slot's book is not being
+ * disconnected and must not go with it. Snapshots carry no account column, so they are only
+ * cleared when nothing else is left to own them — a balance chart missing half its own past is
+ * worse than one that steps.
+ */
+export async function disconnectMt5Action(
+  mt5AccountId?: string,
+  options?: { removeData?: boolean },
+): Promise<void> {
   const session = await requireSession();
+
+  /*
+   * Read before the disconnect, and deleted after it.
+   *
+   * Before, because `disconnectMt5Account` is what makes an account stop counting as
+   * connected, and this needs to know whether any *other* account still does. After, because
+   * a delete that ran first and then failed to disconnect would leave a connected account
+   * whose next sync quietly re-imports everything just removed.
+   */
+  const others = options?.removeData
+    ? (await listMt5Accounts(session.ctx)).filter(
+        (account) => account.id !== mt5AccountId && account.status === 'connected',
+      )
+    : [];
+
   // The id names one account. Omitted — which nothing in the UI does any more — it clears
   // them all, which is what account deletion wants.
   await disconnectMt5Account(session.ctx, mt5AccountId);
+
+  if (options?.removeData && mt5AccountId) {
+    await deleteTradesForAccount(session.ctx, mt5AccountId);
+    if (others.length === 0) await deleteAllSnapshots(session.ctx);
+  }
+
   revalidatePath('/', 'layout');
 }
 
