@@ -7,6 +7,7 @@ import {
   trackAllOpenPositions,
   updateCurrentPrice,
 } from '@/lib/db';
+import { listTrackedSymbols } from '@/lib/db/quotes';
 import { CHUNK, dueSymbols, refreshDueQuotes } from '@/lib/quotes/refresh';
 import { cleanup, createTenantFixture, testDb, type Fixture } from '../helpers/fixtures';
 
@@ -41,41 +42,54 @@ async function addPosition(
   });
 }
 
-/** Every listing this file puts on the feed. */
-const TEST_SYMBOLS = [
-  'AAPL',
-  'MSFT',
-  'NVDA',
-  'TSLA',
-  'QQQ',
-  'SPY',
-  'VOO',
-  'BTC/USD',
-  'ETH/USD',
-  'NOTREAL',
-];
+/**
+ * Every listing this file puts on the feed, by full key.
+ *
+ * By key and not by ticker, and that distinction is the whole isolation story. `AAPL` alone
+ * is three different cache entries — this file's `XNGS` and `XLON` fixtures, and the bare
+ * `AAPL` that `long-positions.test.ts` seeds a few milliseconds away in another worker. A
+ * rule written against the ticker reaches all three.
+ */
+const OWN = [
+  { symbol: 'AAPL', micCode: 'XNGS' },
+  { symbol: 'AAPL', micCode: 'XLON' },
+  { symbol: 'MSFT', micCode: 'XNGS' },
+  { symbol: 'MSFT', micCode: '' },
+  { symbol: 'NVDA', micCode: 'XNGS' },
+  { symbol: 'TSLA', micCode: 'XNGS' },
+  { symbol: 'QQQ', micCode: 'XNGS' },
+  { symbol: 'SPY', micCode: 'XNGS' },
+  { symbol: 'VOO', micCode: 'XNGS' },
+  { symbol: 'BTC/USD', micCode: '' },
+  { symbol: 'ETH/USD', micCode: '' },
+  { symbol: 'NOTREAL', micCode: 'XNGS' },
+] as const;
+
+const keyOf = (key: { symbol: string; micCode: string }) => `${key.symbol}|${key.micCode}`;
+const OWN_KEYS = new Set(OWN.map(keyOf));
 
 /**
- * Positions taken off the feed for the duration, and put back afterwards.
+ * The seeded book, taken off the feed for the duration and put back afterwards.
  *
  * The refresh is global on purpose — one quote serves every tenant holding that listing — so
- * counting what a tick did only works when nothing outside these fixtures is also owed a
- * price. On CI the database holds nothing but the fixtures and that is free. On a development
- * machine it is not: the seeded book holds `MSFT` on `XNGS`, which is exactly the listing the
- * chunk test puts on the feed.
+ * a tick started here also prices whatever else in the database is owed a price. On CI that is
+ * nothing. On a development machine the seeded demo book holds `MSFT` on `XNGS`, which is one
+ * of the nine listings the chunk test puts on the feed.
  *
- * The previous guard stamped everything already tracked as just-fetched, which was meant to
- * keep a test run from marking somebody's real book to a mock price. It contradicted the line
- * above it. A listing that was both seeded *and* used here got its quote deleted so the test
- * could control it, then stamped fresh a moment later — so the fixture's own position was not
- * due, `due` came back one short, and the test failed on a developer's machine while passing
+ * The previous guard stamped everything already tracked as just-fetched, and contradicted the
+ * line below it: a listing that was both seeded *and* used here had its quote deleted so the
+ * test could control it, then stamped fresh a moment later. The fixture's own position was not
+ * due, `due` came back one short, and the file failed on a developer's machine while passing
  * on CI, where there was nothing to collide with.
  *
- * Parking says the same thing without the contradiction: for the length of this file the
- * fixtures are the only book on the feed, so nobody else's positions are repriced and nobody
- * else's listings show up in a count. Restoring is `afterAll`'s job; a crash in the middle
- * leaves seeded positions reading `manual`, which is a checkbox on the screen and a reseed at
- * worst.
+ * **Only rows outside `.itest`.** The fixture tenants every integration file creates all live
+ * on that suffix, and vitest runs those files side by side against one database — so parking
+ * "everything that is not mine" would reach into another file's rows and flip a `priceSource`
+ * it is in the middle of asserting on. The seeded book is what this needs to move, and the
+ * domain is what tells the two apart.
+ *
+ * Restoring is `afterAll`'s job. A crash in the middle leaves seeded positions reading
+ * `manual`, which is a checkbox on the screen and a reseed at worst.
  */
 let parked: string[] = [];
 
@@ -83,11 +97,15 @@ beforeAll(async () => {
   alice = await createTenantFixture();
   bob = await createTenantFixture();
 
-  const others = await testDb.longPosition.findMany({
-    where: { closedAt: null, priceSource: 'auto', userId: { notIn: [alice.userId, bob.userId] } },
+  const seeded = await testDb.longPosition.findMany({
+    where: {
+      closedAt: null,
+      priceSource: 'auto',
+      user: { tenant: { domain: { not: { endsWith: '.itest' } } } },
+    },
     select: { id: true },
   });
-  parked = others.map((row) => row.id);
+  parked = seeded.map((row) => row.id);
   if (parked.length > 0) {
     await testDb.longPosition.updateMany({
       where: { id: { in: parked } },
@@ -96,11 +114,39 @@ beforeAll(async () => {
   }
 });
 
+/**
+ * Two lines that look opposed and are not.
+ *
+ * The first clears the cache for this file's own listings, because being *due* is where every
+ * test here starts and a cached row is the only thing that makes a listing look fresh. The
+ * second does the exact opposite to every listing that is **not** ours — stamping it as
+ * fetched-just-now so it drops out of the tick.
+ *
+ * That second line is what keeps the counts honest. `refreshDueQuotes` returns totals, and
+ * vitest runs the integration files side by side against one database: without it, a bare
+ * `AAPL` seeded by `long-positions.test.ts` in another worker is simply *also* due, and this
+ * file reads `updated: 2` for a tick it thinks it set up alone. It writes to the quote cache,
+ * which is shared by design, and never to anybody's positions — the earlier version of this
+ * parked other files' rows, which meant flipping a `priceSource` a sibling test was in the
+ * middle of asserting on.
+ *
+ * Every test still starts from an empty budget, or the one before it has spent it.
+ */
 beforeEach(async () => {
-  // Deleted rather than stamped: a due listing is what every test here starts from, and the
-  // cached row is the only thing that makes one look fresh.
-  await testDb.quote.deleteMany({ where: { symbol: { in: TEST_SYMBOLS } } });
+  await testDb.quote.deleteMany({
+    where: { OR: OWN.map((key) => ({ symbol: key.symbol, micCode: key.micCode })) },
+  });
   await testDb.rateLimit.deleteMany({ where: { key: 'quotes:daily' } });
+
+  const now = new Date();
+  for (const key of await listTrackedSymbols()) {
+    if (OWN_KEYS.has(keyOf(key))) continue;
+    await testDb.quote.upsert({
+      where: { symbol_micCode: { symbol: key.symbol, micCode: key.micCode } },
+      create: { symbol: key.symbol, micCode: key.micCode, asOf: now, fetchedAt: now },
+      update: { fetchedAt: now, asOf: now },
+    });
+  }
 });
 
 afterEach(async () => {
