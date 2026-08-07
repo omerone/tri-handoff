@@ -44,11 +44,20 @@ export const MainNav = memo(function MainNav({ items }: { items: NavItem[] }) {
   return (
     <nav
       ref={strip}
-      // Full width on a phone, sharing the row with the range picker from `md` up. `min-w-0`
-      // is what makes the sharing work: without a minimum of zero a flex child refuses to
-      // shrink below its content, so the tabs would push the dates off the screen instead of
-      // scrolling — which is the one thing this strip is built to do.
-      className="flex w-full min-w-0 gap-1 overflow-x-auto [scrollbar-width:none] md:w-auto md:flex-1 [&::-webkit-scrollbar]:hidden"
+      /*
+       * Full width on a phone, sharing the row with the range picker from `md` up. `min-w-0`
+       * is what makes the sharing work: without a minimum of zero a flex child refuses to
+       * shrink below its content, so the tabs would push the dates off the screen instead of
+       * scrolling — which is the one thing this strip is built to do.
+       *
+       * `py-1` is for the focus ring. `overflow-x: auto` makes the *vertical* axis clip too —
+       * the spec computes `visible` to `auto` when the other axis is not visible — and this
+       * strip was exactly as tall as its tabs, so a ring drawn 2px outside a tab with a 2px
+       * offset lost 4px off the top and 4px off the bottom. What was left read as a frame
+       * belonging to something other than the button it was on. The wrapper gives the four
+       * pixels back below, so the header is the same height it was.
+       */
+      className="flex w-full min-w-0 gap-1 overflow-x-auto py-1 [scrollbar-width:none] md:w-auto md:flex-1 [&::-webkit-scrollbar]:hidden"
     >
       {items.map((item) => {
         const Icon = ICONS[item.key] ?? LayoutDashboard;

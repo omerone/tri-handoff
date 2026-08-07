@@ -82,7 +82,7 @@ export async function AppShell({
             of the page — at 375px the six tabs and four range buttons did not fit on one line,
             and the header spent a second row on a control that belongs to the screen below
             it rather than to the frame around it. */}
-        <div className="mx-auto max-w-6xl px-2 pb-2">
+        <div className="mx-auto max-w-6xl px-2 pb-1">
           <MainNav items={items} />
         </div>
       </header>

@@ -208,10 +208,19 @@ button {
   }
 }
 
+/*
+ * The focus ring, and the one line that is not in it.
+ *
+ * `border-radius` used to be set here, which reads as "round the ring" and is not what it
+ * does: an outline already follows the element's own radius, so the declaration *overrode*
+ * that radius — a nav tab drawn `rounded-[10px]` became 6px the moment it took focus, and its
+ * background visibly changed shape under the ring. Everything focusable in this product
+ * carries its own radius already; a bare element with none gets a square ring, which is
+ * correct rather than a regression.
+ */
 :where(a, button, input, select, textarea):focus-visible {
   outline: 2px solid var(--tri-brand);
   outline-offset: 2px;
-  border-radius: 6px;
 }
 
 /*

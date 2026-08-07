@@ -1,10 +1,5 @@
 import { Num } from '@/components/ui/kpi';
-import {
-  formatCompactSigned,
-  formatDisplayMoney,
-  formatNumber,
-  type MoneyDisplay,
-} from '@/lib/money/currency';
+import { formatDisplayMoney, formatNumber, type MoneyDisplay } from '@/lib/money/currency';
 import type { Locale } from '@/i18n/config';
 
 /**
@@ -83,23 +78,36 @@ export function DayCell({
 
       {total ? (
         <>
-          <div className={`font-bold ${total.net >= 0 ? 'text-pos' : 'text-neg'}`}>
-            <span className="text-[13px] md:hidden">
-              <Num>{formatCompactSigned(total.net * display.rate, locale)}</Num>
-            </span>
-            <span className="hidden text-xs md:inline">
+          {/*
+            The figures are the desktop's.
+
+            A square is about fifty-five pixels wide on a phone, and a net, a count and a win
+            rate do not go in one. They were going in anyway, at a size picked because nothing
+            larger fitted — and the rest of the detail sat behind a card that opens on hover,
+            which a finger cannot ask for. Below `md` the same days are a list under the grid
+            with room for the words; see `month-days.tsx`. What stays here is what a square is
+            good at: the day, and whether it was up or down.
+          */}
+          <div className={`hidden font-bold md:block ${total.net >= 0 ? 'text-pos' : 'text-neg'}`}>
+            <span className="text-xs">
               <Num>{formatDisplayMoney(total.net, display, { signed: true })}</Num>
             </span>
           </div>
-          <div className="text-dim text-[10px]">
+          <div className="text-dim hidden text-[10px] md:block">
             <Num>
               {total.count}
-              <span className="hidden md:inline">
-                {' · '}
-                {formatNumber(winRate, locale, 0)}%
-              </span>
+              {' · '}
+              {formatNumber(winRate, locale, 0)}%
             </Num>
           </div>
+
+          {/* A dot instead, on the screen where the numbers moved out — so a traded day is
+              still distinguishable from an empty one by more than its background alone. */}
+          <div
+            aria-hidden
+            className="mt-1 h-1 w-1 rounded-full md:hidden"
+            style={{ background: total.net >= 0 ? 'var(--tri-pos)' : 'var(--tri-neg)' }}
+          />
 
           <DayCard
             total={total}
@@ -112,7 +120,9 @@ export function DayCell({
           />
         </>
       ) : (
-        <div className="text-dim/50 text-[11px]">{labels.noTrades}</div>
+        // The dash is a desktop affordance too. Twenty of them in a month is the noise the
+        // grid was mostly made of on a phone, and the empty square already says it.
+        <div className="text-dim/50 hidden text-[11px] md:block">{labels.noTrades}</div>
       )}
     </div>
   );
@@ -152,7 +162,7 @@ function DayCard({
   return (
     <div
       role="tooltip"
-      className={`border-line bg-raised pointer-events-none absolute bottom-full z-30 mb-2 hidden w-max flex-col gap-1 rounded-[10px] border px-3 py-2 shadow-lg group-hover:flex group-focus-within:flex ${position}`}
+      className={`border-line bg-raised pointer-events-none absolute bottom-full z-30 mb-2 hidden w-max flex-col gap-1 rounded-[10px] border px-3 py-2 shadow-lg md:group-hover:flex md:group-focus-within:flex ${position}`}
     >
       <div className="text-text text-[12px] font-bold whitespace-nowrap">{dateLabel}</div>
 

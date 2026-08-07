@@ -11,6 +11,7 @@ import { currentResolvedRange } from '@/lib/preferences/range';
 import { monthsIn, RANGE_PARAM, toTradeFilter } from '@/lib/time/range';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { displayMoney } from '@/lib/money/display';
+import { MonthDays } from './month-days';
 import { wallClock } from '@/lib/time/zone';
 import { formatMonthName, formatWeekdayDate } from '@/lib/time/format';
 import { DayCell } from './day-cell';
@@ -177,6 +178,26 @@ export default async function CalendarPage({
               );
             })}
           </div>
+
+          {/*
+            The same month, as a list, below `md`. The grid above keeps the shape of the month
+            and the list carries the numbers, because a square on a phone has room for one of
+            those and was being asked for both.
+          */}
+          <MonthDays
+            days={cellsOf(month)
+              .filter((day): day is number => day !== null)
+              .map((day) => ({
+                day,
+                key: dayKey(month.year, month.month, day),
+                dateLabel: formatWeekdayDate({ ...month, day }, locale),
+              }))
+              .filter((entry) => totals.has(entry.key))
+              .map((entry) => ({ ...entry, total: totals.get(entry.key)! }))}
+            locale={locale}
+            display={display}
+            labels={dayLabels}
+          />
         </Card>
       ))}
     </div>
