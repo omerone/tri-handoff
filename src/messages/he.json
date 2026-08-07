@@ -293,7 +293,8 @@
     "sortRrLow": "R — מהנמוך",
     "sortRiskHigh": "סיכון — מהגבוה",
     "sortRiskLow": "סיכון — מהנמוך",
-    "sortSymbol": "נכס — א׳ עד ת׳"
+    "sortSymbol": "נכס — א׳ עד ת׳",
+    "chosen": "{count} נבחרו"
   },
   "finance": {
     "income": "הכנסות",

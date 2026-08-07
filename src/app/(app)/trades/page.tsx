@@ -95,18 +95,51 @@ export default async function TradesPage({
   const range = await currentResolvedRange(params.range);
   // `long` is a row style with no column in `trades`, so it never reaches the deal query —
   // `toRows` uses it to drop deals and keep holdings instead.
-  const rowStyle = isRowStyle(params.style) ? params.style : undefined;
+  /*
+   * Every dropdown takes several answers, so every parameter is a list.
+   *
+   * Comma-separated, and a single value is a list of one — which is what keeps a link written
+   * before this existed, or typed by hand, working exactly as it did. Anything unrecognised is
+   * dropped rather than refused, for the same reason the sort key falls back: these are URLs
+   * people edit and bookmarks that outlive the values they name.
+   */
+  const many = <T extends string>(
+    raw: string | undefined,
+    valid: (value: string) => boolean,
+  ): T[] => [
+    ...new Set(
+      (raw ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(valid) as T[],
+    ),
+  ];
+
+  const classes = many<(typeof ASSET_CLASSES)[number]>(params.class, isAssetClass);
+  const directions = many<(typeof DIRECTIONS)[number]>(params.dir, isDirection);
+  const rowStyles = many<RowStyle>(params.style, isRowStyle);
+  const strategies = many<string>(params.strategy, (value) => value.length > 0);
+  const tags = many<string>(params.tag, (value) => value.length > 0);
+  const sources = many<'mt5' | 'manual'>(
+    params.source,
+    (value) => value === 'mt5' || value === 'manual',
+  );
   const query = (params.q ?? '').trim().slice(0, MAX_QUERY_LENGTH);
-  const source = params.source === 'mt5' || params.source === 'manual' ? params.source : undefined;
+
+  // `long` is a row style with no column in `trades`, so it never reaches the deal query.
+  const dealStyles = rowStyles.filter((style): style is 'day' | 'swing' => style !== 'long');
+
   const filter: TradeFilter = {
     ...toTradeFilter(range),
-    ...(isAssetClass(params.class) ? { assetClass: params.class } : {}),
-    ...(isDirection(params.dir) ? { direction: params.dir } : {}),
-    ...(rowStyle && rowStyle !== 'long' ? { style: rowStyle } : {}),
-    ...(params.strategy ? { strategy: params.strategy } : {}),
-    ...(params.tag ? { tag: params.tag } : {}),
+    ...(classes.length > 0 ? { assetClass: classes } : {}),
+    ...(directions.length > 0 ? { direction: directions } : {}),
+    // Asking only for holdings is asking for no deals at all, which the row layer handles by
+    // dropping them — the query must not be told to select every style instead.
+    ...(dealStyles.length > 0 ? { style: dealStyles } : {}),
+    ...(strategies.length > 0 ? { strategy: strategies } : {}),
+    ...(tags.length > 0 ? { tag: tags } : {}),
     ...(query ? { query } : {}),
-    ...(source ? { mt5AccountId: source } : {}),
+    ...(sources.length > 0 ? { mt5AccountId: sources } : {}),
   };
 
   /*
@@ -161,13 +194,13 @@ export default async function TradesPage({
     accountCurrency: account?.accountCurrency ?? 'USD',
     sort,
     filter: {
-      ...(isAssetClass(params.class) ? { assetClass: params.class } : {}),
-      ...(isDirection(params.dir) ? { direction: params.dir } : {}),
-      ...(rowStyle ? { style: rowStyle } : {}),
-      ...(params.strategy ? { strategy: params.strategy } : {}),
-      ...(params.tag ? { tag: params.tag } : {}),
+      assetClass: classes,
+      direction: directions,
+      style: rowStyles,
+      strategy: strategies,
+      tag: tags,
+      source: sources,
       ...(query ? { query } : {}),
-      ...(source ? { source } : {}),
     },
   });
   const summary = summarize(allRows);
@@ -227,12 +260,12 @@ export default async function TradesPage({
           />
           <TradeFilters
             current={{
-              class: params.class ?? 'all',
-              dir: params.dir ?? 'all',
-              style: params.style ?? 'all',
-              strategy: params.strategy ?? 'all',
-              tag: params.tag ?? 'all',
-              source: params.source ?? 'all',
+              class: params.class ?? '',
+              dir: params.dir ?? '',
+              style: params.style ?? '',
+              strategy: params.strategy ?? '',
+              tag: params.tag ?? '',
+              source: params.source ?? '',
             }}
             options={{
               all: t('table.all'),
