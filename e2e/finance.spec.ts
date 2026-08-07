@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { closeAddForm, openAddForm } from './helpers/add-form';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -54,12 +55,15 @@ async function addEntry(
   page: Page,
   entry: { type: 'income' | 'expense'; label: string; amount: number; recurring?: boolean },
 ) {
+  await openAddForm(page);
   await page.selectOption('select[name="type"]', entry.type);
   await page.fill('input[name="label"]', entry.label);
   await page.fill('input[name="amountIls"]', String(entry.amount));
   if (entry.recurring) await page.check('input[name="isRecurring"]');
 
   await page.getByRole('button', { name: 'Add', exact: true }).click();
+  // The sheet covers the list on a phone; the caller is about to read what it just wrote.
+  await closeAddForm(page);
   await expect(page.getByText(entry.label)).toBeVisible();
 }
 
@@ -73,7 +77,12 @@ test.describe('the finance screen', () => {
       await expect(tile(page, label)).toBeVisible();
     }
     await expect(page.getByText('Personal finance')).toBeVisible();
+
+    // The form is on the page from `md` and behind the add button below it — either way it is
+    // reachable, which is what this line is checking.
+    await openAddForm(page);
     await expect(page.locator('input[name="amountIls"]')).toBeVisible();
+    await closeAddForm(page);
 
     // next-intl renders the key itself when a message is missing.
     const text = await page.locator('main').innerText();

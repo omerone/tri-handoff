@@ -1,4 +1,5 @@
 import { getLocale, getTranslations } from 'next-intl/server';
+import { AddSheet } from '@/components/ui/add-sheet';
 import { Card } from '@/components/ui/card';
 import { EmptyState, KPI } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
@@ -51,6 +52,7 @@ export default async function LongPositionsPage({
 }) {
   const session = await requireSession();
   const t = await getTranslations('long');
+  const tBulk = await getTranslations('bulk');
   const tManual = await getTranslations('manual');
   const tJournal = await getTranslations('journal');
   const locale = (await getLocale()) as Locale;
@@ -306,22 +308,24 @@ export default async function LongPositionsPage({
           ) : null}
         </div>
         <div className="border-line border-b pb-3">
-          <AddPositionForm
-            labels={{
-              symbol: t('symbol'),
-              searchHint: t('searchHint'),
-              searching: t('searching'),
-              noMatches: t('noMatches'),
-              qty: t('qty'),
-              buyPrice: t('buyPrice'),
-              buyDate: t('buyDate'),
-              fees: t('fees'),
-              currency: t('currency'),
-              add: t('add'),
-            }}
-            currencies={SUPPORTED_CURRENCIES}
-            defaultDate={defaultDate}
-          />
+          <AddSheet label={tBulk('addPosition')}>
+            <AddPositionForm
+              labels={{
+                symbol: t('symbol'),
+                searchHint: t('searchHint'),
+                searching: t('searching'),
+                noMatches: t('noMatches'),
+                qty: t('qty'),
+                buyPrice: t('buyPrice'),
+                buyDate: t('buyDate'),
+                fees: t('fees'),
+                currency: t('currency'),
+                add: t('add'),
+              }}
+              currencies={SUPPORTED_CURRENCIES}
+              defaultDate={defaultDate}
+            />
+          </AddSheet>
         </div>
 
         {positions.length === 0 ? (

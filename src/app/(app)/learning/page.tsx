@@ -1,4 +1,5 @@
 import { getLocale, getTranslations } from 'next-intl/server';
+import { AddSheet } from '@/components/ui/add-sheet';
 import { Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { DonutChart } from '@/components/charts/donut-chart';
@@ -40,6 +41,7 @@ export default async function LearningPage({
 }) {
   const session = await requireSession();
   const t = await getTranslations('learning');
+  const tBulk = await getTranslations('bulk');
   const locale = (await getLocale()) as Locale;
   const rtl = LOCALE_DIR[locale] === 'rtl';
   const params = await searchParams;
@@ -90,20 +92,22 @@ export default async function LearningPage({
 
       <Card title={`${t('title')} · ${t('subtitle')}`}>
         <div className="border-line border-b pb-3">
-          <LearningEntryForm
-            defaultDate={defaultDate}
-            labels={{
-              what: t('what'),
-              whatPlaceholder: t('whatPlaceholder'),
-              hours: t('hours'),
-              topic: t('topic'),
-              date: t('date'),
-              note: t('note'),
-              notePlaceholder: t('notePlaceholder'),
-              add: t('add'),
-              topics: { psychology: t('topics.psychology'), technical: t('topics.technical') },
-            }}
-          />
+          <AddSheet label={tBulk('addEntry')}>
+            <LearningEntryForm
+              defaultDate={defaultDate}
+              labels={{
+                what: t('what'),
+                whatPlaceholder: t('whatPlaceholder'),
+                hours: t('hours'),
+                topic: t('topic'),
+                date: t('date'),
+                note: t('note'),
+                notePlaceholder: t('notePlaceholder'),
+                add: t('add'),
+                topics: { psychology: t('topics.psychology'), technical: t('topics.technical') },
+              }}
+            />
+          </AddSheet>
         </div>
 
         {entries.length === 0 ? (

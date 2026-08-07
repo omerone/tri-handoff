@@ -123,7 +123,16 @@ export function SymbolField({
       event.preventDefault();
       const match = results[active];
       if (match) choose(match);
-    } else if (event.key === 'Escape') {
+    } else if (event.key === 'Escape' && open) {
+      /*
+       * Only while the menu is open, and it stops there.
+       *
+       * On a phone this field lives inside a sheet that also closes on Escape, so without the
+       * guard one press dismissed the suggestions *and* the whole form, taking everything
+       * already typed with it. A key that means "close the innermost thing" has to be claimed
+       * by the innermost thing that can act on it.
+       */
+      event.stopPropagation();
       setOpen(false);
     }
   };
@@ -193,7 +202,11 @@ export function SymbolField({
             </li>
           ) : (
             results.map((match, index) => (
-              <li key={`${match.symbol}@${match.micCode}`} role="option" aria-selected={index === active}>
+              <li
+                key={`${match.symbol}@${match.micCode}`}
+                role="option"
+                aria-selected={index === active}
+              >
                 <button
                   type="button"
                   // `onMouseDown` rather than `onClick`: the click would land after the input

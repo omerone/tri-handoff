@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openAddForm } from './helpers/add-form';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -125,17 +126,35 @@ test.describe('removing what was picked', () => {
   });
 
   test('takes two learning entries in one press', async ({ page }) => {
+    /*
+     * At a desktop width, on both projects, and on purpose.
+     *
+     * What this test is about is removing rows together — creating them first is setup. Below
+     * `md` that setup goes through a sheet that opens, closes itself on submit and has to be
+     * reopened per row, which is behaviour `add-sheet.spec.ts` covers directly and which this
+     * file would otherwise be re-testing by accident, three assertions at a time.
+     */
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/learning');
+    await openAddForm(page, /add an entry/i);
     const form = page
       .locator('form')
       .filter({ has: page.locator('input[name="title"]') })
+      .filter({ visible: true })
       .first();
 
     for (const hours of ['1', '2']) {
       await form.locator('input[name="title"]').fill(`${TOPIC} ${hours}`);
       await form.locator('input[name="hours"]').fill(hours);
       await form.getByRole('button', { name: 'Add' }).click();
-      await expect(page.getByText(`${TOPIC} ${hours}`)).toBeVisible();
+      // The row in the list, not any text on the page: below `md` the sheet closes on submit
+      // and the form's own copy of the title goes with it.
+      await expect(
+        page
+          .locator('main li')
+          .filter({ hasText: `${TOPIC} ${hours}` })
+          .first(),
+      ).toBeVisible({ timeout: 15_000 });
     }
 
     await page.getByRole('button', { name: 'Select' }).click();

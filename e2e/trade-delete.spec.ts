@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openAddForm } from './helpers/add-form';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -37,15 +38,31 @@ function displayDate(daysAgo: number): string {
 }
 
 test('ticks two rows and removes them together', async ({ page }) => {
+  /*
+   * At a desktop width, on both projects, and on purpose.
+   *
+   * What this test is about is removing rows together — creating them first is setup. Below
+   * `md` that setup goes through a sheet that opens, closes itself on submit and has to be
+   * reopened per row, which is behaviour `add-sheet.spec.ts` covers directly and which this
+   * file would otherwise be re-testing by accident, three assertions at a time.
+   */
+  await page.setViewportSize({ width: 1280, height: 900 });
   // Two hand-entered rows, so the test owns everything it is about to delete.
   for (const [index, profit] of [
     [1, '120'],
     [2, '-45'],
   ] as const) {
     await page.goto('/long?book=day');
+    await openAddForm(page, /add a trade/i);
+    /*
+     * The *visible* form. `/long` draws two that carry a symbol field — one for holdings and one
+     * for hand-entered trades — and below `md` each is inside its own sheet, so the first match
+     * in the document is whichever sheet happens to be shut.
+     */
     const form = page
       .locator('form')
       .filter({ has: page.locator('input[name="symbol"]') })
+      .filter({ visible: true })
       .first();
     await form.locator('input[name="symbol"]').fill(SYMBOL);
     await form.locator('input[placeholder="dd/mm/yyyy"]').first().fill(displayDate(index));

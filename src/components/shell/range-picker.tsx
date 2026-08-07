@@ -89,16 +89,38 @@ export function RangePicker({
    * range is everything. Resetting on the range key is the documented way to derive state from
    * props, and it closes the popover exactly when the answer above it changed.
    */
-  const [panel, setPanel] = useState(() => ({ key, open: custom, mode: modeOf(current) }));
+  /*
+   * Arriving on a custom range opens the panel — on a wide screen.
+   *
+   * It exists so a shared link lands on the fields that produced it. Below `lg` that is both
+   * unnecessary and in the way: the trigger *is* the range there, so the panel says nothing new,
+   * and it is a full-width sheet that opens over whatever the page put under it — on the finance
+   * screen, directly over the button for adding an entry.
+   *
+   * Read once, on mount, rather than watched: this decides an initial state, and a panel that
+   * opened or closed itself because a phone was turned sideways is a control moving on its own.
+   */
+  const wideEnough = () =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+
+  const [panel, setPanel] = useState(() => ({ key, open: false, mode: modeOf(current) }));
 
   useEffect(() => {
     setPanel((prev) => {
       if (prev.key !== key) {
-        return { key, open: custom, mode: modeOf(current) };
+        return { key, open: custom && wideEnough(), mode: modeOf(current) };
       }
       return prev;
     });
   }, [key, custom, current]);
+
+  // The first paint has to agree between the server and the client, so the mount-time open is
+  // an effect rather than an initial value.
+  useEffect(() => {
+    if (custom && wideEnough()) setPanel((prev) => ({ ...prev, open: true }));
+    // Once, for the range this mounted on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const anchor = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);

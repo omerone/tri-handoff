@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { AddSheet } from '@/components/ui/add-sheet';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { EmptyState, KPI, Num } from '@/components/ui/kpi';
@@ -292,22 +293,24 @@ export default async function FinancePage({
         }
       >
         <div className="border-line border-b pb-3">
-          <EntryForm
-            labels={{
-              label: t('label'),
-              amount: t('amount'),
-              category: t('category'),
-              date: t('date'),
-              typeIncome: t('typeIncome'),
-              typeExpense: t('typeExpense'),
-              recurring: t('recurring'),
-              recurringHint: t('recurringHint'),
-              add: t('add'),
-            }}
-            categories={{ income: suggestions('income'), expense: suggestions('expense') }}
-            defaultDate={defaultDateFor(period, today)}
-            window={{ from: iso(period.from), to: iso(period.to) }}
-          />
+          <AddSheet label={tBulk('addEntry')}>
+            <EntryForm
+              labels={{
+                label: t('label'),
+                amount: t('amount'),
+                category: t('category'),
+                date: t('date'),
+                typeIncome: t('typeIncome'),
+                typeExpense: t('typeExpense'),
+                recurring: t('recurring'),
+                recurringHint: t('recurringHint'),
+                add: t('add'),
+              }}
+              categories={{ income: suggestions('income'), expense: suggestions('expense') }}
+              defaultDate={defaultDateFor(period, today)}
+              window={{ from: iso(period.from), to: iso(period.to) }}
+            />
+          </AddSheet>
         </div>
 
         {balance.entries.length === 0 ? (

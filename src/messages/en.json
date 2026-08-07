@@ -728,6 +728,9 @@
     "delete": "Delete",
     "confirm": "Delete {count, plural, one {this row} other {these # rows}}? This cannot be undone.",
     "failed": "Those rows could not be deleted. Nothing was removed.",
-    "recurringWarning": "A row that repeats every month goes from every month, including the ones already past."
+    "recurringWarning": "A row that repeats every month goes from every month, including the ones already past.",
+    "addEntry": "Add an entry",
+    "addTrade": "Add a trade",
+    "addPosition": "Add a position"
   }
 }

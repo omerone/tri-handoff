@@ -217,6 +217,19 @@ test.describe('the custom panel', () => {
   const picker = (page: Page) => page.locator('button[aria-controls="tri-range-custom"]');
   const open = (page: Page) => picker(page).click();
 
+  /**
+   * Open it if it is not already.
+   *
+   * Arriving on a custom range opens the panel by itself — on a wide screen, where it lands the
+   * reader on the fields that produced the link they followed. Below `lg` it does not, and
+   * deliberately: the trigger there *is* the range, so the panel would say nothing new while
+   * covering whatever the page put beneath it. What these tests are about is what the panel
+   * shows once it is up, not which of the two brought it there.
+   */
+  async function ensureOpen(page: Page) {
+    if ((await page.locator('#tri-range-custom').count()) === 0) await open(page);
+  }
+
   test('applies a month range', async ({ page }) => {
     await page.goto('/dashboard');
     await open(page);
@@ -264,13 +277,15 @@ test.describe('the custom panel', () => {
 
   test('opens showing the bounds it is responsible for', async ({ page }) => {
     await page.goto('/analytics?range=2026-05..2026-07');
-    // Already open, and stating what is in force rather than making the user go and look.
+    await ensureOpen(page);
+    // Stating what is in force rather than making the reader go and look.
     await expect(page.locator('select[name="fromMonthYear"]')).toBeVisible();
     await expect(page.locator('select[name="toMonthMonth"]')).toHaveValue('7');
   });
 
   test('opens on the dates form when a date range is what is showing', async ({ page }) => {
     await page.goto('/analytics?range=2026-06-01..2026-06-15');
+    await ensureOpen(page);
     await expect(page.locator('input[name="fromDate"]')).toHaveCount(1);
     await expect(page.getByPlaceholder('dd/mm/yyyy').first()).toHaveValue('01/06/2026');
   });
@@ -313,6 +328,7 @@ test.describe('the custom panel', () => {
     // The panel used to stay open across the navigation, leaving a form full of month fields
     // standing under a picker that says the range is everything.
     await page.goto('/dashboard?range=2026-05..2026-07');
+    await ensureOpen(page);
     await expect(page.locator('select[name="fromMonthMonth"]')).toBeVisible();
 
     await choose(page, 'Maximum');

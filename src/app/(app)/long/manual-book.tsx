@@ -1,4 +1,5 @@
 import { getLocale, getTranslations } from 'next-intl/server';
+import { AddSheet } from '@/components/ui/add-sheet';
 import { Card } from '@/components/ui/card';
 import { KPI } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
@@ -29,6 +30,7 @@ import { ManualTradeList, type ManualTradeView } from './manual-trade-list';
 export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
   const session = await requireSession();
   const t = await getTranslations('manual');
+  const tBulk = await getTranslations('bulk');
   const tTable = await getTranslations('table');
   const tEnum = await getTranslations('enum');
   const tJournal = await getTranslations('journal');
@@ -130,9 +132,7 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
     profitPositive: trade.profit >= 0,
     risk: trade.risk === null ? null : money(trade.risk),
     rr:
-      trade.rr === null
-        ? null
-        : `${trade.rr >= 0 ? '+' : ''}${formatNumber(trade.rr, locale, 2)}R`,
+      trade.rr === null ? null : `${trade.rr >= 0 ? '+' : ''}${formatNumber(trade.rr, locale, 2)}R`,
     rrPositive: (trade.rr ?? 0) >= 0,
     journalled: trade.journalled,
     isManual: trade.isManual,
@@ -171,7 +171,11 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
         <KPI
           label={t('winRate')}
           value={metrics.count === 0 ? '—' : `${formatNumber(metrics.winRate, locale, 0)}%`}
-          sub={metrics.count === 0 ? undefined : t('wins', { wins: metrics.wins, total: metrics.count })}
+          sub={
+            metrics.count === 0
+              ? undefined
+              : t('wins', { wins: metrics.wins, total: metrics.count })
+          }
         />
         <KPI
           label={t('avgRr')}
@@ -186,11 +190,9 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
         <p className="text-dim mb-3 text-xs leading-relaxed">{t(`${style}Subtitle`)}</p>
 
         <div className="border-line border-b pb-3">
-          <ManualTradeForm
-            style={style}
-            defaultDate={defaultDate}
-            labels={formLabels}
-          />
+          <AddSheet label={tBulk('addTrade')}>
+            <ManualTradeForm style={style} defaultDate={defaultDate} labels={formLabels} />
+          </AddSheet>
         </div>
 
         <ManualTradeList
@@ -209,7 +211,7 @@ export async function ManualBook({ style }: { style: 'day' | 'swing' }) {
             row: {
               journal: tJournal('title'),
               edit: t('edit'),
-      synced: t('syncedRow'),
+              synced: t('syncedRow'),
               cancel: t('cancel'),
               save: t('save'),
               delete: t('delete'),

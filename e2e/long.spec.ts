@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { closeAddForm, openAddForm } from './helpers/add-form';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -31,15 +32,24 @@ function tile(page: Page, label: string) {
 }
 
 async function addPosition(page: Page, symbol: string) {
+  await openAddForm(page, /add a position/i);
   await page.fill('input[name="symbol"]', symbol);
-  // The symbol box is a search now. `E2E…` matches no listing, which is the manual path this
-  // file is about — dismissing the menu keeps it from floating over the fields below.
-  await page.keyboard.press('Escape');
+  /*
+   * The symbol box is a search now. `E2E…` matches no listing, which is the manual path this
+   * file is about — moving on keeps any menu from floating over the fields below.
+   *
+   * `Tab`, not `Escape`. Below `md` this form is inside a sheet that also closes on Escape, and
+   * a press sent when no menu is open reaches it and shuts the whole form. That is not a
+   * mismatch to paper over: a phone has no Escape key, and what a person does to leave a
+   * suggestion list is go to the next field.
+   */
+  await page.keyboard.press('Tab');
   await page.fill('input[name="qty"]', '10');
   await page.fill('input[name="buyPrice"]', '100');
   await page.fill('input[name="fees"]', '0');
   await page.selectOption('select[name="currency"]', 'USD');
   await page.getByRole('button', { name: 'Add position' }).click();
+  await closeAddForm(page);
   await expect(page.getByRole('cell', { name: symbol, exact: true })).toBeVisible();
 }
 
@@ -95,6 +105,7 @@ test('finds a listing by company name and prices the position from it', async ({
   // The two halves of the feature in one pass: searching by name rather than ticker, and a
   // picked listing coming back as a position the refresh owns rather than the user.
   await page.goto('/long');
+  await openAddForm(page, /add a position/i);
   await page.fill('input[name="symbol"]', 'Microsoft');
 
   // The listing whose *symbol* is MSFT, not the first row that merely mentions it. The
@@ -156,6 +167,8 @@ test('keeps the search icon out of the ticker', async ({ page }) => {
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
 
+  // Hebrew, so the button is named in Hebrew too.
+  await openAddForm(page, /add a position|הוספת פוזיציה/i);
   const input = page.locator('input[name="symbol"]');
   await input.fill('TSLA');
 

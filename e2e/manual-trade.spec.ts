@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openAddForm } from './helpers/add-form';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -38,9 +39,16 @@ function displayDate(daysAgo: number): string {
 test('records a day trade that closed before today', async ({ page }) => {
   await page.goto('/long?book=day');
 
+  await openAddForm(page, /add a trade/i);
+  /*
+   * The *visible* form. `/long` draws two that carry a symbol field — one for holdings and one
+   * for hand-entered trades — and below `md` each is inside its own sheet, so the first match
+   * in the document is whichever sheet happens to be shut.
+   */
   const form = page
     .locator('form')
     .filter({ has: page.locator('input[name="symbol"]') })
+    .filter({ visible: true })
     .first();
   await form.locator('input[name="symbol"]').fill(SYMBOL);
   // The close date only — the open date stays untouched, which is the whole point.
