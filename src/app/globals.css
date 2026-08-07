@@ -347,6 +347,26 @@ button {
  * it, leaving the hint to appear outright — which is the correct answer for anyone who asked
  * for that, not a degraded one.
  */
+/*
+ * A panel growing out of the control that opened it.
+ *
+ * Anchored at the top by `transform-origin`, so it reads as the button unfolding rather than
+ * as a card fading in over the page — the range picker's sheet is attached to its trigger and
+ * the motion should say so. Short, because it is in the way of the thing being chosen.
+ *
+ * The `prefers-reduced-motion` block below turns this off with everything else.
+ */
+@keyframes tri-sheet {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scaleY(0.96);
+  }
+}
+.tri-sheet {
+  animation: tri-sheet 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top center;
+}
+
 @keyframes tri-tip {
   from {
     opacity: 0;
@@ -361,5 +381,20 @@ button {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * The dashboard's "recent trades" keeps six rows on a desktop and four on a phone.
+ *
+ * Trimmed here rather than by slicing the array, because the page is a server component and
+ * the viewport is not a thing it knows: rendering four would give the desktop four as well.
+ * The rows are cheap and the two that go are the two that were pushing the equity curve below
+ * the fold.
+ */
+@media (max-width: 639px) {
+  [data-recent-index='4'],
+  [data-recent-index='5'] {
+    display: none;
   }
 }

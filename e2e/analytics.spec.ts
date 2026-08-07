@@ -130,7 +130,8 @@ test.describe('dashboard', () => {
     expect(await order()).toEqual(['netPnl', 'winRate', 'balance', ...before.slice(3)]);
     await expect(page.locator('[data-widget="balance"]')).toHaveCSS(
       'grid-column-start',
-      wide ? 'span 3' : 'span 6',
+      // The chosen span is only read from `lg`; below it a KPI is three-up whatever is stored.
+      wide ? 'span 3' : 'span 4',
     );
 
     await edit.click();
@@ -156,8 +157,10 @@ test.describe('dashboard', () => {
     await expect(kpi).toHaveCSS('grid-column-start', 'span 4'); // three-up on a tablet
     await expect(panel).toHaveCSS('grid-column-start', 'span 12');
 
+    // Three-up on a phone too. Two-up put eleven tiles over six rows and most of a screen,
+    // when the figures are short and the room was going to the card rather than the number.
     await page.setViewportSize({ width: 375, height: 812 });
-    await expect(kpi).toHaveCSS('grid-column-start', 'span 6'); // two-up on a phone
+    await expect(kpi).toHaveCSS('grid-column-start', 'span 4');
     await expect(panel).toHaveCSS('grid-column-start', 'span 12');
   });
 

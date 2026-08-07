@@ -94,6 +94,11 @@ export default async function DashboardPage({
   const run = streaks(book.trades);
   const balance = book.openingBalance + metrics.net;
 
+  /*
+   * Six on a desktop, four on a phone — and the phone cannot ask, so both are rendered and CSS
+   * drops the tail. The panel answers "what did I just do", which is a glance; the fifth and
+   * sixth rows are what push the equity curve below the fold on a handset.
+   */
   const recent = [...book.trades].slice(-6).reverse();
 
   // Thirty calendar days rather than the last sixty trades: "the last sixty" is a different
@@ -313,9 +318,10 @@ export default async function DashboardPage({
     recent: (
       <Card title={t('dash.recent')}>
         <div className="flex flex-col gap-2">
-          {recent.map((trade) => (
+          {recent.map((trade, index) => (
             <div
               key={trade.id}
+              data-recent-index={index}
               /*
                 One line on a phone, two from `sm`.
                 

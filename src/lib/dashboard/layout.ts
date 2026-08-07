@@ -28,8 +28,7 @@ export const COLUMNS = 12;
  * Every widget the dashboard can show, in the order the prototype lays them out.
  *
  * `kind` drives the fallback width on narrow screens, where the user's chosen span is not
- * used at all: a KPI tile goes two-up on a phone and three-up on a tablet, a panel goes full
- * width. Below the desktop breakpoint the layout is the app's business, not the user's —
+ * used at all: a KPI tile goes three-up, a panel goes full width. Below the desktop breakpoint the layout is the app's business, not the user's —
  * there is no room for a choice, and a 2-column tile the user set would be unreadable.
  */
 export const WIDGETS = {
@@ -77,7 +76,7 @@ export function isWidgetId(value: unknown): value is WidgetId {
  * visible from the desktop breakpoint the rest of the suite renders at.
  */
 export const NARROW_SPAN = {
-  kpi: { base: 6, md: 4 },
+  kpi: { base: 4, md: 4 },
   panel: { base: 12, md: 12 },
 } as const satisfies Record<WidgetKind, { base: number; md: number }>;
 

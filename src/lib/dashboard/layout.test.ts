@@ -279,10 +279,14 @@ describe('the widths used where a chosen span is not', () => {
         expect(COLUMNS % span, `${kind}.${tier} does not divide the grid`).toBe(0);
       }
     }
-    // Two-up on a phone, three-up on a tablet, panels full width at both. A panel dropping to
-    // half width at 768px is the regression this exists to catch: it puts the equity chart's
-    // axis labels on top of each other at a width nothing else in the suite renders at.
-    expect(NARROW_SPAN.kpi).toEqual({ base: 6, md: 4 });
+    // Three-up at both narrow tiers, panels full width at both. A panel dropping to half
+    // width at 768px is the regression this exists to catch: it puts the equity chart's axis
+    // labels on top of each other at a width nothing else in the suite renders at.
+    //
+    // The tiles were two-up on a phone, which put eleven of them over six rows and most of a
+    // screen — the figures are short and the room went to the card around them, not to the
+    // number. Three-up is four rows; `KPI` carries the tighter type that pays for it.
+    expect(NARROW_SPAN.kpi).toEqual({ base: 4, md: 4 });
     expect(NARROW_SPAN.panel).toEqual({ base: 12, md: 12 });
   });
 

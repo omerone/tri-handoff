@@ -66,19 +66,23 @@ export function KPI({
 }) {
   return (
     /*
-      A uniform height on a phone, and it is the whole of "tidy" here.
+      One height for every tile on a phone — 80px, three to a row.
       
-      These sit two to a row, and a tile's height came from its own content: no sub-line and it
-      was 70px, a sub-line that wrapped and it was 105px. Every row was a different height from
-      the one above it, which on a screen that is nothing but tiles reads as broken rather than
-      as dense. A floor makes the grid a grid; a tile with more to say still grows, and its
-      neighbour grows with it because the row already stretches.
+      A tile used to take its height from its own content: seventy pixels with no sub-line,
+      eighty-eight with one, a hundred and five when that line wrapped. Eleven of them two-up
+      was six rows, each a different height from the one above, which on a screen that is
+      nothing but tiles reads as broken rather than as dense.
+      
+      Fixed rather than a floor, because a floor still lets the tallest tile in a row drag its
+      neighbours up and the next row sit lower. The two lines that vary are pinned instead: the
+      label reserves its second line whether it needs it or not, and the sub-line is clamped to
+      one. Both are released at `sm`, where there is width for them.
       
       Tighter padding with it: `py-3` twice over is 24 pixels of nothing on a card whose whole
-      job is one number, repeated eleven times down a phone.
+      job is one number, repeated eleven times down a handset.
     */
     <div
-      className="border-line bg-surface flex min-h-[5.25rem] flex-col rounded-[18px] border px-3 py-2.5 sm:min-h-0 sm:px-4 sm:py-3"
+      className="border-line bg-surface flex h-[5rem] flex-col rounded-[14px] border px-2.5 py-2 sm:h-auto sm:rounded-[18px] sm:px-4 sm:py-3"
       data-tip={title}
     >
       {/*
@@ -91,8 +95,17 @@ export function KPI({
         change to a screen they do not test. Markup nobody needs is still markup somebody
         depends on.
       */}
+      {/*
+        Two lines of room for the label on a phone, used or not.
+
+        Three-up gives a label about a third of the row, so "Drawdown מקסימלי" wraps and
+        "Profit Factor" does not — and the tiles either side of it end up different heights,
+        which is the raggedness this screen keeps coming back to. Reserving the second line
+        costs about twelve pixels a row and makes every tile identical without truncating a
+        single label. It is released at `sm`, where the label has the width to sit on one line.
+      */}
       {info ? (
-        <div className="text-dim flex items-center gap-1 text-xs">
+        <div className="text-dim flex min-h-[2.2em] items-center gap-1 text-[10px] leading-tight sm:min-h-0 sm:text-xs">
           <span className="min-w-0">{label}</span>
           <button
             type="button"
@@ -106,7 +119,7 @@ export function KPI({
           </button>
         </div>
       ) : (
-        <div className="text-dim text-xs">{label}</div>
+        <div className="text-dim min-h-[2.2em] text-[10px] leading-tight sm:min-h-0 sm:text-xs">{label}</div>
       )}
       {/*
         The figure scales with the tile rather than overflowing it: a seven-figure balance at
@@ -115,13 +128,29 @@ export function KPI({
       */}
       <div
         className={`leading-tight font-bold ${TONE_CLASS[tone]}`}
-        style={{ fontSize: 'clamp(17px, 5.6vw, 22px)' }}
+        /*
+          Three-up changes the arithmetic this clamp exists for. The tile is a third of the
+          row, so a seven-figure balance has about 72px on a 320px screen rather than 170 —
+          the floor drops to 13px and the ceiling stays where the desktop wants it.
+        */
+        style={{ fontSize: 'clamp(13px, 4.4vw, 22px)' }}
       >
         <Num>{value}</Num>
       </div>
-      {/* `mt-auto` rather than a fixed gap: with a floor on the tile the slack has to go
-          somewhere, and under the figure is the only place it does not look like a mistake. */}
-      {sub ? <div className="text-dim mt-auto pt-0.5 text-[11px]">{sub}</div> : null}
+      {sub ? (
+        /*
+          One line, clamped, on a phone.
+          
+          The last of the raggedness was here: some tiles have no sub-line, some have one, and
+          "longest: 4 wins · 6 losses" takes two. With a fixed tile height the variation has to
+          go somewhere, and the honest place is the least important line on the card — the
+          headline is the figure above it. Released at `sm`, where the tile grows to its
+          content and the whole sentence fits anyway.
+        */
+        <div className="text-dim mt-auto line-clamp-1 pt-0.5 text-[10px] leading-tight sm:line-clamp-none sm:text-[11px]">
+          {sub}
+        </div>
+      ) : null}
     </div>
   );
 }
