@@ -25,7 +25,16 @@ export function SettingRow({
 }) {
   return (
     <div className="border-line flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b py-3 last:border-b-0 last:pb-0 first:pt-0">
-      <div className="min-w-0 flex-1">
+      {/*
+        `basis-56`, not `flex-1`.
+
+        `flex-1` is `flex: 1 1 0%`, and a basis of zero never asks for room — so on a phone the
+        four-option currency control kept its full width and the text beside it was squeezed to
+        about seventy pixels: "The / exchange / rate / is / fetched", one word per line, eleven
+        lines deep. The row wraps only when a child's basis does not fit, so the text has to
+        claim a width worth reading at before it will give up the line.
+      */}
+      <div className="min-w-0 flex-[1_1_14rem]">
         <div className="text-text text-[13px] font-semibold">{label}</div>
         {description ? (
           <div className="text-dim mt-0.5 text-[11px] leading-relaxed">{description}</div>

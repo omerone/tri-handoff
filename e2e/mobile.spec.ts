@@ -13,17 +13,39 @@ import { expect, test, type Page } from '@playwright/test';
  * desktop layout that technically renders at 375px and cannot be read there.
  */
 
-const ROUTES = ['/dashboard', '/analytics', '/trades', '/calendar', '/finance', '/long', '/settings'];
+const ROUTES = [
+  '/dashboard',
+  '/analytics',
+  '/trades',
+  '/calendar',
+  '/finance',
+  '/long',
+  '/settings',
+];
+
+/**
+ * The narrowest phone worth supporting, checked as well as the project's own device.
+ *
+ * This file says it measures at 375px and did not: the mobile project is a Pixel 7, which is
+ * 412 wide, and 37 pixels is the whole margin some of these layouts have. The settings page
+ * overflowed to 405px — invisible at 412, a sideways scroll on any iPhone since the 12. The
+ * sweep below now runs at both widths, because the bug was never that the layout is broken,
+ * only that it is broken *narrower than we were looking*.
+ */
+const NARROW = 375;
 
 /** True when the page as a whole scrolls sideways — never correct, at any width. */
 const scrollsSideways = (page: Page) =>
-  page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+  );
 
 test.describe('on a phone', () => {
   test.skip(({ viewport }) => (viewport?.width ?? 0) >= 768, 'the desktop project covers the rest');
 
   for (const route of ROUTES) {
     test(`${route} fits the screen`, async ({ page }) => {
+      await page.setViewportSize({ width: NARROW, height: page.viewportSize()?.height ?? 800 });
       await page.goto(route);
       await expect(page.locator('main')).toBeVisible();
       expect(await scrollsSideways(page), `${route} scrolls sideways`).toBe(false);
@@ -44,7 +66,9 @@ test.describe('on a phone', () => {
             return r.width > 0 && r.height > 0 && (r.right > vw + 1 || r.left < -1);
           })
           .slice(0, 3)
-          .map((el) => `${el.tagName.toLowerCase()}.${(el.className || '').toString().slice(0, 40)}`);
+          .map(
+            (el) => `${el.tagName.toLowerCase()}.${(el.className || '').toString().slice(0, 40)}`,
+          );
       });
       expect(escaped, `${route} has elements past the viewport edge`).toEqual([]);
     });

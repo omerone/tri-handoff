@@ -11,7 +11,7 @@ import { listMt5Accounts } from '@/lib/db';
 import { getTwoFactorState } from '@/lib/db/two-factor';
 import type { Locale } from '@/i18n/config';
 import { asCurrency, formatMoney } from '@/lib/money/currency';
-import { formatDateTimeAt } from '@/lib/time/format';
+import { formatDateAt, formatDateTimeAt, formatTimeAt } from '@/lib/time/format';
 
 export default async function SettingsPage() {
   const session = await requireSession();
@@ -45,7 +45,11 @@ export default async function SettingsPage() {
     label: account.label,
     purpose: account.purpose,
     status: account.status,
-    lastSync: account.lastSyncAt ? formatDateTimeAt(account.lastSyncAt) : null,
+    // Two fields rather than one string: the card has a third of its width for this and needs
+    // somewhere to break. Same formatters, same timezone, same result read end to end.
+    lastSync: account.lastSyncAt
+      ? { date: formatDateAt(account.lastSyncAt), time: formatTimeAt(account.lastSyncAt) }
+      : null,
     balance: money(account.balance, account.accountCurrency),
     equity: money(account.equity, account.accountCurrency),
   }));
