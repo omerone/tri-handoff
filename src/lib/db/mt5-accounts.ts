@@ -205,6 +205,8 @@ export async function readCredentialCiphertexts(ctx: TenantContext): Promise<
     investorPwEncrypted: string;
     providerAccountId: string | null;
     purpose: TradeStyle | null;
+    /** What the account is denominated in; null until its first successful sync. */
+    accountCurrency: string | null;
   }[]
 > {
   assertContext(ctx);
@@ -224,6 +226,7 @@ export async function readCredentialCiphertexts(ctx: TenantContext): Promise<
       investorPwEncrypted: true,
       providerAccountId: true,
       purpose: true,
+      accountCurrency: true,
     },
   });
 }

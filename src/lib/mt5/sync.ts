@@ -75,9 +75,21 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
   let updated = 0;
   let accountCurrency: string | null = null;
   const failures: string[] = [];
-  // Per account, not one for the run: a trader can hold a dollar account and a euro one, and
-  // pricing either one's trades in the other's currency is a wrong number that looks fine.
+
+  /*
+   * Per account, not one for the run, and seeded from what is already stored.
+   *
+   * Per account because a trader can hold a dollar account and a euro one, and pricing either
+   * one's trades in the other's currency is a wrong number that looks entirely fine. Seeded
+   * from the stored rows because the repair below needs nothing from the broker — only what
+   * the account is denominated in, which the last successful sync already wrote down. Taking
+   * it from this run's results instead meant a broker that answered 429 skipped the repair
+   * too, and the trades it exists to rescue are exactly the ones no broker will ever mention.
+   */
   const currencyByAccount = new Map<string, string>();
+  for (const stored of accounts) {
+    if (stored.accountCurrency) currencyByAccount.set(stored.id, stored.accountCurrency);
+  }
 
   for (const stored of accounts) {
     try {
@@ -96,28 +108,25 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
     }
   }
 
-  if (failures.length === accounts.length) {
-    const message = failures.join('; ');
-    await finishSyncLog(ctx, logId, { status: 'error', error: message });
-    return { status: 'error', message };
-  }
-
   /*
-   * Trades the loop above could not have touched.
+   * Trades the loop above could not have touched — run whether or not it succeeded.
    *
    * `upsertTrades` matches on `(userId, mt5AccountId, ticket)`, so a row whose account link was
-   * cleared by an old disconnect is invisible to every sync that will ever run — and the client
-   * whose report started this had 48 of those, 37 with a valid stop and no risk. Repairing them
-   * is not part of importing from a broker, but this is the only moment the app knows both that
-   * a user is looking and what their account is denominated in.
-   *
-   * Each account's own currency goes with it, and an account that failed this run contributes
-   * none — so its trades are left rather than priced against a neighbour's denomination.
+   * cleared by an old disconnect is invisible to every sync that will ever run. The client whose
+   * report started this had 48 of those, 37 with a valid stop and no risk. Repairing them is not
+   * part of importing from a broker and does not need one — which is why it sits above the
+   * early return: the run that most needs it is the one where the broker is refusing to answer.
    */
   if (currencyByAccount.size > 0) {
     const repaired = await repairMissingRisk(ctx, currencyByAccount);
     if (repaired > 0)
       console.warn('[mt5] priced', repaired, 'trade(s) that had a stop but no risk');
+  }
+
+  if (failures.length === accounts.length) {
+    const message = failures.join('; ');
+    await finishSyncLog(ctx, logId, { status: 'error', error: message });
+    return { status: 'error', message };
   }
 
   await finishSyncLog(ctx, logId, {

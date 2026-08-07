@@ -197,6 +197,43 @@ describe('the trades no sync can reach', () => {
     );
   });
 
+  it('prices them even when the broker refuses to answer', async () => {
+    /*
+     * The run that most needs the repair is the one where the sync failed.
+     *
+     * Production had a `429 too many undeployed trading accounts` from MetaApi the day before
+     * this shipped. With the repair keyed to a successful run, that reply would have skipped it
+     * — and the trades it exists to rescue are precisely the ones no broker will ever mention
+     * again, so a broker being unreachable is no reason to leave them blank. The currency comes
+     * from the stored account row, which the last good sync already wrote down.
+     */
+    await resync();
+    await testDb.trade.update({
+      where: { id: tradeId },
+      data: { mt5AccountId: null, risk: null, rr: null },
+    });
+
+    // What an unreachable broker leaves behind: credentials that decrypt to nothing usable.
+    const good = await testDb.mt5Account.findUniqueOrThrow({
+      where: { id: accountId },
+      select: { investorPwEncrypted: true },
+    });
+    await testDb.mt5Account.update({
+      where: { id: accountId },
+      data: { investorPwEncrypted: 'v1.not.decryptable' },
+    });
+
+    try {
+      const outcome = await syncMt5(fixture.ctx, 'manual');
+      expect(outcome.status, 'the premise of this test has changed').toBe('error');
+
+      const after = await stored();
+      expect(after.risk, 'a failed broker call skipped the repair as well').not.toBeNull();
+    } finally {
+      await testDb.mt5Account.update({ where: { id: accountId }, data: good });
+    }
+  });
+
   it('leaves a hand-entered trade alone', async () => {
     /*
      * The entry price is optional on the manual form and a blank one is stored as zero, so the
