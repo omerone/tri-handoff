@@ -547,7 +547,10 @@
     ],
     "noTrades": "—",
     "prevMonth": "Previous month",
-    "nextMonth": "Next month"
+    "nextMonth": "Next month",
+    "dayTrades": "The day's trades",
+    "openTrade": "Open this trade",
+    "close": "Close"
   },
   "error": {
     "unknownTenant": "This domain isn't connected to an active TRi account.",

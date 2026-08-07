@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openAddForm } from './helpers/add-form';
+import { closeAddForm, openAddForm } from './helpers/add-form';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -58,6 +58,11 @@ test('records a day trade that closed before today', async ({ page }) => {
   await form.getByRole('button', { name: 'Add' }).click();
 
   await expect(form.getByText('The open date is later than the close date.')).toHaveCount(0);
+
+  // The sheet stays up after a submit — deliberately, so several trades can be entered in a
+  // row — and while it is up it is a modal over the page. Reading the row back is a different
+  // job from writing it, so the form is put away first.
+  await closeAddForm(page);
 
   // It landed in the shared book, with the R multiple the typed risk implies.
   //

@@ -56,9 +56,13 @@ test.describe('the calendar on a phone', () => {
     await page.goto('/calendar?m=2026-07');
 
     const listed = await page.locator('main ul > li').filter({ visible: true }).count();
-    // A traded square is the one carrying a coloured dot; an empty one has nothing but its
-    // number. Counted from the markup rather than from the colour, which a theme can change.
-    const traded = await page.locator('main .grid > div:has([aria-hidden].rounded-full)').count();
+    /*
+     * A traded day is one that opens. Since the squares became buttons that show the day's
+     * trades, that is the same set as "has a dot" and a far more stable thing to name — the
+     * dot is markup, and this locator was already reading it through `.grid > div`, which
+     * stopped matching the moment a wrapper went round the square.
+     */
+    const traded = await page.locator('main button[aria-controls][aria-haspopup="dialog"]').count();
 
     expect(traded, 'no traded days in the grid to compare against').toBeGreaterThan(0);
     expect(listed, 'the list and the grid disagree about which days were traded').toBe(traded);

@@ -87,9 +87,7 @@ test.describe('theme', () => {
       page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
     const dark = await background();
 
-    await page.context().addCookies([
-      { name: 'tri_theme', value: 'light', url: page.url() },
-    ]);
+    await page.context().addCookies([{ name: 'tri_theme', value: 'light', url: page.url() }]);
     await page.reload();
 
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');

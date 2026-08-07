@@ -547,7 +547,10 @@
     ],
     "noTrades": "—",
     "prevMonth": "חודש קודם",
-    "nextMonth": "חודש הבא"
+    "nextMonth": "חודש הבא",
+    "dayTrades": "עסקאות היום",
+    "openTrade": "פתיחת העסקה",
+    "close": "סגירה"
   },
   "error": {
     "unknownTenant": "הדומיין הזה אינו מחובר לחשבון TRi פעיל.",
