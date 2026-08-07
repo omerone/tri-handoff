@@ -440,55 +440,13 @@ export async function ticketsWithExcursions(
   return new Set(rows.map((row) => row.ticket));
 }
 
-/**
- * One value or several, because every dropdown on the trades screen now takes several.
- *
- * `undefined` and an empty array both mean "not filtering on this" — an empty array is what a
- * trader who unticked the last box leaves behind, and reading it as "match nothing" would turn
- * clearing a filter into an empty table.
- */
-export type OneOrMany<T> = T | readonly T[];
-
-/** A single value, an `in` list, or nothing at all. */
-function oneOf<T>(value: OneOrMany<T> | undefined): T | { in: T[] } | undefined {
-  if (value === undefined) return undefined;
-  if (!Array.isArray(value)) return value as T;
-  const list = [...(value as readonly T[])];
-  return list.length === 0 ? undefined : { in: list };
-}
-
-/** `{ [key]: predicate }`, or nothing when there is no predicate to apply. */
-const spread = <T,>(key: string, predicate: T | { in: T[] } | undefined) =>
-  predicate === undefined ? {} : { [key]: predicate };
-
-/**
- * Which book a row came from, as a `where`.
- *
- * `'manual'` and `'mt5'` are ticket namespaces rather than the account column — see the note
- * on the field. Choosing both is choosing neither: it selects the whole book, so it drops out
- * rather than becoming an impossible `AND` of two opposite prefixes.
- */
-function sourceClause(value: TradeFilter['mt5AccountId']): Prisma.TradeWhereInput {
-  if (value === undefined) return {};
-  const list = [value].flat();
-  if (list.length === 0) return {};
-
-  const manual = list.includes('manual');
-  const mt5 = list.includes('mt5');
-  const accounts = list.filter((entry) => entry !== 'manual' && entry !== 'mt5');
-
-  if (manual && mt5 && accounts.length === 0) return {};
-  if (accounts.length > 0) return { mt5AccountId: { in: accounts } };
-  return manual ? MANUAL_ONLY : SYNCED_ONLY;
-}
-
 export type TradeFilter = {
-  assetClass?: OneOrMany<AssetClass>;
-  direction?: OneOrMany<Direction>;
-  style?: OneOrMany<TradeStyle>;
+  assetClass?: AssetClass;
+  direction?: Direction;
+  style?: TradeStyle;
   symbol?: string;
-  strategy?: OneOrMany<string>;
-  tag?: OneOrMany<string>;
+  strategy?: string;
+  tag?: string;
   from?: Date;
   to?: Date;
   /** Free text, matched across the symbol and everything the trader wrote. See `textSearch`. */
@@ -506,7 +464,7 @@ export type TradeFilter = {
    * exactly what happened here: one press of disconnect left forty-nine synced trades with a
    * null account. The prefix survives that, because it is on the row itself.
    */
-  mt5AccountId?: OneOrMany<string | 'manual' | 'mt5'>;
+  mt5AccountId?: string | 'manual' | 'mt5';
 };
 
 /**
@@ -551,8 +509,6 @@ function whereClause(
   if (filter.to) closeAt.lte = filter.to;
   if (options.closedOnly) closeAt.not = null;
 
-  const tags = filter.tag === undefined ? [] : [filter.tag].flat();
-
   return {
     userId: ctx.userId,
     // Belt and braces: a context is only ever minted from a verified tenant/user pair, but
@@ -560,15 +516,23 @@ function whereClause(
     user: { tenantId: ctx.tenantId },
     // Analytics is about trading performance; deposits and withdrawals are not trades.
     kind: 'trade',
-    ...spread('assetClass', oneOf(filter.assetClass)),
-    ...spread('direction', oneOf(filter.direction)),
-    ...spread('style', oneOf(filter.style)),
+    ...(filter.assetClass ? { assetClass: filter.assetClass } : {}),
+    ...(filter.direction ? { direction: filter.direction } : {}),
+    ...(filter.style ? { style: filter.style } : {}),
     ...(filter.symbol ? { symbol: filter.symbol } : {}),
-    ...spread('strategy', oneOf(filter.strategy)),
-    // `hasSome` rather than `has`: a trade carries a list of tags and the filter is now a list
-    // too, so the question is whether the two overlap.
-    ...(tags.length > 0 ? { tags: { hasSome: tags } } : {}),
-    ...sourceClause(filter.mt5AccountId),
+    ...(filter.strategy ? { strategy: filter.strategy } : {}),
+    ...(filter.tag ? { tags: { has: filter.tag } } : {}),
+    ...(filter.mt5AccountId === undefined
+      ? {}
+      : filter.mt5AccountId === 'manual'
+        ? MANUAL_ONLY
+        : // `'mt5'` is every broker account rather than a named one, and it is the ticket
+          // namespace for the same reason `'manual'` is: a disconnect sets the foreign key
+          // null, so keying on the column would drop a whole imported history the moment its
+          // connection was removed.
+          filter.mt5AccountId === 'mt5'
+          ? SYNCED_ONLY
+          : { mt5AccountId: filter.mt5AccountId }),
     ...(filter.query ? { OR: textSearch(filter.query) } : {}),
     ...(Object.keys(closeAt).length > 0 ? { closeAt } : {}),
   };

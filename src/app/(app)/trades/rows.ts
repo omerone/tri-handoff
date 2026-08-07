@@ -147,21 +147,21 @@ export type TableRow = {
 };
 
 export type RowFilter = {
-  assetClass?: readonly AssetClass[];
-  direction?: readonly Direction[];
-  style?: readonly RowStyle[];
+  assetClass?: AssetClass;
+  direction?: Direction;
+  style?: RowStyle;
   /**
    * Only deals carry these, so narrowing by either excludes every holding — a position has
    * no strategy and no tags to match, and showing it anyway would answer a question it was
    * never asked.
    */
-  strategy?: readonly string[];
-  tag?: readonly string[];
+  strategy?: string;
+  tag?: string;
   /**
    * Who produced the row's figures. A holding is always the trader's own, so narrowing to the
    * broker's excludes every one of them — which is the honest answer, not an omission.
    */
-  source?: readonly ('mt5' | 'manual')[];
+  source?: 'mt5' | 'manual';
   /**
    * The free-text box. The deals were already narrowed by it in SQL — see `textSearch` in
    * db/trades.ts — so this only has to decide the holdings, and a holding has none of the
@@ -257,15 +257,11 @@ async function positionRows(
   });
 }
 
-/** An empty list is no filter at all, the same rule the query layer follows. */
-const permits = <T,>(chosen: readonly T[] | undefined, value: T): boolean =>
-  chosen === undefined || chosen.length === 0 || chosen.includes(value);
-
 function matches(row: TableRow, filter: RowFilter): boolean {
-  if (!permits(filter.assetClass, row.assetClass)) return false;
-  if (!permits(filter.direction, row.direction)) return false;
-  if (!permits(filter.style, row.style)) return false;
-  if (!permits(filter.source, row.source)) return false;
+  if (filter.assetClass && row.assetClass !== filter.assetClass) return false;
+  if (filter.direction && row.direction !== filter.direction) return false;
+  if (filter.style && row.style !== filter.style) return false;
+  if (filter.source && row.source !== filter.source) return false;
   if (filter.query && !row.symbol.toLowerCase().includes(filter.query.toLowerCase())) return false;
   return true;
 }
@@ -285,13 +281,12 @@ export async function toRows(
   // A strategy filter is a question about deals, so no holding can answer it, and narrowing
   // to a deal style excludes them for the same reason. Narrowing to `long` is the mirror
   // image: it asks for holdings, so no deal qualifies.
-  const styles = options.filter.style ?? [];
   const includePositions =
-    (options.filter.strategy ?? []).length === 0 &&
-    (options.filter.tag ?? []).length === 0 &&
-    // A holding survives while `long` is among the styles asked for, or while none was.
-    (styles.length === 0 || styles.includes('long'));
-  const includeTrades = styles.length === 0 || styles.some((style) => style !== 'long');
+    !options.filter.strategy &&
+    !options.filter.tag &&
+    options.filter.style !== 'day' &&
+    options.filter.style !== 'swing';
+  const includeTrades = options.filter.style !== 'long';
 
   const rows = includeTrades ? trades.map(tradeRow) : [];
   if (includePositions) {
