@@ -573,8 +573,33 @@ export class MetaApiProvider implements Mt5Provider {
     }
   }
 
-  async fetchAccountState(credentials: Mt5Credentials): Promise<Mt5AccountState> {
+  /**
+   * The account id to read against, with the terminal actually running behind it.
+   *
+   * `resolveAccountId` returns a stored `providerAccountId` without a single request — that is
+   * the point of the column — and for a *provisioned* account that is right. It is not enough
+   * to *read* against, because `release` stops the terminal at the end of every sync to drop
+   * the meter from $9.20 a month to $0.77. So by the time the next refresh runs, the account
+   * is `UNDEPLOYED` and every client call answers 504 "not connected to broker yet".
+   *
+   * `release` tries to cover this by forgetting its memo entry so the next sync provisions
+   * again — but the stored id short-circuits ahead of the memo, so that never fires once an
+   * account has been connected. The result was the worst kind of broken: the first sync after
+   * connecting worked, and every refresh after it failed, for as long as the account existed.
+   *
+   * `waitUntilReady` is the cheap thing to call here rather than the careful one. Deployed and
+   * connected, it costs a single GET and returns on the first poll; stopped, it sends the one
+   * `deploy` that is needed and sits through the minute the terminal takes to reach the
+   * broker, which is exactly the wake-up cost the release comment budgets for.
+   */
+  private async readableAccountId(credentials: Mt5Credentials): Promise<string> {
     const accountId = await this.resolveAccountId(credentials);
+    await this.waitUntilReady(accountId, Date.now() + this.readyTimeoutMs);
+    return accountId;
+  }
+
+  async fetchAccountState(credentials: Mt5Credentials): Promise<Mt5AccountState> {
+    const accountId = await this.readableAccountId(credentials);
     const info = await this.request<{
       balance: number;
       equity: number;
@@ -598,7 +623,7 @@ export class MetaApiProvider implements Mt5Provider {
     credentials: Mt5Credentials,
     options: FetchDealsOptions = {},
   ): Promise<Mt5Deal[]> {
-    const accountId = await this.resolveAccountId(credentials);
+    const accountId = await this.readableAccountId(credentials);
     // No `since` means the first connect: pull the whole history. MT5 keeps it all, which is
     // what makes the backfill in SPEC §3.6 possible without touching the old journal.
     const from = (options.since ?? new Date('2000-01-01T00:00:00Z')).toISOString();
@@ -676,7 +701,10 @@ export class MetaApiProvider implements Mt5Provider {
     credentials: Mt5Credentials,
     symbols: string[],
   ): Promise<SymbolSpecOverride[]> {
-    const accountId = await this.resolveAccountId(credentials);
+    // Same client API, same requirement. In a normal sync the deals fetch has already woken
+    // the terminal and this costs one GET that returns on the first poll; it is here so that a
+    // caller which asks for specs on their own does not 504 for want of a deploy.
+    const accountId = await this.readableAccountId(credentials);
 
     const specs = await Promise.all(
       symbols.map(async (symbol) => {

@@ -187,7 +187,9 @@ describe('waiting for the account to come up', () => {
     const state = await provider().fetchAccountState(credentials);
 
     expect(state.balance).toBe(10_000);
-    expect(poll).toBe(3);
+    // Three to come up, and a fourth from the read path confirming it is still up — see
+    // `readableAccountId`. The fourth is the one that answers on its first poll.
+    expect(poll).toBe(4);
     // DEPLOYING is on its way up; deploying it again would be noise.
     expect(calls.some((call) => call.url.endsWith('/deploy'))).toBe(false);
   });
@@ -236,8 +238,20 @@ describe('waiting for the account to come up', () => {
 });
 
 describe('finding an account that already exists', () => {
-  it('skips every lookup when the stored provider account id is passed in', async () => {
-    const calls = mockFetch(() => ({ body: ACCOUNT_INFO }));
+  /*
+   * A stored id skips the *lookup*, not the readiness check.
+   *
+   * It used to skip both, and that was the whole of a bug worth remembering: `release` stops
+   * the terminal at the end of every sync to drop the meter, so the account is `UNDEPLOYED`
+   * by the time the next refresh runs. Going straight to the client API against a stopped
+   * terminal answers 504 — the first sync after connecting worked and every one after it
+   * failed, on a live account, for as long as the account existed.
+   */
+  it('skips the lookup for a stored provider account id, but still waits for the terminal', async () => {
+    const calls = mockFetch((call) => {
+      if (call.url.includes('account-information')) return { body: ACCOUNT_INFO };
+      return { body: { ...READY, _id: 'acc-stored' } };
+    });
 
     const state = await provider().fetchAccountState({
       ...credentials,
@@ -245,8 +259,12 @@ describe('finding an account that already exists', () => {
     });
 
     expect(state.balance).toBe(10_000);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.url).toContain('/users/current/accounts/acc-stored/account-information');
+    // No `?query=` search: the id was known.
+    expect(calls.some((call) => call.url.includes('?query='))).toBe(false);
+    // One readiness check, then the read.
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.url).toContain('/users/current/accounts/acc-stored');
+    expect(calls[1]?.url).toContain('/users/current/accounts/acc-stored/account-information');
   });
 
   it('looks the account up once per sync, not once per call', async () => {
@@ -370,7 +388,9 @@ describe('reading the history', () => {
         const offset = Number(new URL(call.url).searchParams.get('offset'));
         return { body: offset === 0 ? page(0, 1000) : page(1000, 7) };
       }
-      return { body: ACCOUNT_INFO };
+      // The read path confirms the terminal is up before asking for history.
+      if (call.url.includes('account-information')) return { body: ACCOUNT_INFO };
+      return { body: READY };
     });
 
     const deals = await provider().fetchDeals({ ...credentials, providerAccountId: 'acc-1' });
