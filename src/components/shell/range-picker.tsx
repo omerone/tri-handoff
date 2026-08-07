@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { ChevronDown } from 'lucide-react';
+import { CalendarRange, ChevronDown } from 'lucide-react';
 import { applyRangeAction } from '@/app/actions/range';
 import { DateField } from '@/components/ui/date-field';
 import type { Locale } from '@/i18n/config';
@@ -163,15 +163,22 @@ export function RangePicker({
      * the whole group hung 33px off the side of every screen in the app. Wrapping costs one
      * line on a phone and nothing at all above it, where the row has always fitted.
      */
-    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-2 md:w-auto md:justify-end">
       <>
         {/* No label and no icon. The buttons say "maximum", "this month", "last month" and
             name the custom range outright, so a heading in front of them was restating what
             they already read as. The group keeps its `aria-label`, so a screen reader — which
             cannot see that the buttons are a set — is told what they are for. */}
-        <form action={applyRangeAction}>
+        {/* The presets take the phone's width and split it evenly, rather than sitting in a
+            huddle at one end of an empty row. Above `md` they keep their natural widths, where
+            the row is shared with the tabs and a stretched group would push them about. */}
+        <form action={applyRangeAction} className="min-w-0 flex-1 md:flex-none">
           <Where path={pathname} query={query} />
-          <div role="group" aria-label={labels.title} className={`${group} inline-flex`}>
+          <div
+            role="group"
+            aria-label={labels.title}
+            className={`${group} flex w-full md:inline-flex md:w-auto`}
+          >
             {RANGE_PRESETS.map((preset) => (
               <button
                 key={preset}
@@ -179,7 +186,7 @@ export function RangePicker({
                 name="intent"
                 value={presetToken(preset)}
                 aria-pressed={current.kind === preset}
-                className={segment(current.kind === preset)}
+                className={`${segment(current.kind === preset)} min-w-0 flex-1 md:flex-none`}
               >
                 {labels.presets[preset]}
               </button>
@@ -195,11 +202,17 @@ export function RangePicker({
             aria-haspopup="dialog"
             aria-controls="tri-range-custom"
             onClick={() => setPanel((state) => ({ ...state, open: !state.open }))}
-            className={`tri-tap border-line inline-flex min-h-9 items-center gap-1.5 rounded-[10px] border px-3 py-1.5 text-[13px] ${
+            aria-label={labels.custom}
+            className={`tri-tap border-line inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 py-1.5 text-[13px] ${
               custom ? 'bg-brand font-bold text-white' : 'bg-raised text-dim font-medium'
             }`}
           >
-            {labels.custom}
+            {/* An icon on a phone, where "custom range" is seventy-nine pixels of a screen
+                that has three presets to fit beside it — and where the line below now says
+                what the range actually is, which is what the words were standing in for.
+                The button keeps the name for anything that cannot see the icon. */}
+            <CalendarRange size={14} aria-hidden className="md:hidden" />
+            <span className="hidden md:inline">{labels.custom}</span>
             <ChevronDown size={13} aria-hidden className={panel.open ? 'rotate-180' : undefined} />
           </button>
 
@@ -305,7 +318,16 @@ export function RangePicker({
           // `dir="ltr"` for the same reason `Num` sets it: `01/01/2026 – 31/03/2026` is a
           // left-to-right run, and inside the Hebrew layout the neutral slashes and dash let
           // the endpoints swap places.
-          <span dir="ltr" className="text-dim hidden text-[11px] md:inline">
+          /*
+           * Shown on a phone too, and on its own line there.
+           *
+           * It was `hidden md:inline`, so the one screen where the custom trigger had no room
+           * for its own label was also the one screen that never said which dates were being
+           * read. A trader who set a range on Tuesday came back on Thursday to three unlit
+           * presets and no way to tell what they were looking at without opening the popover.
+           * `w-full` puts it under the buttons rather than fighting them for the row.
+           */
+          <span dir="ltr" className="text-dim w-full text-[11px] md:w-auto md:text-start">
             {summary}
           </span>
         ) : null}
