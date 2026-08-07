@@ -260,6 +260,8 @@
   },
   "table": {
     "filter": "Filter",
+    "filterDone": "Show results",
+    "filterClose": "Close filters",
     "all": "All",
     "symbol": "Symbol",
     "assetClass": "Asset class",

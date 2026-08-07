@@ -260,6 +260,8 @@
   },
   "table": {
     "filter": "סינון",
+    "filterDone": "הצג תוצאות",
+    "filterClose": "סגירת הסינון",
     "all": "הכול",
     "symbol": "נכס",
     "assetClass": "סוג נכס",

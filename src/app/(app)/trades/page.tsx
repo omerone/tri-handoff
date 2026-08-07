@@ -15,6 +15,7 @@ import { formatDateAt, formatTimeAt } from '@/lib/time/format';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { toTradeFilter } from '@/lib/time/range';
 import { displayMoney } from '@/lib/money/display';
+import { FilterSheet } from '@/components/ui/filter-sheet';
 import { TradeFilters } from './filters';
 import {
   DEFAULT_SORT,
@@ -247,6 +248,22 @@ export default async function TradesPage({
   };
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  /*
+   * How many filters are narrowing the table, for the badge on the phone's filter button.
+   *
+   * Counted as *filters*, not as values: "crypto and indices" is one decision the trader made
+   * and one thing to undo. The search box is not in it — it is visible in the row at every
+   * size, so it is never the hidden thing the badge exists to disclose.
+   */
+  const activeFilters = [
+    params.class,
+    params.dir,
+    params.style,
+    params.strategy,
+    params.tag,
+    params.source,
+  ].filter((value) => (value ?? '').trim() !== '' && value !== 'all').length;
+
   const align = rtl ? 'text-right' : 'text-left';
 
   return (
@@ -258,38 +275,55 @@ export default async function TradesPage({
             placeholder={t('table.searchHint')}
             clear={t('table.searchClear')}
           />
-          <TradeFilters
-            current={{
-              class: params.class ?? '',
-              dir: params.dir ?? '',
-              style: params.style ?? '',
-              strategy: params.strategy ?? '',
-              tag: params.tag ?? '',
-              source: params.source ?? '',
+          {/*
+            Everything but the search folds behind one button on a phone.
+
+            The count on that button is the point of it: a filter you cannot see is a filter
+            you forget is on, and "no trades match" then reads as an empty book. Search stays
+            in the row because it is the control people reach for most and it costs one line.
+          */}
+          <FilterSheet
+            title={t('table.filter')}
+            active={activeFilters}
+            labels={{
+              open: t('table.filter'),
+              close: t('table.filterClose'),
+              done: t('table.filterDone'),
             }}
-            options={{
-              all: t('table.all'),
-              allStrategies: t('table.allStrategies'),
-              names: {
-                class: t('table.assetClass'),
-                direction: t('table.direction'),
-                style: t('table.style'),
-                strategy: t('table.strategy'),
-                tag: t('journal.tags'),
-                source: t('trades.source.label'),
-              },
-              classes: ASSET_CLASSES.map((key) => [key, t(`enum.assetClass.${key}`)] as const),
-              directions: DIRECTIONS.map((key) => [key, t(`enum.direction.${key}`)] as const),
-              styles: ROW_STYLES.map((key) => [key, t(`enum.style.${key}`)] as const),
-              sources: [
-                ['mt5', t('trades.source.mt5')],
-                ['manual', t('trades.source.manual')],
-              ] as const,
-              strategies: vocabulary.strategies.map((value) => [value, value] as const),
-              tags: vocabulary.tags.map((value) => [value, value] as const),
-              allTags: t('table.all'),
-            }}
-          />
+          >
+            <TradeFilters
+              current={{
+                class: params.class ?? '',
+                dir: params.dir ?? '',
+                style: params.style ?? '',
+                strategy: params.strategy ?? '',
+                tag: params.tag ?? '',
+                source: params.source ?? '',
+              }}
+              options={{
+                all: t('table.all'),
+                allStrategies: t('table.allStrategies'),
+                names: {
+                  class: t('table.assetClass'),
+                  direction: t('table.direction'),
+                  style: t('table.style'),
+                  strategy: t('table.strategy'),
+                  tag: t('journal.tags'),
+                  source: t('trades.source.label'),
+                },
+                classes: ASSET_CLASSES.map((key) => [key, t(`enum.assetClass.${key}`)] as const),
+                directions: DIRECTIONS.map((key) => [key, t(`enum.direction.${key}`)] as const),
+                styles: ROW_STYLES.map((key) => [key, t(`enum.style.${key}`)] as const),
+                sources: [
+                  ['mt5', t('trades.source.mt5')],
+                  ['manual', t('trades.source.manual')],
+                ] as const,
+                strategies: vocabulary.strategies.map((value) => [value, value] as const),
+                tags: vocabulary.tags.map((value) => [value, value] as const),
+                allTags: t('table.all'),
+              }}
+            />
+          </FilterSheet>
 
           {/*
             The ordering, in the filter bar rather than only on the headings.
