@@ -643,9 +643,9 @@
   },
   "review": {
     "tpTiming": "Exit timing",
-    "originalTp": "Original TP",
-    "originalTpQuestion": "Did the trade take the original TP?",
-    "tpTimingQuestion": "Was the TP taken early, on time, or late?",
+    "originalTp": "Original profit target",
+    "originalTpQuestion": "Did the trade close at the profit target you planned?",
+    "tpTimingQuestion": "When did you exit, compared with your plan?",
     "unset": "Not answered",
     "saved": "Saved",
     "saveFailed": "Could not save. Try again.",
@@ -661,7 +661,11 @@
     },
     "reviewedOf": "{answered} of {total} trades answered",
     "noneReviewed": "No trade has been reviewed yet",
-    "ofTrades": "{count} trades"
+    "ofTrades": "{count} trades",
+    "sheetTitle": "Review this trade",
+    "add": "Review",
+    "done": "Done",
+    "clear": "Clear answer"
   },
   "manual": {
     "day": "Day",

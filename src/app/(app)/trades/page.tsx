@@ -245,6 +245,12 @@ export default async function TradesPage({
       late: t('review.timings.late'),
     },
     answers: { yes: t('review.answers.yes'), no: t('review.answers.no') },
+    tpTimingQuestion: t('review.tpTimingQuestion'),
+    originalTpQuestion: t('review.originalTpQuestion'),
+    sheetTitle: t('review.sheetTitle'),
+    add: t('review.add'),
+    done: t('review.done'),
+    clear: t('review.clear'),
   };
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -433,42 +439,44 @@ export default async function TradesPage({
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={`inline-flex items-center gap-1 text-xs ${
-                            trade.direction === 'long' ? 'text-pos' : 'text-neg'
-                          }`}
-                        >
-                          {trade.direction === 'long' ? (
-                            <ArrowUpRight size={13} aria-hidden />
-                          ) : (
-                            <ArrowDownRight size={13} aria-hidden />
-                          )}
-                          {t(`enum.direction.${trade.direction}`)}
-                          <span className="text-dim">· {t(`enum.style.${trade.style}`)}</span>
-                        </span>
-                        {trade.rr === null ? (
-                          <Chip tone="dim">—</Chip>
-                        ) : (
-                          <Chip tone={trade.rr >= 0 ? 'pos' : 'neg'}>
-                            <Num>
-                              {trade.rr >= 0 ? '+' : ''}
-                              {formatNumber(trade.rr, locale, 2)}R
-                            </Num>
-                          </Chip>
-                        )}
-                      </div>
+                      {/*
+                        One line, not two.
 
+                        Direction, style, date, risk and the journal marks were spread over two
+                        rows that were each half empty — the left of one and the right of the
+                        other. Together they are a sentence a person reads in one pass, and the
+                        line they save pays for the review chip below, which is what actually
+                        needed the room.
+                      */}
                       <div className="text-dim flex items-center justify-between gap-2 text-[11px]">
-                        <Num>{trade.closeAt ? closedAt(trade.closeAt) : '—'}</Num>
-                        <span className="flex items-center gap-2">
-                          <span>
-                            {t('table.risk')}{' '}
-                            <Num>{trade.risk === null ? '—' : money(trade.risk)}</Num>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span
+                            className={`inline-flex shrink-0 items-center gap-0.5 ${
+                              trade.direction === 'long' ? 'text-pos' : 'text-neg'
+                            }`}
+                          >
+                            {trade.direction === 'long' ? (
+                              <ArrowUpRight size={12} aria-hidden />
+                            ) : (
+                              <ArrowDownRight size={12} aria-hidden />
+                            )}
+                            {t(`enum.direction.${trade.direction}`)}
                           </span>
+                          <span className="shrink-0">· {t(`enum.style.${trade.style}`)}</span>
+                          <Num className="truncate">
+                            · {trade.closeAt ? closedAt(trade.closeAt) : '—'}
+                          </Num>
+                          {/* Risk goes quietly when absent rather than printing a dash that
+                              costs the width of a word and says nothing. */}
+                          {trade.risk === null ? null : (
+                            <Num className="shrink-0">· {money(trade.risk)}</Num>
+                          )}
+                        </span>
+
+                        <span className="flex shrink-0 items-center gap-1.5">
                           {trade.journalled ? (
                             <NotebookPen
-                              size={13}
+                              size={12}
                               className="text-brand"
                               aria-label={t('journal.title')}
                             />
@@ -481,6 +489,14 @@ export default async function TradesPage({
                           {trade.mood ? (
                             <span className="text-dim text-[10px]">{trade.mood}</span>
                           ) : null}
+                          {trade.rr === null ? null : (
+                            <Chip tone={trade.rr >= 0 ? 'pos' : 'neg'}>
+                              <Num>
+                                {trade.rr >= 0 ? '+' : ''}
+                                {formatNumber(trade.rr, locale, 2)}R
+                              </Num>
+                            </Chip>
+                          )}
                         </span>
                       </div>
                     </Link>

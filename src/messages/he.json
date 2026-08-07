@@ -643,9 +643,9 @@
   },
   "review": {
     "tpTiming": "עיתוי היציאה",
-    "originalTp": "TP מקורי",
-    "originalTpQuestion": "האם העסקה לקחה את ה-TP המקורי?",
-    "tpTimingQuestion": "האם ה-TP נלקח לפני הזמן, בזמן, או אחרי?",
+    "originalTp": "יעד הרווח המקורי",
+    "originalTpQuestion": "האם העסקה נסגרה ביעד הרווח שתכננת מראש?",
+    "tpTimingQuestion": "מתי יצאת מהעסקה, ביחס לתוכנית שלך?",
     "unset": "לא נענה",
     "saved": "נשמר",
     "saveFailed": "לא הצלחנו לשמור. נסה שוב.",
@@ -661,7 +661,11 @@
     },
     "reviewedOf": "נענו {answered} מתוך {total} עסקאות",
     "noneReviewed": "עדיין לא נענתה אף עסקה",
-    "ofTrades": "{count} עסקאות"
+    "ofTrades": "{count} עסקאות",
+    "sheetTitle": "סקירת העסקה",
+    "add": "סקירה",
+    "done": "סיום",
+    "clear": "נקה תשובה"
   },
   "manual": {
     "day": "Day",
