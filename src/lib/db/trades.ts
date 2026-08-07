@@ -603,6 +603,35 @@ export async function deleteTradesForAccount(
   return count;
 }
 
+/**
+ * The rows a trader picked out of the table, whatever they came from.
+ *
+ * Unlike the two above, this one deletes synced trades as readily as hand-typed ones. That is
+ * the point of it — the trader is looking at a row and saying "not this one" — and it is also
+ * the reason the caller has to be honest about what it buys: while the account that produced a
+ * row is still connected, the next refresh reads a two-day overlap from the newest close and
+ * writes it straight back. Deleting an old trade sticks; deleting last night's does not. The
+ * confirmation says so, because a delete that silently undoes itself is worse than no delete.
+ *
+ * Disconnecting is the durable answer, and it clears the credentials, so nothing can put the
+ * rows back — see `deleteTradesForAccount`.
+ *
+ * Ids are filtered by owner in the same statement rather than checked first: a borrowed id
+ * from another tenant matches nothing and deletes nothing, with no round trip that could
+ * report on somebody else's book by its absence.
+ */
+export async function deleteTradesByIds(
+  ctx: TenantContext,
+  ids: readonly string[],
+): Promise<number> {
+  assertContext(ctx);
+  if (ids.length === 0) return 0;
+  const { count } = await prisma.trade.deleteMany({
+    where: { id: { in: [...ids] }, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+  });
+  return count;
+}
+
 export async function getTrade(ctx: TenantContext, id: string): Promise<TradeRecord | null> {
   assertContext(ctx);
   const row = await prisma.trade.findFirst({

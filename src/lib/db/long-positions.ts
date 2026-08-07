@@ -334,6 +334,25 @@ export async function deleteLongPosition(ctx: TenantContext, id: string): Promis
   return count > 0;
 }
 
+/**
+ * Several holdings at once, for the trades table's multi-select.
+ *
+ * A holding appears in that table only once it is closed, so this is deleting realised
+ * history rather than a position someone is still holding — and unlike a synced trade there
+ * is nothing that could bring it back, because nobody but the trader ever wrote it.
+ */
+export async function deleteLongPositionsByIds(
+  ctx: TenantContext,
+  ids: readonly string[],
+): Promise<number> {
+  assertContext(ctx);
+  if (ids.length === 0) return 0;
+  const { count } = await prisma.longPosition.deleteMany({
+    where: { id: { in: [...ids] }, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+  });
+  return count;
+}
+
 export async function getLongPosition(
   ctx: TenantContext,
   id: string,

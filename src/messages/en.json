@@ -683,6 +683,16 @@
       "manual": "Manual",
       "holding": "Holding",
       "label": "Source"
+    },
+    "delete": {
+      "selected": "{count, plural, one {# row selected} other {# rows selected}}",
+      "selectAll": "Select every row on this page",
+      "selectRow": "Select {row}",
+      "clear": "Clear",
+      "delete": "Delete",
+      "confirm": "Delete {count, plural, one {this row} other {these # rows}}? This cannot be undone.",
+      "confirmSynced": "Rows that came from a connected broker account will come back on the next refresh. To be rid of them for good, disconnect the account and remove its data.",
+      "failed": "Those rows could not be deleted. Nothing was removed."
     }
   }
 }

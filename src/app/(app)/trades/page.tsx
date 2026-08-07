@@ -8,7 +8,7 @@ import { requireSession } from '@/lib/auth/session';
 import { computeMetrics, toAnalyticsTrades } from '@/lib/analytics';
 import { listClosedLongPositions, listClosedTrades, type TradeFilter } from '@/lib/db';
 import { ASSET_CLASSES, DIRECTIONS, STYLES } from '@/lib/analytics/dimensions';
-import { getMt5Account, listJournalVocabulary } from '@/lib/db';
+import { getMt5Account, listJournalVocabulary, listMt5Accounts } from '@/lib/db';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { formatNumber } from '@/lib/money/currency';
 import { formatDateAt, formatTimeAt } from '@/lib/time/format';
@@ -20,6 +20,7 @@ import { summarize, toRows, type RowStyle, type TableRow } from './rows';
 import { ReviewControl, type ReviewLabels } from './review-control';
 import { TradeSearch } from './search-field';
 import { Pager } from './pager';
+import { RowCheckbox, SelectAllCheckbox, TradeSelection } from './selection';
 
 const PAGE_SIZE = 40;
 
@@ -97,6 +98,20 @@ export default async function TradesPage({
     listJournalVocabulary(session.ctx),
   ]);
 
+  /*
+   * Whether a broker could put a deleted row back.
+   *
+   * `listMt5Accounts` is request-cached and `getMt5Account` above already went through it, so
+   * this is the same call and costs nothing. It decides one sentence in the delete
+   * confirmation: a connected account re-reads a two-day overlap on the next refresh and
+   * writes back what was just removed, while a disconnected one has had its credentials
+   * cleared and cannot. Saying so only when it is true is the difference between a warning
+   * and noise.
+   */
+  const brokerConnected = (await listMt5Accounts(session.ctx)).some(
+    (account) => account.status === 'connected',
+  );
+
   // Deals only. A holding has no stop loss, so it has no R to average and no win to rate;
   // feeding it in here would divide by a denominator it never contributed to.
   const metrics = computeMetrics(toAnalyticsTrades(filteredRecords));
@@ -142,6 +157,14 @@ export default async function TradesPage({
       : money(row.profit ?? 0, { signed: true });
 
   const rowSign = (row: TableRow) => (row.profit ?? row.profitInOwnCurrency?.amount ?? 0) >= 0;
+
+  /*
+   * What a tick box announces itself as. Forty checkboxes all reading "select row" is a
+   * screen-reader user being asked to pick from forty identical controls, so this names the
+   * one thing that tells the rows apart at a glance — the instrument and when it closed.
+   */
+  const rowLabel = (row: TableRow) =>
+    row.closeAt ? `${row.symbol} · ${closedAt(row.closeAt)}` : row.symbol;
 
   const reviewLabels: ReviewLabels = {
     tpTiming: t('review.tpTiming'),
@@ -216,7 +239,10 @@ export default async function TradesPage({
           */
           <EmptyState>{query ? t('table.emptySearch', { query }) : t('table.empty')}</EmptyState>
         ) : (
-          <>
+          <TradeSelection
+            rows={rows.map((trade) => ({ key: trade.key, source: trade.source }))}
+            brokerConnected={brokerConnected}
+          >
             {/*
              * On a phone the table is 660 pixels wide inside a 340 pixel scroller, which puts
              * P&L and RR — the two numbers this screen exists for — off the right edge behind
@@ -226,11 +252,25 @@ export default async function TradesPage({
              */}
             <ul className="md:hidden">
               {rows.map((trade) => (
-                <li key={trade.key} className="border-line border-b last:border-b-0">
-                  <Link
-                    href={trade.href}
-                    className="hover:bg-raised/60 flex flex-col gap-1 px-4 py-3"
-                  >
+                <li
+                  key={trade.key}
+                  className="border-line flex items-start border-b last:border-b-0"
+                >
+                  {/*
+                    Outside the Link, for the same reason the review control below is: a
+                    control nested inside an anchor is activated by a tap the anchor also
+                    handles, so ticking a row would navigate away from the row being ticked.
+                    Its own padding rather than the Link's, so the target is a finger wide.
+                  */}
+                  <span className="flex shrink-0 items-center self-stretch ps-4 pe-1">
+                    <RowCheckbox rowKey={trade.key} label={rowLabel(trade)} />
+                  </span>
+
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <Link
+                      href={trade.href}
+                      className="hover:bg-raised/60 flex flex-col gap-1 px-3 py-3"
+                    >
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="flex min-w-0 items-center gap-2">
                         {/*
@@ -304,23 +344,24 @@ export default async function TradesPage({
                         ) : null}
                       </span>
                     </div>
-                  </Link>
+                    </Link>
 
-                  {/*
-                    Outside the Link on purpose. A select nested inside an anchor is opened
-                    by a tap that the anchor also handles, so answering a question would
-                    navigate away from the row being answered.
-                  */}
-                  {trade.isPosition ? null : (
-                    <div className="px-4 pb-3">
-                      <ReviewControl
-                        tradeId={trade.key.replace('trade:', '')}
-                        tpTiming={trade.tpTiming}
-                        tookOriginalTp={trade.tookOriginalTp}
-                        labels={reviewLabels}
-                      />
-                    </div>
-                  )}
+                    {/*
+                      Outside the Link on purpose. A select nested inside an anchor is opened
+                      by a tap that the anchor also handles, so answering a question would
+                      navigate away from the row being answered.
+                    */}
+                    {trade.isPosition ? null : (
+                      <div className="px-3 pb-3">
+                        <ReviewControl
+                          tradeId={trade.key.replace('trade:', '')}
+                          tpTiming={trade.tpTiming}
+                          tookOriginalTp={trade.tookOriginalTp}
+                          labels={reviewLabels}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -329,6 +370,11 @@ export default async function TradesPage({
               <table className="w-full border-collapse text-[13px]">
                 <thead>
                   <tr className="text-dim text-[11px]">
+                    {/* Its own cell rather than sharing the date's, so the column stays put
+                        when a date wraps and the header box lines up over the row boxes. */}
+                    <th className="border-line w-9 border-b px-3.5 py-2.5">
+                      <SelectAllCheckbox />
+                    </th>
                     {[
                       t('table.closed'),
                       t('table.symbol'),
@@ -353,6 +399,9 @@ export default async function TradesPage({
                 <tbody>
                   {rows.map((trade) => (
                     <tr key={trade.key} className="border-line border-b last:border-b-0">
+                      <td className="px-3.5 py-2.5">
+                        <RowCheckbox rowKey={trade.key} label={rowLabel(trade)} />
+                      </td>
                       <td className="text-dim px-3.5 py-2.5 text-xs whitespace-nowrap">
                         <Num>{trade.closeAt ? closedAt(trade.closeAt) : '—'}</Num>
                       </td>
@@ -465,7 +514,7 @@ export default async function TradesPage({
                 </tbody>
               </table>
             </div>
-          </>
+          </TradeSelection>
         )}
       </Card>
 
