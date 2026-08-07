@@ -7,7 +7,6 @@ import {
   trackAllOpenPositions,
   updateCurrentPrice,
 } from '@/lib/db';
-import { listTrackedSymbols } from '@/lib/db/quotes';
 import { CHUNK, dueSymbols, refreshDueQuotes } from '@/lib/quotes/refresh';
 import { cleanup, createTenantFixture, testDb, type Fixture } from '../helpers/fixtures';
 
@@ -42,37 +41,66 @@ async function addPosition(
   });
 }
 
+/** Every listing this file puts on the feed. */
+const TEST_SYMBOLS = [
+  'AAPL',
+  'MSFT',
+  'NVDA',
+  'TSLA',
+  'QQQ',
+  'SPY',
+  'VOO',
+  'BTC/USD',
+  'ETH/USD',
+  'NOTREAL',
+];
+
+/**
+ * Positions taken off the feed for the duration, and put back afterwards.
+ *
+ * The refresh is global on purpose — one quote serves every tenant holding that listing — so
+ * counting what a tick did only works when nothing outside these fixtures is also owed a
+ * price. On CI the database holds nothing but the fixtures and that is free. On a development
+ * machine it is not: the seeded book holds `MSFT` on `XNGS`, which is exactly the listing the
+ * chunk test puts on the feed.
+ *
+ * The previous guard stamped everything already tracked as just-fetched, which was meant to
+ * keep a test run from marking somebody's real book to a mock price. It contradicted the line
+ * above it. A listing that was both seeded *and* used here got its quote deleted so the test
+ * could control it, then stamped fresh a moment later — so the fixture's own position was not
+ * due, `due` came back one short, and the test failed on a developer's machine while passing
+ * on CI, where there was nothing to collide with.
+ *
+ * Parking says the same thing without the contradiction: for the length of this file the
+ * fixtures are the only book on the feed, so nobody else's positions are repriced and nobody
+ * else's listings show up in a count. Restoring is `afterAll`'s job; a crash in the middle
+ * leaves seeded positions reading `manual`, which is a checkbox on the screen and a reseed at
+ * worst.
+ */
+let parked: string[] = [];
+
 beforeAll(async () => {
   alice = await createTenantFixture();
   bob = await createTenantFixture();
-});
 
-/**
- * The refresh is global on purpose — one quote serves every tenant holding that listing — so
- * these tests share a mechanism with whatever else is in the development database. Two
- * consequences, and both were learned the hard way when the demo tenant's own positions were
- * switched onto the feed and half this file started failing:
- *
- *  1. counting what the refresh *did* only works if nothing else is due, so the assertions
- *     below are about the fixtures' own listings, not about totals;
- *  2. a test run must not spend the fixtures' credits marking somebody's real book to a mock
- *     price, so anything already tracked is stamped as just-fetched and drops out of the
- *     due list for the duration.
- */
-const TEST_SYMBOLS = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'QQQ', 'SPY', 'VOO', 'BTC/USD', 'ETH/USD', 'NOTREAL'];
-
-beforeEach(async () => {
-  await testDb.quote.deleteMany({ where: { symbol: { in: TEST_SYMBOLS } } });
-  await testDb.rateLimit.deleteMany({ where: { key: 'quotes:daily' } });
-
-  const now = new Date();
-  for (const key of await listTrackedSymbols()) {
-    await testDb.quote.upsert({
-      where: { symbol_micCode: { symbol: key.symbol, micCode: key.micCode } },
-      create: { symbol: key.symbol, micCode: key.micCode, asOf: now, fetchedAt: now },
-      update: { fetchedAt: now, asOf: now },
+  const others = await testDb.longPosition.findMany({
+    where: { closedAt: null, priceSource: 'auto', userId: { notIn: [alice.userId, bob.userId] } },
+    select: { id: true },
+  });
+  parked = others.map((row) => row.id);
+  if (parked.length > 0) {
+    await testDb.longPosition.updateMany({
+      where: { id: { in: parked } },
+      data: { priceSource: 'manual' },
     });
   }
+});
+
+beforeEach(async () => {
+  // Deleted rather than stamped: a due listing is what every test here starts from, and the
+  // cached row is the only thing that makes one look fresh.
+  await testDb.quote.deleteMany({ where: { symbol: { in: TEST_SYMBOLS } } });
+  await testDb.rateLimit.deleteMany({ where: { key: 'quotes:daily' } });
 });
 
 afterEach(async () => {
@@ -81,7 +109,15 @@ afterEach(async () => {
   });
 });
 
-afterAll(cleanup);
+afterAll(async () => {
+  if (parked.length > 0) {
+    await testDb.longPosition.updateMany({
+      where: { id: { in: parked } },
+      data: { priceSource: 'auto' },
+    });
+  }
+  await cleanup();
+});
 
 describe('what gets refreshed', () => {
   it('prices a tracked position and stamps it with the market’s own time', async () => {
@@ -191,7 +227,13 @@ describe('spending', () => {
     }
 
     const outcome = await refreshDueQuotes(new Date(), 999);
-    expect(outcome.due).toBe(symbols.length);
+
+    // A floor rather than an equality. Parking takes the seeded book off the feed, but vitest
+    // runs test files side by side against one database and `long-positions.test.ts` puts
+    // positions of its own on it while this is running — so the number of listings due at any
+    // instant is not this file's to predict. What is being asserted is the cap: more was owed
+    // than a chunk, the caller asked for 999, and a chunk is what went out.
+    expect(outcome.due).toBeGreaterThanOrEqual(symbols.length);
     expect(outcome.requested).toBe(CHUNK);
     expect(outcome.requested).toBeLessThan(symbols.length);
   });
@@ -245,7 +287,11 @@ describe('switching an existing book onto the feed', () => {
   it('prices a position that carries no MIC, which is every position that predates the feed', async () => {
     // `MSFT`, not `AAPL`: a bare ticker is one shared cache key, and the demo tenant's own
     // book holds a bare `AAPL` — the fixture would be reading somebody else's quote row.
-    const position = await addPosition(alice, { symbol: 'MSFT', micCode: '', priceSource: 'manual' });
+    const position = await addPosition(alice, {
+      symbol: 'MSFT',
+      micCode: '',
+      priceSource: 'manual',
+    });
     await setPriceSource(alice.ctx, position.id, 'auto');
 
     const outcome = await refreshDueQuotes();
