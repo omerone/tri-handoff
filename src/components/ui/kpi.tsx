@@ -65,7 +65,22 @@ export function KPI({
   infoLabel?: string;
 }) {
   return (
-    <div className="border-line bg-surface rounded-[18px] border px-4 py-3" data-tip={title}>
+    /*
+      A uniform height on a phone, and it is the whole of "tidy" here.
+      
+      These sit two to a row, and a tile's height came from its own content: no sub-line and it
+      was 70px, a sub-line that wrapped and it was 105px. Every row was a different height from
+      the one above it, which on a screen that is nothing but tiles reads as broken rather than
+      as dense. A floor makes the grid a grid; a tile with more to say still grows, and its
+      neighbour grows with it because the row already stretches.
+      
+      Tighter padding with it: `py-3` twice over is 24 pixels of nothing on a card whose whole
+      job is one number, repeated eleven times down a phone.
+    */
+    <div
+      className="border-line bg-surface flex min-h-[5.25rem] flex-col rounded-[18px] border px-3 py-2.5 sm:min-h-0 sm:px-4 sm:py-3"
+      data-tip={title}
+    >
       {/*
         Two shapes, and the plain one is not an optimisation.
 
@@ -104,7 +119,9 @@ export function KPI({
       >
         <Num>{value}</Num>
       </div>
-      {sub ? <div className="text-dim mt-0.5 text-[11px]">{sub}</div> : null}
+      {/* `mt-auto` rather than a fixed gap: with a floor on the tile the slack has to go
+          somewhere, and under the figure is the only place it does not look like a mistake. */}
+      {sub ? <div className="text-dim mt-auto pt-0.5 text-[11px]">{sub}</div> : null}
     </div>
   );
 }

@@ -41,7 +41,10 @@ export function EquityChart({
   // The axis gets the short form; the tooltip keeps the exact figure.
   const axisFormat = (value: number) => formatCompactMoney(value, display);
   return (
-    <div style={{ height: 240 }}>
+    /* Shorter on a phone. 240px is a good chart on a desktop and a quarter of the screen on a
+       handset, where it competes with the tiles above it rather than with the whitespace it
+       has on a monitor. */
+    <div className="h-[180px] sm:h-[240px]">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
           <defs>

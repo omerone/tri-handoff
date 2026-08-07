@@ -316,22 +316,33 @@ export default async function DashboardPage({
           {recent.map((trade) => (
             <div
               key={trade.id}
-              className="border-line flex items-center justify-between border-b py-1.5 last:border-b-0"
+              /*
+                One line on a phone, two from `sm`.
+                
+                Six trades at two lines each is most of a phone screen spent on a panel that
+                answers "what did I just do" — a glance, not a study. The same four facts read
+                fine in a row: what, which way, how much, at what R.
+              */
+              className="border-line flex items-center justify-between gap-2 border-b py-1.5 last:border-b-0"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 {trade.direction === 'long' ? (
-                  <ArrowUpRight size={14} className="text-pos" aria-hidden />
+                  <ArrowUpRight size={14} className="text-pos shrink-0" aria-hidden />
                 ) : (
-                  <ArrowDownRight size={14} className="text-neg" aria-hidden />
+                  <ArrowDownRight size={14} className="text-neg shrink-0" aria-hidden />
                 )}
-                <div>
+                <div className="flex min-w-0 items-baseline gap-1.5 sm:block">
                   <div className="text-[13px] font-bold">{trade.symbol}</div>
-                  <div className="text-dim text-[11px]">
+                  <div className="text-dim truncate text-[11px]">
                     {t(`enum.assetClass.${trade.assetClass}`)} · {t(`enum.style.${trade.style}`)}
                   </div>
                 </div>
               </div>
-              <div className={rtl ? 'text-left' : 'text-right'}>
+              <div
+                className={`flex shrink-0 items-baseline gap-1.5 sm:block ${
+                  rtl ? 'sm:text-left' : 'sm:text-right'
+                }`}
+              >
                 <div
                   className={`text-[13px] font-bold ${trade.profit >= 0 ? 'text-pos' : 'text-neg'}`}
                 >
