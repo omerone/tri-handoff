@@ -684,8 +684,7 @@
   "trades": {
     "source": {
       "mt5": "MT5",
-      "manual": "Manual",
-      "holding": "Holding",
+      "manual": "Manual entry",
       "label": "Source"
     },
     "delete": {

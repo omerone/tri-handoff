@@ -293,16 +293,33 @@ test.describe('cross-screen consistency', () => {
   });
 });
 
+/**
+ * The cells under a named column, whatever position that column is in.
+ *
+ * `td:nth-child(4)` is a guess about layout dressed up as a locator. A checkbox column was
+ * added at the front of this table and every index after it moved by one, so a test about
+ * *filtering* went red over something filtering has nothing to do with — and the failure named
+ * a column number, which is not a thing anyone can look at on the screen. Reading the header
+ * row once and finding the column by its own name costs a line and cannot drift.
+ */
+async function column(page: Page, heading: string): Promise<string[]> {
+  const index = await page
+    .locator('thead th')
+    .evaluateAll((cells, name) => cells.findIndex((c) => c.textContent?.trim() === name), heading);
+  expect(index, `the table has no "${heading}" column`).toBeGreaterThanOrEqual(0);
+  return page.locator(`tbody tr td:nth-child(${index + 1})`).allInnerTexts();
+}
+
 test.describe('trades table', () => {
   test('filters through the URL and keeps the selection', async ({ page }) => {
     await page.goto('/trades?class=crypto&dir=short');
 
     // Every visible row matches the filter.
-    const sides = await page.locator('tbody tr td:nth-child(4)').allInnerTexts();
+    const sides = await column(page, 'Side');
     expect(sides.length).toBeGreaterThan(0);
     expect(sides.every((side) => side.includes('Short'))).toBe(true);
 
-    const symbols = await page.locator('tbody tr td:nth-child(2)').allInnerTexts();
+    const symbols = await column(page, 'Symbol');
     expect(symbols.every((symbol) => /BTC|ETH|SOL/.test(symbol))).toBe(true);
   });
 

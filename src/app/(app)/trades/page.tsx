@@ -440,10 +440,18 @@ export default async function TradesPage({
                           looks like, so the badge read as decoration rather than as an answer.
                           Hand-entered rows stay grey: between the two, the one worth spotting
                           at a glance is the one the broker vouched for.
+
+                          `data-source` so the answer can be read as an answer. Table cells
+                          concatenate with nothing between them — a row's text runs
+                          "…DayMT5₪418" — so a test looking for the word finds it welded to the
+                          one before it, and a test written to cope with that is asserting on
+                          string surgery rather than on what the row says.
                         */}
-                          <Chip tone={trade.source === 'mt5' ? 'broker' : 'dim'}>
-                            {t(`trades.source.${trade.source}`)}
-                          </Chip>
+                          <span data-source={trade.source}>
+                            <Chip tone={trade.source === 'mt5' ? 'broker' : 'dim'}>
+                              {t(`trades.source.${trade.source}`)}
+                            </Chip>
+                          </span>
                         </span>
                       </td>
                       <td className="px-3.5 py-2.5 text-xs">

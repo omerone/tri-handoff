@@ -66,3 +66,57 @@ test('records a day trade that closed before today', async ({ page }) => {
   await expect(entry).toBeVisible();
   await expect(entry).toContainText('2.50R');
 });
+
+/**
+ * Which rows the table says the trader typed.
+ *
+ * The badge exists to answer one question — "is this figure the broker's or mine?" — and on a
+ * long-term holding it answered a different one. The Style column already read "Long"; the
+ * badge beside it read "Holding", so the space kept for the one fact it was not saying said
+ * the fact next to it again. Nobody but the trader enters a holding, so it is a manual entry
+ * like any other and now says so.
+ *
+ * The badge is in the table, which exists from `md` up — below that the row is a card with no
+ * room for it. So this is the desktop half of the screen, deliberately.
+ */
+test.describe('where a row came from', () => {
+  test.skip(({ isMobile }) => !!isMobile, 'the badge lives in the table, which a phone replaces');
+
+  test('says manual entry on a holding, not the word beside it', async ({ page }) => {
+    await page.goto('/trades?range=max');
+
+    /*
+     * By where the row links, not by the word "Long".
+     *
+     * `hasText: 'Long'` was the obvious locator and it is the wrong one: most trades in the
+     * book are long *positions*, so it matched an ordinary MT5 buy and the test passed against
+     * the very layout it was written to reject. A holding is the only row that links to the
+     * manual-entry book — its key is `position:…` and its href is `/long` — which is a
+     * property of being a holding rather than a word that happens to appear in two columns.
+     */
+    const holding = page.locator('tbody tr:has(a[href="/long"])').first();
+    await expect(holding, 'the seeded book has no holdings to read').toBeVisible();
+
+    await expect(holding.locator('[data-source]')).toHaveAttribute('data-source', 'manual');
+    await expect(holding).toContainText('Manual entry');
+    await expect(holding, 'the badge still repeats the style column').not.toContainText('Holding');
+  });
+
+  test('gives every row one answer, and one that is on the badge', async ({ page }) => {
+    // Not "most rows": a row with no badge is a row whose figures have no stated author, and
+    // the badge is only worth having if it is on all of them.
+    await page.goto('/trades?range=max');
+    const rows = page.locator('tbody tr');
+    await expect(rows.first()).toBeVisible();
+
+    const badges = page.locator('tbody tr [data-source]');
+    expect(await badges.count(), 'a row is missing its source badge').toBe(await rows.count());
+
+    // And the badge says something, in the reader's language, rather than carrying the value
+    // only in an attribute nobody can see.
+    for (const text of await badges.allInnerTexts()) {
+      expect(text.trim(), 'a source badge rendered empty').not.toBe('');
+      expect(text, 'a holding is still labelled by its style').not.toContain('Holding');
+    }
+  });
+});

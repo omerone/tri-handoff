@@ -684,8 +684,7 @@
   "trades": {
     "source": {
       "mt5": "MT5",
-      "manual": "ידני",
-      "holding": "אחזקה",
+      "manual": "הוזן ידנית",
       "label": "מקור"
     },
     "delete": {

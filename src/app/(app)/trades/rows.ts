@@ -40,15 +40,22 @@ export type TableRow = {
   /** Drives the summary split: positions count toward money, never toward R. */
   isPosition: boolean;
   /**
-   * Where the row came from, so the table can say so.
+   * Who produced this row's figures — the broker, or the person reading them.
    *
    * A journal that mixes what the broker sent with what the trader typed is the whole design
    * — the analytics, the calendar and the R-strip are meant not to care. A person reading the
    * table does care: "is this figure the broker's or mine?" is the first question asked of a
-   * number that looks wrong, and until now the only way to answer it was to know that manual
+   * number that looks wrong, and until this the only way to answer it was to know that manual
    * tickets start with `manual:`.
+   *
+   * Two values, not three. A long-term holding used to carry its own `holding`, which put the
+   * word "Holding" in a chip immediately beside a column already reading "Long" — the same
+   * fact twice, in the space reserved for the one fact it was not saying. Nobody types a
+   * holding but the trader, so its answer to this question is `manual` like any other row they
+   * entered. That a row *is* a holding is carried where it belongs: by `isPosition`, and by
+   * the `position:` prefix on its key, which is what the delete path sorts on.
    */
-  source: 'mt5' | 'manual' | 'holding';
+  source: 'mt5' | 'manual';
   /** Whether anything has been written about this row; always false for a holding. */
   journalled: boolean;
   strategy: string | null;
@@ -165,7 +172,7 @@ async function positionRows(
       closeAt: position.closedAt,
       isPosition: true,
       // A holding is always something the trader entered; no broker sends these.
-      source: 'holding',
+      source: 'manual',
       journalled: false,
       strategy: null,
       rating: null,
