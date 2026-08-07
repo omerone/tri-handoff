@@ -96,7 +96,13 @@ export function DayTrades({
         aria-expanded={open}
         aria-controls={dialogId}
         aria-label={`${dateLabel} · ${summary.pnl}`}
-        className="contents text-start"
+        /*
+          `tri-day` is only there for the rule in `globals.css` that puts the hover card away
+          while this day is open. Pressing a square leaves the pointer on it, so the card stays
+          up behind the dimmer — the same date, net and win rate the dialog opens by repeating,
+          greyed out underneath it.
+        */
+        className="tri-day contents text-start"
       >
         {children}
       </button>
@@ -135,9 +141,7 @@ export function DayTrades({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <span
-                  className={`text-sm font-bold ${summary.up ? 'text-pos' : 'text-neg'}`}
-                >
+                <span className={`text-sm font-bold ${summary.up ? 'text-pos' : 'text-neg'}`}>
                   <Num>{summary.pnl}</Num>
                 </span>
                 <button

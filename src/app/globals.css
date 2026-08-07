@@ -384,6 +384,20 @@ button {
   animation: tri-sheet-up 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/*
+ * A calendar day that is open does not also need its hover card.
+ *
+ * The card opens on `group-hover`, and pressing a square leaves the pointer sitting on it — so
+ * the card stayed up behind the dimmer, showing the date, the net and the win rate that the
+ * dialog opens by showing again, greyed out under the dialog that replaced it.
+ *
+ * Here rather than in the component because the card is drawn on the server, inside the
+ * square, and the button that knows whether the day is open only wraps it.
+ */
+.tri-day[aria-expanded='true'] [role='tooltip'] {
+  display: none;
+}
+
 @keyframes tri-tip {
   from {
     opacity: 0;

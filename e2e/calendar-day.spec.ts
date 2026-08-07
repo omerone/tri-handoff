@@ -40,6 +40,13 @@ test.describe('a day in the calendar', () => {
 
     // And the header agrees with the square that opened it.
     await expect(dialog).toContainText(new RegExp(`${count}`));
+
+    /*
+     * The square's own hover card is put away while the day is open. Pressing a square leaves
+     * the pointer on it, and the card opens on hover — so it sat behind the dimmer repeating
+     * the date, the net and the win rate the dialog had just opened by showing.
+     */
+    await expect(page.locator('main [role="tooltip"]').filter({ visible: true })).toHaveCount(0);
   });
 
   test('closes on Escape, and a day with nothing on it does not open at all', async ({ page }) => {
