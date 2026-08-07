@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { CalendarRange, ChevronDown } from 'lucide-react';
+import { CalendarRange, Check, ChevronDown } from 'lucide-react';
 import { applyRangeAction } from '@/app/actions/range';
 import { DateField } from '@/components/ui/date-field';
 import type { Locale } from '@/i18n/config';
@@ -152,33 +152,40 @@ export function RangePicker({
   const field =
     'border-line bg-raised text-text min-h-9 w-full rounded-[10px] border px-2.5 py-1.5 text-xs';
 
+  /*
+   * What the compact trigger says: the range itself.
+   *
+   * A preset by its own name, a custom one by its dates. That is the whole idea of the narrow
+   * layout — the control reads as the answer rather than as four ways to change it, and the
+   * ways to change it are one tap away.
+   */
+  const activeLabel =
+    current.kind === 'dates' || current.kind === 'months'
+      ? (summary ?? labels.custom)
+      : labels.presets[current.kind];
+
   return (
     /*
-     * No bar of its own. This used to be a full-width strip under the nav — a third row in a
-     * sticky header, spending vertical space on every screen to hold four buttons.
+     * Two layouts of one control, and the breakpoint is `lg` rather than `md`.
      *
-     * It wraps rather than holding its width. Four buttons and a summary come to 429px, and a
-     * phone is 412 with padding to spare on top of that: with `shrink-0` on this row the flex
-     * parent could not narrow it, so `flex-wrap` never had a constraint to wrap against and
-     * the whole group hung 33px off the side of every screen in the app. Wrapping costs one
-     * line on a phone and nothing at all above it, where the row has always fitted.
+     * From `lg` the presets are a segmented row with the custom trigger beside them and the
+     * range spelled out after that — a shape that needs about four hundred and thirty pixels
+     * and has them there.
+     *
+     * Below it, one button that reads the current range, and a panel with every option in it.
+     * `md` was the wrong line to draw: it *is* 768, so a tablet at exactly that width got the
+     * wide layout with nothing to spare, tabs cut off on one side and the picker filling the
+     * rest.
      */
-    <div className="flex w-full min-w-0 flex-wrap items-center gap-2 md:w-auto md:justify-end">
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
       <>
         {/* No label and no icon. The buttons say "maximum", "this month", "last month" and
             name the custom range outright, so a heading in front of them was restating what
             they already read as. The group keeps its `aria-label`, so a screen reader — which
             cannot see that the buttons are a set — is told what they are for. */}
-        {/* The presets take the phone's width and split it evenly, rather than sitting in a
-            huddle at one end of an empty row. Above `md` they keep their natural widths, where
-            the row is shared with the tabs and a stretched group would push them about. */}
-        <form action={applyRangeAction} className="min-w-0 flex-1 md:flex-none">
+        <form action={applyRangeAction} className="hidden lg:block">
           <Where path={pathname} query={query} />
-          <div
-            role="group"
-            aria-label={labels.title}
-            className={`${group} flex w-full md:inline-flex md:w-auto`}
-          >
+          <div role="group" aria-label={labels.title} className={`${group} inline-flex`}>
             {RANGE_PRESETS.map((preset) => (
               <button
                 key={preset}
@@ -186,7 +193,7 @@ export function RangePicker({
                 name="intent"
                 value={presetToken(preset)}
                 aria-pressed={current.kind === preset}
-                className={`${segment(current.kind === preset)} min-w-0 flex-1 md:flex-none`}
+                className={segment(current.kind === preset)}
               >
                 {labels.presets[preset]}
               </button>
@@ -194,7 +201,7 @@ export function RangePicker({
           </div>
         </form>
 
-        <div ref={anchor} className="relative">
+        <div ref={anchor} className="relative w-full lg:w-auto">
           <button
             ref={trigger}
             type="button"
@@ -202,40 +209,89 @@ export function RangePicker({
             aria-haspopup="dialog"
             aria-controls="tri-range-custom"
             onClick={() => setPanel((state) => ({ ...state, open: !state.open }))}
-            aria-label={labels.custom}
-            className={`tri-tap border-line inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 py-1.5 text-[13px] ${
+            /*
+             * No `aria-label`. One was added here and it overrode the button's own text: on a
+             * desktop a screen reader read "Time range: Maximum" off a button that says
+             * "Custom range", which is a worse name than the one it replaced and broke every
+             * test that finds this control the way a person does. The visible content is the
+             * name — the range itself on a phone, the words above `lg` — and `aria-haspopup`
+             * already says it opens something.
+             */
+            className={`tri-tap border-line flex min-h-9 w-full items-center justify-between gap-1.5 rounded-[10px] border px-3 py-1.5 text-[13px] lg:inline-flex lg:w-auto lg:justify-start ${
               custom ? 'bg-brand font-bold text-white' : 'bg-raised text-dim font-medium'
             }`}
           >
-            {/* An icon on a phone, where "custom range" is seventy-nine pixels of a screen
-                that has three presets to fit beside it — and where the line below now says
-                what the range actually is, which is what the words were standing in for.
-                The button keeps the name for anything that cannot see the icon. */}
-            <CalendarRange size={14} aria-hidden className="md:hidden" />
-            <span className="hidden md:inline">{labels.custom}</span>
-            <ChevronDown size={13} aria-hidden className={panel.open ? 'rotate-180' : undefined} />
+            <span className="flex min-w-0 items-center gap-1.5">
+              <CalendarRange size={14} aria-hidden className="shrink-0" />
+              {/* The range below `lg`, the words "custom range" above it — where the segmented
+                  row already names the presets and this button is only the other door. */}
+              <span
+                dir={current.kind === 'dates' ? 'ltr' : undefined}
+                className="truncate lg:hidden"
+              >
+                {activeLabel}
+              </span>
+              <span className="hidden lg:inline">{labels.custom}</span>
+            </span>
+            <ChevronDown
+              size={13}
+              aria-hidden
+              className={`shrink-0 transition-transform ${panel.open ? 'rotate-180' : ''}`}
+            />
           </button>
 
           {panel.open ? (
             /*
-             * One form, one Apply, two fields.
+             * One panel, holding whatever the layout above it does not.
              *
-             * Stacked rather than strung out along a row: "from" above "to" is the order the
-             * range is read in, each endpoint gets its own line and its own label, and the card
-             * is narrow enough that the eye does not travel. The horizontal version put six
-             * controls and two Apply buttons across the full width of the page for a choice
-             * that is one or the other.
-             *
-             * Switching the mode leaves only the two fields that mode needs, which also keeps
-             * `required` honest: a hidden-but-present date field is one the browser refuses to
-             * report a validation error on, because it cannot focus it to show the message.
+             * From `lg` that is the custom range alone, because the presets are already a row
+             * of buttons outside it. Below `lg` the presets come in here too, as full-width
+             * rows — which is the point of the narrow layout: one control, and every way to
+             * change the range behind it.
              */
             <div
               id="tri-range-custom"
               role="dialog"
-              aria-label={labels.custom}
-              className="border-line bg-surface absolute end-0 top-[calc(100%+6px)] z-30 w-[290px] max-w-[calc(100vw-2rem)] rounded-[14px] border p-3 shadow-xl"
+              aria-label={labels.title}
+              className="tri-sheet border-line bg-surface absolute end-0 top-[calc(100%+6px)] z-30 w-full max-w-[calc(100vw-2rem)] rounded-[14px] border p-3 shadow-xl lg:w-[290px]"
             >
+              <form action={applyRangeAction} className="mb-3 flex flex-col gap-1 lg:hidden">
+                <Where path={pathname} query={query} />
+                {RANGE_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="submit"
+                    name="intent"
+                    value={presetToken(preset)}
+                    aria-pressed={current.kind === preset}
+                    className={`tri-tap flex min-h-9 items-center justify-between rounded-[10px] px-3 py-1.5 text-[13px] ${
+                      current.kind === preset
+                        ? 'bg-brand font-bold text-white'
+                        : 'text-text hover:bg-raised font-medium'
+                    }`}
+                  >
+                    {labels.presets[preset]}
+                    {current.kind === preset ? <Check size={14} aria-hidden /> : null}
+                  </button>
+                ))}
+              </form>
+
+              {/* The line between "one of these three" and "or say it yourself". */}
+              <div className="border-line mb-3 border-t lg:hidden" />
+
+              {/*
+                One form, one Apply, two fields.
+
+                Stacked rather than strung out along a row: "from" above "to" is the order the
+                range is read in, each endpoint gets its own line and its own label, and the
+                card is narrow enough that the eye does not travel. The horizontal version put
+                six controls and two Apply buttons across the full width of the page for a
+                choice that is one or the other.
+
+                Switching the mode leaves only the two fields that mode needs, which also keeps
+                `required` honest: a hidden-but-present date field is one the browser refuses
+                to report a validation error on, because it cannot focus it to show the message.
+              */}
               <form action={applyRangeAction} className="flex flex-col gap-3">
                 <Where path={pathname} query={query} />
                 <input type="hidden" name="intent" value={panel.mode} />
@@ -313,21 +369,14 @@ export function RangePicker({
         </div>
 
         {/* What is actually on screen, in the same words the picker offered — so a range
-            picked three screens ago is still legible without opening the popover. */}
+            picked three screens ago is still legible without opening the popover. Wide layouts
+            only: below `lg` the trigger itself reads the range, which is the whole point of it.
+
+            `dir="ltr"` for the same reason `Num` sets it: `01/01/2026 – 31/03/2026` is a
+            left-to-right run, and inside the Hebrew layout the neutral slashes and dash let the
+            endpoints swap places. */}
         {summary ? (
-          // `dir="ltr"` for the same reason `Num` sets it: `01/01/2026 – 31/03/2026` is a
-          // left-to-right run, and inside the Hebrew layout the neutral slashes and dash let
-          // the endpoints swap places.
-          /*
-           * Shown on a phone too, and on its own line there.
-           *
-           * It was `hidden md:inline`, so the one screen where the custom trigger had no room
-           * for its own label was also the one screen that never said which dates were being
-           * read. A trader who set a range on Tuesday came back on Thursday to three unlit
-           * presets and no way to tell what they were looking at without opening the popover.
-           * `w-full` puts it under the buttons rather than fighting them for the row.
-           */
-          <span dir="ltr" className="text-dim w-full text-[11px] md:w-auto md:text-start">
+          <span dir="ltr" className="text-dim hidden text-[11px] lg:inline">
             {summary}
           </span>
         ) : null}

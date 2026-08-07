@@ -1,78 +1,103 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * The range picker at two sizes.
+ * The range picker, which is two controls wearing one name.
  *
- * On a phone it was a huddle of buttons at one end of an empty row, right-aligned because the
- * desktop shares that row with the tabs and needs them out of the way. At 360px the huddle no
- * longer fitted and took a second line. And the summary — the one thing that says which dates
- * are actually being read — was `hidden md:inline`, so the screen with no room for the custom
- * button's own label was also the screen that never said what the custom range was. Three
- * unlit presets and no way to tell what you were looking at without opening the popover.
+ * From `lg` it is a segmented row of presets with a custom trigger beside it and the range
+ * spelled out after that — a shape that needs about four hundred and thirty pixels and has
+ * them. Below `lg` it is one button that *reads the current range*, and every way to change it
+ * lives in a panel behind it.
  *
- * Below `md` the presets take the width and split it evenly, the custom trigger is an icon, and
- * the summary sits under them on its own line. Above `md` none of that applies.
+ * The narrow layout is the interesting half and the reason is worth stating: a picker's default
+ * state should answer "what am I looking at", not offer four ways to change it. The old one did
+ * the opposite — three unlit preset buttons and, on a phone, nothing at all naming the range
+ * they were unlit against.
+ *
+ * The breakpoint is `lg`, not `md`, because `md` *is* 768: a tablet at exactly that width got
+ * the wide layout with nothing to spare, tabs cut off on one side and the picker filling the
+ * rest. That was the screenshot that prompted this.
  */
 
-/** The preset segment buttons, which are the ones inside the labelled group. */
-const presets = (page: Page) => page.locator('[role="group"][aria-label] button');
-
-const widthsOf = async (page: Page) =>
-  presets(page).evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().width)));
+const trigger = (page: Page) => page.locator('button[aria-controls="tri-range-custom"]');
+const sheet = (page: Page) => page.locator('#tri-range-custom');
+/**
+ * The segmented preset row, which is drawn only in the wide layout.
+ *
+ * By what is visible, not by a class string: both layouts are in the markup at every width and
+ * CSS decides which one is painted, so `form:not([class*="lg:hidden"])` — the first version of
+ * this — matched the wide row on a phone and called the layout broken.
+ */
+const segmented = (page: Page) =>
+  page
+    .locator('[role="group"]')
+    .filter({ has: page.getByRole('button', { name: /last month|חודש קודם/i }) })
+    .filter({ visible: true });
 
 test.describe('the range picker on a phone', () => {
-  test.skip(({ isMobile }) => !isMobile, 'this is the phone layout');
+  test.skip(({ isMobile }) => !isMobile, 'this is the narrow layout');
 
-  test('gives every preset the same share of the row', async ({ page }) => {
-    await page.goto('/trades');
-    const widths = await widthsOf(page);
-    expect(widths.length, 'no presets found').toBeGreaterThan(1);
+  test('reads the current range rather than offering four ways to change it', async ({ page }) => {
+    await page.goto('/trades?range=max');
+    await expect(trigger(page), 'the trigger does not name the active range').toContainText(
+      /maximum|מקסימום/i,
+    );
+    await expect(segmented(page), 'the segmented row is still on a phone').toHaveCount(0);
 
-    // Equal to the pixel is not the claim — sub-pixel rounding is real. Within two is.
-    const spread = Math.max(...widths) - Math.min(...widths);
-    expect(
-      spread,
-      `the presets are still sized by their labels: ${widths.join(', ')}`,
-    ).toBeLessThanOrEqual(2);
-  });
-
-  test('stays on one line at the narrowest phone worth supporting', async ({ page }) => {
-    /*
-     * 360px is where it used to wrap: three Hebrew labels and a seventy-nine-pixel "custom
-     * range" do not go on one line, and the second line pushed every screen's content down.
-     */
-    await page.setViewportSize({ width: 360, height: 800 });
-    await page.goto('/trades');
-
-    const row = presets(page)
-      .first()
-      .locator('xpath=ancestor::div[contains(@class,"flex-wrap")][1]');
-    const height = await row.evaluate((el) => Math.round(el.getBoundingClientRect().height));
-    // One row of controls, plus the summary line when there is one. Two lines of *buttons*
-    // would be about eighty.
-    expect(height, 'the picker wrapped onto a second line of buttons').toBeLessThan(70);
-  });
-
-  test('says which dates are being read', async ({ page }) => {
-    // The gap this closes: on a phone the custom trigger is an icon, so without this line
-    // nothing on the screen names the range.
+    // A custom range names itself by its dates, which is the thing a preset label cannot say.
     await page.goto('/trades?range=2026-06-01..2026-07-31');
-    const summary = page.locator('span[dir="ltr"]').filter({ hasText: /\d{2}\/\d{2}\/\d{4}/ });
-    await expect(summary.first(), 'the active range is not named anywhere').toBeVisible();
+    await expect(trigger(page)).toContainText(/\d{2}\/\d{2}\/\d{4}/);
+  });
+
+  test('opens a panel holding every option, presets included', async ({ page }) => {
+    await page.goto('/trades?range=max');
+    await expect(sheet(page), 'the panel is open before it was asked for').toHaveCount(0);
+
+    await trigger(page).click();
+    const panel = sheet(page);
+    await expect(panel).toBeVisible();
+
+    // Both halves: the three presets, and the custom range under them.
+    for (const preset of [/maximum|מקסימום/i, /this month|החודש/i, /last month|חודש קודם/i]) {
+      await expect(panel.getByRole('button', { name: preset })).toBeVisible();
+    }
+    await expect(panel.getByRole('button', { name: /apply|החל/i })).toBeVisible();
+
+    // And it animates open rather than appearing — the class carries it, and
+    // `prefers-reduced-motion` turns it off with everything else.
+    await expect(panel).toHaveClass(/tri-sheet/);
+  });
+
+  test('a preset picked in the panel becomes the range the trigger reads', async ({ page }) => {
+    await page.goto('/trades?range=max');
+    await trigger(page).click();
+    await sheet(page)
+      .getByRole('button', { name: /this month|החודש/i })
+      .click();
+
+    await expect(trigger(page), 'the trigger did not follow the choice').toContainText(
+      /this month|החודש/i,
+    );
+    await expect(sheet(page), 'the panel stayed open over the answer').toHaveCount(0);
   });
 });
 
 test.describe('the range picker on a desktop', () => {
   test.skip(({ isMobile }) => !!isMobile, 'this is the wide layout');
 
-  test('keeps its labels and its natural widths', async ({ page }) => {
-    await page.goto('/trades');
+  test('keeps the presets in the row and only the custom range in the panel', async ({ page }) => {
+    await page.goto('/trades?range=max');
+    await expect(segmented(page).first(), 'the segmented row is missing').toBeVisible();
 
-    // The custom trigger says what it is here; on a phone it is the calendar icon.
-    await expect(page.getByRole('button', { name: /custom|מותאם/i })).toContainText(/\w|\S/);
+    await trigger(page).click();
+    const panel = sheet(page);
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole('button', { name: /apply|החל/i })).toBeVisible();
 
-    const widths = await widthsOf(page);
-    const spread = Math.max(...widths) - Math.min(...widths);
-    expect(spread, 'the desktop presets were stretched to match each other').toBeGreaterThan(2);
+    // The presets are already outside it; repeating them here would be two controls for one
+    // choice, sitting one above the other.
+    await expect(
+      panel.getByRole('button', { name: /last month|חודש קודם/i }),
+      'the presets are duplicated inside the panel',
+    ).toHaveCount(0);
   });
 });

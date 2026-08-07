@@ -36,28 +36,78 @@ function monthBefore(label: string): string {
  * and whether it composes with the filters a screen already had.
  */
 
+/**
+ * The picker's trigger, by what it controls rather than by what it says.
+ *
+ * It says two different things on purpose: "Custom range" from `lg`, where a segmented row of
+ * presets sits beside it and this is only the other door — and the *active range itself* below
+ * that, where it is the only control and its job is to answer "what am I looking at". A name
+ * that changes with the viewport is not a handle a test can hold.
+ */
+const picker = (page: Page) => page.locator('button[aria-controls="tri-range-custom"]');
+
+/**
+ * A preset, wherever the current layout keeps it — and never the trigger.
+ *
+ * Below `lg` the trigger *is* named after the range, so "the visible button called Last month"
+ * matches it once that range is chosen, and every assertion about a preset then lands on a
+ * button that has no `aria-pressed` and never did. The trigger is the one carrying
+ * `aria-controls`; excluding it is the whole of the distinction.
+ */
+const preset = (page: Page, name: string) =>
+  page
+    .getByRole('button', { name, exact: true })
+    .and(page.locator('button:not([aria-controls])'))
+    .filter({ visible: true });
+
+/**
+ * Choose a preset, whichever layout is drawing them.
+ *
+ * From `lg` they are a row and one click does it. Below that they live in the panel behind the
+ * trigger, which is the entire point of the narrow layout — so the panel is opened first. A
+ * test about what a *range* does should not have to know which of the two it is looking at.
+ */
+async function choose(page: Page, name: string) {
+  if ((await preset(page, name).count()) === 0) await picker(page).click();
+  await preset(page, name).click();
+}
+
+/**
+ * That the picker is showing this range — which the two layouts say differently.
+ *
+ * The wide one lights the preset it is on, `aria-pressed` and all. The narrow one has no
+ * presets on screen; its trigger *reads the range*, which is the same fact told in the only
+ * way a single button can tell it. Asserting the desktop's spelling on a phone finds the
+ * trigger — whose name is now the range — and fails on an attribute it was never going to have.
+ */
+async function expectShowing(page: Page, name: string) {
+  const lit = preset(page, name);
+  if ((await lit.count()) > 0) {
+    await expect(lit).toHaveAttribute('aria-pressed', 'true');
+  } else {
+    await expect(picker(page)).toContainText(name);
+  }
+}
+
 test.describe('the picker', () => {
   test('is on every screen that reads a period, and on no others', async ({ page }) => {
     for (const path of ['/dashboard', '/analytics', '/trades', '/calendar', '/finance']) {
       await page.goto(path);
-      await expect(page.getByRole('button', { name: 'Maximum', exact: true })).toBeVisible();
+      // The trigger is the picker at every width; the presets are beside it or behind it.
+      await expect(picker(page)).toBeVisible();
     }
 
     // Open positions are what is held right now, and Settings is not data at all.
     for (const path of ['/long', '/settings']) {
       await page.goto(path);
-      await expect(page.getByRole('button', { name: 'Maximum', exact: true })).toHaveCount(0);
+      await expect(picker(page)).toHaveCount(0);
     }
   });
 
   test('puts the chosen range in the URL, so it can be shared', async ({ page }) => {
     await page.goto('/dashboard');
-    await page.getByRole('button', { name: 'Last month', exact: true }).click();
+    await choose(page, 'Last month');
     await expect(page).toHaveURL(/range=last-month/);
-    await expect(page.getByRole('button', { name: 'Last month', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
   });
 
   test('follows a nav link that carries no query string of its own', async ({ page }) => {
@@ -65,27 +115,22 @@ test.describe('the picker', () => {
     // idea a range exists, and threading one through every link in the product would mean
     // every future link remembering to.
     await page.goto('/analytics');
-    await page.getByRole('button', { name: 'Last month', exact: true }).click();
+    await choose(page, 'Last month');
 
     await page.getByRole('link', { name: 'Trades', exact: true }).click();
     await expect(page).toHaveURL(/\/trades$/);
-    await expect(page.getByRole('button', { name: 'Last month', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await expectShowing(page, 'Last month');
   });
 
   test('honours a shared link over the reader’s own cookie', async ({ page }) => {
     await page.goto('/dashboard');
-    await page.getByRole('button', { name: 'Last month', exact: true }).click();
+    await choose(page, 'Last month');
 
     // Arriving with an explicit range: what the link says wins, or the recipient is quietly
     // shown a different month than the person who sent it.
     await page.goto('/dashboard?range=max');
-    await expect(page.getByRole('button', { name: 'Maximum', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await expectShowing(page, 'Maximum');
+    await expect(page).toHaveURL(/range=max/);
   });
 });
 
@@ -94,7 +139,7 @@ test.describe('what the range does to a screen', () => {
     await page.goto('/trades');
     const all = Number((await page.locator('main').innerText()).match(/(\d+) trades/)![1]);
 
-    await page.getByRole('button', { name: 'Last month', exact: true }).click();
+    await choose(page, 'Last month');
     // The preset is a form submit, so the figure has to be read after the redirect lands
     // rather than off the page that is still on screen while it is in flight.
     await expect(page).toHaveURL(/range=last-month/);
@@ -108,7 +153,7 @@ test.describe('what the range does to a screen', () => {
     // Changing the range on a table narrowed to crypto must not throw the narrowing away —
     // and the page number, which names a position inside the *old* window, must not survive.
     await page.goto('/trades?class=crypto&page=2');
-    await page.getByRole('button', { name: 'Last month', exact: true }).click();
+    await choose(page, 'Last month');
 
     await expect(page).toHaveURL(/class=crypto/);
     await expect(page).toHaveURL(/range=last-month/);
@@ -170,8 +215,16 @@ test.describe('what the range does to a screen', () => {
 });
 
 test.describe('the custom panel', () => {
-  const open = (page: Page) =>
-    page.getByRole('button', { name: 'Custom range' }).click();
+  /*
+   * By what the button controls, not by what it says.
+   *
+   * It says two different things on purpose now: "Custom range" from `lg`, where a segmented
+   * row of presets sits beside it and this is only the other door — and the *active range
+   * itself* below that, where it is the only control and its job is to answer "what am I
+   * looking at". A name that changes with the viewport is not a handle a test can hold.
+   */
+  const picker = (page: Page) => page.locator('button[aria-controls="tri-range-custom"]');
+  const open = (page: Page) => picker(page).click();
 
   test('applies a month range', async ({ page }) => {
     await page.goto('/dashboard');
@@ -252,7 +305,7 @@ test.describe('the custom panel', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toHaveCount(0);
     // Otherwise the way out of the popover is hunting for the button again.
-    await expect(page.getByRole('button', { name: 'Custom range' })).toBeFocused();
+    await expect(picker(page)).toBeFocused();
   });
 
   test('dismisses on a click elsewhere', async ({ page }) => {
@@ -271,13 +324,10 @@ test.describe('the custom panel', () => {
     await page.goto('/dashboard?range=2026-05..2026-07');
     await expect(page.locator('select[name="fromMonthMonth"]')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Maximum', exact: true }).click();
+    await choose(page, 'Maximum');
     await expect(page).toHaveURL(/range=max/);
     await expect(page.locator('select[name="fromMonthMonth"]')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Custom range' })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
+    await expect(picker(page)).toHaveAttribute('aria-expanded', 'false');
   });
 });
 
