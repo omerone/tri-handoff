@@ -15,7 +15,9 @@ export type Mt5CardLabels = WizardLabels & {
   slotEmpty: string;
   disconnect: string;
   disconnectTitle: string;
-  /** What happens to the history when the box below is left alone. */
+  /** The either/or itself: what should happen to this account's trades. */
+  disconnectQuestion: string;
+  /** The answer that loses nothing, and the preselected one. */
   disconnectKeeps: string;
   disconnectRemoveWarn: string;
   disconnectCancel: string;
@@ -152,8 +154,8 @@ export function Mt5Card({
 function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5CardLabels }) {
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
-  // Always starts unticked, including on a second visit to the panel: carrying a previous
-  // answer forward would mean a tick made once could delete a book later.
+  // Always reopens on "keep", including after a previous visit chose otherwise: carrying an
+  // answer forward would mean a choice made once could delete a book later.
   const [removeData, setRemoveData] = useState(false);
 
   return (
@@ -218,33 +220,53 @@ function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5
       </dl>
 
       {/*
-        A panel rather than a `confirm()`, because this is a choice and not a yes/no.
+        An asked question, not an opt-in box.
 
-        Keeping the trades stays the default — they record what the trader actually did, and
-        unplugging a broker does not unmake a year of it — so the destructive half is a box
-        that has to be ticked. A dialog with two buttons would have made "delete my history"
-        as easy to hit as "no", which for the one irreversible action on this screen is the
-        wrong shape.
+        What happens to the history is the part of disconnecting that a person cannot undo, so
+        it is put to them as an either/or with both answers written out, rather than a
+        checkbox whose unticked state quietly means "keep". Radios also make the panel state
+        what it is *about* to do at all times, which a checkbox only does once you have read
+        the sentence beside it.
+
+        Keeping is still preselected, because it is the answer that loses nothing. The delete
+        half carries its own colour and its own count so that choosing it is deliberate.
       */}
       {confirming ? (
-        <div className="border-line bg-raised flex flex-col gap-2 rounded-[10px] border p-3">
+        <div className="border-line bg-raised flex flex-col gap-2.5 rounded-[10px] border p-3">
           <p className="text-text text-xs font-semibold">{labels.disconnectTitle}</p>
+          <p className="text-dim text-[11px] leading-relaxed">{labels.disconnectQuestion}</p>
 
-          <label className="text-dim flex items-start gap-2 text-[11px] leading-relaxed">
-            <input
-              type="checkbox"
-              checked={removeData}
-              onChange={(event) => setRemoveData(event.target.checked)}
-              className="accent-brand mt-0.5 size-3.5 shrink-0 cursor-pointer"
-            />
-            <span>{account.removeDataLabel}</span>
-          </label>
+          <div role="radiogroup" aria-label={labels.disconnectQuestion} className="flex flex-col gap-1.5">
+            <label className="flex items-start gap-2 text-[11px] leading-relaxed">
+              <input
+                type="radio"
+                name={`disconnect-${account.id}`}
+                checked={!removeData}
+                onChange={() => setRemoveData(false)}
+                className="accent-brand mt-0.5 size-3.5 shrink-0 cursor-pointer"
+              />
+              <span className="text-text">{labels.disconnectKeeps}</span>
+            </label>
 
-          {/* Only when it applies. A standing "this cannot be undone" beside an action that is
-              usually reversible is how people stop reading the ones that are not. */}
-          <p className={`text-[11px] leading-relaxed ${removeData ? 'text-neg' : 'text-dim'}`}>
-            {removeData ? labels.disconnectRemoveWarn : labels.disconnectKeeps}
-          </p>
+            <label className="flex items-start gap-2 text-[11px] leading-relaxed">
+              <input
+                type="radio"
+                name={`disconnect-${account.id}`}
+                checked={removeData}
+                onChange={() => setRemoveData(true)}
+                className="accent-neg mt-0.5 size-3.5 shrink-0 cursor-pointer"
+              />
+              <span className={removeData ? 'text-neg font-semibold' : 'text-text'}>
+                {account.removeDataLabel}
+              </span>
+            </label>
+          </div>
+
+          {/* Only once the irreversible answer is the selected one. A standing "cannot be
+              undone" beside an action that usually can be is how people stop reading it. */}
+          {removeData ? (
+            <p className="text-neg text-[11px] leading-relaxed">{labels.disconnectRemoveWarn}</p>
+          ) : null}
 
           <div className="flex items-center gap-2">
             <button
@@ -257,7 +279,11 @@ function Connected({ account, labels }: { account: ConnectedAccount; labels: Mt5
                   void disconnectMt5Action(account.id, { removeData });
                 })
               }
-              className="bg-neg/10 text-neg border-neg/30 hover:bg-neg/20 rounded-[10px] border px-3 py-2 text-xs font-semibold disabled:opacity-60"
+              className={`rounded-[10px] border px-3 py-2 text-xs font-semibold disabled:opacity-60 ${
+                removeData
+                  ? 'bg-neg/10 text-neg border-neg/30 hover:bg-neg/20'
+                  : 'border-line bg-raised text-text hover:text-neg'
+              }`}
             >
               {labels.disconnect}
             </button>

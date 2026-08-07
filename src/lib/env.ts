@@ -131,6 +131,26 @@ function parseEnv(): Env {
   if (parsed.data.MT5_PROVIDER === 'metaapi' && !parsed.data.METAAPI_TOKEN) {
     throw new Error('MT5_PROVIDER=metaapi requires METAAPI_TOKEN to be set.');
   }
+  /*
+   * The mock broker must never run in production, and it defaults on.
+   *
+   * It is not a stub that returns nothing — it accepts *any* account number with *any*
+   * password and answers with a generated book and a generated balance. In development that
+   * is the point. In production it means a trader types their real account number, is told it
+   * connected, and is shown dozens of trades that never happened, with no marking anywhere to
+   * say the figures are invented.
+   *
+   * `docker-compose.yml` reads `${MT5_PROVIDER:-mock}`, so this is one unset variable away on
+   * every deploy — and the app has already carried invented trades in production once. Failing
+   * at boot is the right cost: a deployment that cannot say which broker it talks to should
+   * not be answering questions about somebody's money.
+   */
+  if (parsed.data.NODE_ENV === 'production' && parsed.data.MT5_PROVIDER === 'mock') {
+    throw new Error(
+      'MT5_PROVIDER=mock is refused in production: the mock accepts any credentials and ' +
+        'generates trades that never happened. Set MT5_PROVIDER=metaapi with METAAPI_TOKEN.',
+    );
+  }
   if (parsed.data.QUOTES_PROVIDER === 'twelvedata' && !parsed.data.TWELVEDATA_API_KEY) {
     throw new Error('QUOTES_PROVIDER=twelvedata requires TWELVEDATA_API_KEY to be set.');
   }

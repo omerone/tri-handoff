@@ -100,6 +100,7 @@ export default async function SettingsPage() {
             dayAccount: t('dayAccount'),
               slotEmpty: t('slotEmpty'),
               disconnectTitle: t('disconnectTitle'),
+              disconnectQuestion: t('disconnectQuestion'),
               disconnectKeeps: t('disconnectKeeps'),
               disconnectRemoveWarn: t('disconnectRemoveWarn'),
               disconnectCancel: t('disconnectCancel'),

@@ -8,6 +8,8 @@ import { applyRangeAction } from '@/app/actions/range';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { describeRange } from '@/lib/time/range';
 import { getMt5Account, listFinanceEntries, listLongPositions } from '@/lib/db';
+import { computeMetrics } from '@/lib/analytics';
+import { loadBook } from '@/lib/analytics/load';
 import { portfolioTotals } from '@/lib/positions/valuation';
 import { cumulativeCash, expensesByCategory, rangeBalance, totalWealth, yearBalance } from '@/lib/finance/balance';
 import { isKnownCategory, suggestedCategories } from '@/lib/finance/categories';
@@ -116,7 +118,22 @@ export default async function FinancePage({
   const fromTrading = (amount: number) =>
     tradingMoney.converted ? amount * tradingMoney.fx.rate : amount;
 
-  const tradingValue = account?.equity ?? account?.balance ?? 0;
+  /*
+   * What the trading account is worth, and why it is not simply `?? 0`.
+   *
+   * The broker's own equity is the best answer when there is one: it counts open positions and
+   * anything the journal never saw. But it is only there once a sync has succeeded, and a
+   * connected account that has never synced — a broker refusing the connection, a token that
+   * expired, an account added minutes ago — reported zero. Net worth then silently dropped a
+   * whole leg and still rendered as a fact: this deployment showed ₪34,004 while the dashboard
+   * showed ₪74,127 for the same account, with nothing on screen to say a leg was missing.
+   *
+   * So the fallback is the book the dashboard already draws its own balance from — deposits
+   * plus everything realised — which is the same quantity arrived at from the other side. Zero
+   * is kept for the case it is actually true: no account at all.
+   */
+  const reported = account?.equity ?? account?.balance ?? null;
+  const tradingValue = account === null ? 0 : (reported ?? (await bookBalance(session.ctx)));
 
   // Long positions can be held in several currencies, so each is converted before the
   // portfolio is totalled. If any one of them has no rate, the total is not computed at all
@@ -413,4 +430,20 @@ function defaultDateFor(
 ): string {
   const now = iso({ year: today.year, month: today.month, day: today.day });
   return now >= iso(period.from) && now <= iso(period.to) ? now : iso(period.from);
+}
+
+/**
+ * The account balance the dashboard shows, arrived at from the book rather than the broker.
+ *
+ * Deposits plus everything realised — the same expression the dashboard's own balance KPI
+ * uses, so the two screens cannot quietly disagree about what one account is worth. Used only
+ * as a fallback: when the broker has reported an equity, that is the better number, because it
+ * counts open positions the journal has no row for.
+ *
+ * `loadBook` is request-cached, so asking for it here costs nothing on a page that has
+ * already been rendered from the same context.
+ */
+async function bookBalance(ctx: Parameters<typeof loadBook>[0]): Promise<number> {
+  const book = await loadBook(ctx);
+  return book.openingBalance + computeMetrics(book.trades).net;
 }
