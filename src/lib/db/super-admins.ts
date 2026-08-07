@@ -1,4 +1,5 @@
 import 'server-only';
+import { ADMIN_ABSOLUTE_TTL_MS } from '@/lib/auth/session-limits';
 import { prisma } from './prisma';
 
 /**
@@ -32,12 +33,34 @@ export async function createAdminSession(params: {
   await prisma.superAdminSession.create({ data: params });
 }
 
+/**
+ * Two clocks, as on a client session: `expires_at` is the idle window and rolls, `created_at`
+ * is the ceiling and does not. Both belong in the WHERE clause so there is no way to read an
+ * operator session without applying them.
+ */
 export async function findAdminSession(tokenHash: string) {
+  const now = Date.now();
   const row = await prisma.superAdminSession.findFirst({
-    where: { tokenHash, expiresAt: { gt: new Date() } },
-    select: { id: true, superAdmin: { select: { id: true, email: true } } },
+    where: {
+      tokenHash,
+      expiresAt: { gt: new Date(now) },
+      createdAt: { gt: new Date(now - ADMIN_ABSOLUTE_TTL_MS) },
+    },
+    select: { id: true, expiresAt: true, superAdmin: { select: { id: true, email: true } } },
   });
-  return row ? { sessionId: row.id, adminId: row.superAdmin.id, email: row.superAdmin.email } : null;
+  return row
+    ? {
+        sessionId: row.id,
+        adminId: row.superAdmin.id,
+        email: row.superAdmin.email,
+        expiresAt: row.expiresAt,
+      }
+    : null;
+}
+
+/** Rolls the idle window of an operator session that is being used. */
+export async function touchAdminSession(sessionId: string, expiresAt: Date): Promise<void> {
+  await prisma.superAdminSession.update({ where: { id: sessionId }, data: { expiresAt } });
 }
 
 export async function deleteAdminSession(tokenHash: string): Promise<void> {

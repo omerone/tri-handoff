@@ -77,7 +77,12 @@
     "twoFactorWrong": "הקוד שגוי או שפג תוקפו",
     "twoFactorExpired": "הזמן להזנת הקוד עבר. יש להיכנס שוב.",
     "twoFactorExhausted": "יותר מדי קודים שגויים. יש להיכנס שוב.",
-    "twoFactorRecoveryHint": "אין גישה לטלפון? אפשר להזין קוד שחזור."
+    "twoFactorRecoveryHint": "אין גישה לטלפון? אפשר להזין קוד שחזור.",
+    "sessionExpiringTitle": "עוד רגע תנותק",
+    "sessionExpiringBody": "TRi מנתקת אחרי שעה ללא פעילות. נותרו {seconds} שניות.",
+    "sessionStay": "השאר מחובר",
+    "sessionExpiredIdle": "נותקת אחרי שעה ללא פעילות. יש להתחבר מחדש.",
+    "sessionExpiredAbsolute": "נותקת מפני שההתחברות הגיעה לאורך המרבי שלה. יש להתחבר מחדש."
   },
   "kpi": {
     "balance": "יתרת חשבון",
@@ -536,15 +541,7 @@
     "dayAccount": "חשבון דיי טרייד"
   },
   "calendar": {
-    "weekdays": [
-      "א",
-      "ב",
-      "ג",
-      "ד",
-      "ה",
-      "ו",
-      "ש"
-    ],
+    "weekdays": ["א", "ב", "ג", "ד", "ה", "ו", "ש"],
     "noTrades": "—",
     "prevMonth": "חודש קודם",
     "nextMonth": "חודש הבא",

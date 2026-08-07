@@ -3,14 +3,21 @@ import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { generateToken, hashToken } from '@/lib/crypto/tokens';
-import { createAdminSession, deleteAdminSession, findAdminSession } from '@/lib/db/unscoped';
+import {
+  createAdminSession,
+  deleteAdminSession,
+  findAdminSession,
+  touchAdminSession,
+} from '@/lib/db/unscoped';
 import { env } from '@/lib/env';
 import { normalizeDomain } from '@/lib/tenant/domain';
 import { getRequestHost } from '@/lib/tenant/resolve';
 import { ADMIN_SESSION_COOKIE, cookieOptions, packCookie, unpackCookie } from './cookie';
-
-/** Operator sessions are short: 8 hours, no rolling refresh. */
-const ADMIN_TTL_MS = 8 * 60 * 60 * 1000;
+import {
+  ADMIN_ABSOLUTE_TTL_MS,
+  ADMIN_IDLE_TTL_MS,
+  SESSION_REFRESH_AFTER_MS,
+} from './session-limits';
 
 export type AdminIdentity = { adminId: string; email: string };
 
@@ -31,7 +38,17 @@ export const getAdmin = cache(async (): Promise<AdminIdentity | null> => {
   if (!token) return null;
 
   const record = await findAdminSession(hashToken(token));
-  return record ? { adminId: record.adminId, email: record.email } : null;
+  if (!record) return null;
+
+  // Half an hour of inactivity ends it, and the eight-hour ceiling in `findAdminSession` ends
+  // it regardless. Rolling here is what turns the ceiling into a ceiling rather than the only
+  // clock there was: before this, a panel signed into at nine was open at five untouched.
+  const remaining = record.expiresAt.getTime() - Date.now();
+  if (remaining < ADMIN_IDLE_TTL_MS - SESSION_REFRESH_AFTER_MS) {
+    await touchAdminSession(record.sessionId, new Date(Date.now() + ADMIN_IDLE_TTL_MS));
+  }
+
+  return { adminId: record.adminId, email: record.email };
 });
 
 export async function requireAdmin(): Promise<AdminIdentity> {
@@ -61,7 +78,10 @@ export async function adminForApi(): Promise<
   const admin = await getAdmin();
   if (!admin) {
     return {
-      response: Response.json({ error: 'Unauthorized: operator session required' }, { status: 401 }),
+      response: Response.json(
+        { error: 'Unauthorized: operator session required' },
+        { status: 401 },
+      ),
     };
   }
   return { admin };
@@ -72,11 +92,13 @@ export async function startAdminSession(superAdminId: string): Promise<void> {
   await createAdminSession({
     superAdminId,
     tokenHash: hashToken(token),
-    expiresAt: new Date(Date.now() + ADMIN_TTL_MS),
+    expiresAt: new Date(Date.now() + ADMIN_IDLE_TTL_MS),
   });
 
   const store = await cookies();
-  store.set(ADMIN_SESSION_COOKIE, packCookie(token), cookieOptions(ADMIN_TTL_MS / 1000));
+  // The cookie is given the ceiling, not the idle window: it is transport, and the row is what
+  // decides. A cookie that dies at half past would sign out an operator who is working.
+  store.set(ADMIN_SESSION_COOKIE, packCookie(token), cookieOptions(ADMIN_ABSOLUTE_TTL_MS / 1000));
 }
 
 export async function endAdminSession(): Promise<void> {

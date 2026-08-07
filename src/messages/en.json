@@ -77,7 +77,12 @@
     "twoFactorWrong": "That code is wrong or has expired",
     "twoFactorExpired": "The code step timed out. Please sign in again.",
     "twoFactorExhausted": "Too many wrong codes. Please sign in again.",
-    "twoFactorRecoveryHint": "No access to your phone? Enter a recovery code instead."
+    "twoFactorRecoveryHint": "No access to your phone? Enter a recovery code instead.",
+    "sessionExpiringTitle": "You'll be signed out shortly",
+    "sessionExpiringBody": "TRi signs you out after an hour without activity. {seconds} seconds left.",
+    "sessionStay": "Stay signed in",
+    "sessionExpiredIdle": "You were signed out after an hour without activity. Please sign in again.",
+    "sessionExpiredAbsolute": "You were signed out because the sign-in reached its maximum length. Please sign in again."
   },
   "kpi": {
     "balance": "Account balance",
@@ -536,15 +541,7 @@
     "dayAccount": "Day-trading account"
   },
   "calendar": {
-    "weekdays": [
-      "S",
-      "M",
-      "T",
-      "W",
-      "T",
-      "F",
-      "S"
-    ],
+    "weekdays": ["S", "M", "T", "W", "T", "F", "S"],
     "noTrades": "—",
     "prevMonth": "Previous month",
     "nextMonth": "Next month",

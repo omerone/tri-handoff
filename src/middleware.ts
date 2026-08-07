@@ -113,6 +113,30 @@ export function middleware(request: NextRequest) {
   // "strict-origin-when-cross-origin" balances privacy and analytics utility.
   response.headers.set('referrer-policy', 'strict-origin-when-cross-origin');
 
+  /*
+   * Cross-Origin-Opener-Policy: cut the handle a popup keeps on the page that opened it.
+   *
+   * Without it, any page this app opens in a new window — and any page that opens *this* one
+   * — keeps a live `window.opener` reference across origins. That is the lever behind tabnabbing
+   * (the opener quietly navigates the original tab to a login page it controls) and it is what
+   * puts this browsing context in the same process group as somebody else's, which is the
+   * precondition for reading it through a speculative-execution bug.
+   *
+   * `same-origin` costs nothing here: nothing in this app is opened by a third party or opens
+   * one. `frame-ancestors 'none'` already covers being embedded; this covers being *linked*.
+   */
+  response.headers.set('cross-origin-opener-policy', 'same-origin');
+
+  /*
+   * Cross-Origin-Resource-Policy: another site cannot load these responses as a subresource.
+   *
+   * CSP governs what this page may fetch. It says nothing about someone else's page fetching
+   * a page of ours as an image or a script and measuring what comes back — the shape of a
+   * cross-site leak, and the reason a dashboard behind a cookie is worth protecting even
+   * though the attacker cannot read the body directly.
+   */
+  response.headers.set('cross-origin-resource-policy', 'same-origin');
+
   // Permissions-Policy (formerly Feature-Policy): disable unused browser features.
   // This prevents JavaScript from accessing sensitive APIs that aren't needed.
   const permissionsPolicy = [

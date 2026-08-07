@@ -1,6 +1,12 @@
 import { TenantGate } from '@/components/tenant-gate';
 import { AppShell } from '@/components/shell/app-shell';
 import { LiveRefresh } from '@/components/shell/live-refresh';
+import { SessionExpiry } from '@/components/shell/session-expiry';
+import {
+  SESSION_ABSOLUTE_TTL_MS,
+  SESSION_IDLE_TTL_MS,
+  SESSION_WARN_BEFORE_MS,
+} from '@/lib/auth/session-limits';
 import { requireSession } from '@/lib/auth/session';
 
 /**
@@ -31,6 +37,15 @@ async function Protected({ children }: { children: React.ReactNode }) {
   return (
     <AppShell session={session}>
       <LiveRefresh />
+      {/*
+        Numbers, not a formatter. The countdown's own strings are translated inside the
+        component; anything that has to be *called* cannot cross this boundary.
+      */}
+      <SessionExpiry
+        idleMs={SESSION_IDLE_TTL_MS}
+        warnMs={SESSION_WARN_BEFORE_MS}
+        endsAt={session.startedAt.getTime() + SESSION_ABSOLUTE_TTL_MS}
+      />
       {children}
     </AppShell>
   );

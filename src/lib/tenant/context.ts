@@ -44,4 +44,12 @@ export type TenantSession = {
   readonly tenant: ActiveTenant;
   readonly user: TenantUser;
   readonly ctx: TenantContext;
+  /**
+   * When this sign-in happened, so the shell can say when it runs out.
+   *
+   * The two limits are computed from it — `SESSION_IDLE_TTL_MS` from the last use and
+   * `SESSION_ABSOLUTE_TTL_MS` from here — and the database enforces both. This copy exists so
+   * a forgotten tab can say so on screen instead of looking signed in until someone clicks.
+   */
+  readonly startedAt: Date;
 };

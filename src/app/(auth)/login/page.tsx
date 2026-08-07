@@ -6,10 +6,27 @@ import { LoginForm } from './login-form';
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reset?: string }>;
+  searchParams: Promise<{ reset?: string; expired?: string }>;
 }) {
   const t = await getTranslations('auth');
   const params = await searchParams;
+
+  /*
+   * Why they are back here.
+   *
+   * Being returned to a login screen with no explanation reads as a bug, or worse as somebody
+   * else having signed them out — and the honest answer is short and reassuring. Matched
+   * exactly rather than passed through: the value arrives in a query string, which is to say
+   * from whoever sent the link.
+   */
+  const notice =
+    params.expired === 'absolute'
+      ? t('sessionExpiredAbsolute')
+      : params.expired === 'idle'
+        ? t('sessionExpiredIdle')
+        : params.reset === 'done'
+          ? t('resetDone')
+          : undefined;
 
   return (
     <Card>
@@ -33,7 +50,7 @@ export default async function LoginPage({
           twoFactorSubmit: t('twoFactorSubmit'),
           twoFactorRecoveryHint: t('twoFactorRecoveryHint'),
         }}
-        initialNotice={params.reset === 'done' ? t('resetDone') : undefined}
+        initialNotice={notice}
         forgot={
           <Link href="/forgot" className="text-dim hover:text-text text-xs">
             {t('forgot')}

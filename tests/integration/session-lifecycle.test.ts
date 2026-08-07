@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { SESSION_ABSOLUTE_TTL_MS } from '@/lib/auth/session-limits';
 import { hashToken } from '@/lib/crypto/tokens';
 import { deleteOtherUserSessions, pruneExpiredSessions } from '@/lib/db';
 import {
@@ -103,6 +104,58 @@ describe('findSession', () => {
     expect(await findSession(hashToken(token), suspended.tenantId)).toMatchObject({
       tenantStatus: 'suspended',
     });
+  });
+});
+
+describe('the absolute cap', () => {
+  /**
+   * The idle window alone can be held open forever — by a tab that polls, a machine that
+   * never sleeps, or a stolen cookie replayed once an hour. The cap is counted from
+   * `created_at`, which nothing rewrites, so twelve hours after signing in the password is
+   * asked for again however busy the session has been.
+   */
+  async function ageSession(token: string, byMs: number): Promise<void> {
+    await testDb.session.update({
+      where: { tokenHash: hashToken(token) },
+      data: { createdAt: new Date(Date.now() - byMs) },
+    });
+  }
+
+  it('refuses a session older than the cap even with its idle window wide open', async () => {
+    const token = await openSession(alice, 30 * MINUTE);
+    await ageSession(token, SESSION_ABSOLUTE_TTL_MS + MINUTE);
+
+    expect(await findSession(hashToken(token), alice.tenantId)).toBeNull();
+  });
+
+  it('leaves a session just inside the cap alone', async () => {
+    const token = await openSession(alice, 30 * MINUTE);
+    await ageSession(token, SESSION_ABSOLUTE_TTL_MS - 5 * MINUTE);
+
+    expect(await findSession(hashToken(token), alice.tenantId)).not.toBeNull();
+  });
+
+  it('cannot be pushed back by using the session', async () => {
+    const token = await openSession(alice, MINUTE);
+    await ageSession(token, SESSION_ABSOLUTE_TTL_MS - MINUTE);
+
+    const found = await findSession(hashToken(token), alice.tenantId);
+    expect(found).not.toBeNull();
+
+    // The rolling refresh, which is the only thing that writes to a live session.
+    await touchSession(found!.sessionId, new Date(Date.now() + 60 * MINUTE));
+    await ageSession(token, SESSION_ABSOLUTE_TTL_MS + MINUTE);
+
+    expect(await findSession(hashToken(token), alice.tenantId)).toBeNull();
+  });
+
+  it('is swept up by the prune, not left in the table looking live', async () => {
+    const old = await openSession(bob, 60 * MINUTE);
+    await ageSession(old, SESSION_ABSOLUTE_TTL_MS + MINUTE);
+
+    await pruneExpiredSessions();
+
+    expect(await testDb.session.findUnique({ where: { tokenHash: hashToken(old) } })).toBeNull();
   });
 });
 

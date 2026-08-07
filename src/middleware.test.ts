@@ -132,6 +132,23 @@ describe('security headers', () => {
     expect(getHeader(response, 'referrer-policy')).toBe('strict-origin-when-cross-origin');
   });
 
+  /**
+   * The two that cover what `frame-ancestors` does not.
+   *
+   * That directive stops this app being put in somebody's iframe. It says nothing about being
+   * *opened* by another page — which leaves a live `window.opener` handle across origins, the
+   * lever behind tabnabbing — or about another origin loading a page of ours as a subresource
+   * and measuring the response. Neither is expensive here: nothing in this app opens a
+   * cross-origin window or is meant to be embedded anywhere.
+   */
+  it('severs the opener relationship across origins', () => {
+    expect(getHeader(respond(), 'cross-origin-opener-policy')).toBe('same-origin');
+  });
+
+  it('refuses to be loaded as another origin’s subresource', () => {
+    expect(getHeader(respond(), 'cross-origin-resource-policy')).toBe('same-origin');
+  });
+
   it('sets restrictive Permissions-Policy', () => {
     const response = respond();
     const policy = getHeader(response, 'permissions-policy');

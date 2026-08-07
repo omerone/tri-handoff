@@ -1,5 +1,6 @@
 import 'server-only';
 import type { Locale } from '@/i18n/config';
+import { SESSION_ABSOLUTE_TTL_MS } from '@/lib/auth/session-limits';
 import { prisma } from './prisma';
 
 /**
@@ -21,7 +22,10 @@ export type SessionRecord = {
   tenantName: string;
   tenantDomain: string;
   tenantStatus: 'active' | 'suspended';
+  /** End of the idle window. Moves forward every time the session is used. */
   expiresAt: Date;
+  /** When the session was issued. Fixed, and what the absolute cap is counted from. */
+  createdAt: Date;
 };
 
 export async function createSession(params: {
@@ -48,20 +52,28 @@ export async function createSession(params: {
  * The caller passes the tenant resolved from the request host; a session issued on one
  * client's domain must not authenticate a request arriving on another's, so the tenant id
  * is part of the WHERE clause rather than something checked afterwards.
+ *
+ * Both clocks are in the WHERE clause for the same reason. `expiresAt` is the idle window and
+ * moves every time the session is used; `createdAt` is the absolute cap and never moves. A
+ * check written after the query is a check some future caller forgets to make — here there is
+ * no way to read a session without them.
  */
 export async function findSession(
   tokenHash: string,
   tenantId: string,
 ): Promise<SessionRecord | null> {
+  const now = Date.now();
   const row = await prisma.session.findFirst({
     where: {
       tokenHash,
-      expiresAt: { gt: new Date() },
+      expiresAt: { gt: new Date(now) },
+      createdAt: { gt: new Date(now - SESSION_ABSOLUTE_TTL_MS) },
       user: { tenantId },
     },
     select: {
       id: true,
       expiresAt: true,
+      createdAt: true,
       user: {
         select: {
           id: true,
@@ -93,6 +105,7 @@ export async function findSession(
     tenantDomain: row.user.tenant.domain,
     tenantStatus: row.user.tenant.status,
     expiresAt: row.expiresAt,
+    createdAt: row.createdAt,
   };
 }
 
@@ -131,7 +144,20 @@ export async function deleteOtherUserSessions(
   return count;
 }
 
+/**
+ * Rows that can no longer authenticate anything: past the idle window, or past the absolute
+ * cap. Both, because `findSession` refuses both — a row kept for only one of them is a row
+ * that sits in the table forever looking live.
+ */
 export async function pruneExpiredSessions(): Promise<number> {
-  const { count } = await prisma.session.deleteMany({ where: { expiresAt: { lte: new Date() } } });
+  const now = Date.now();
+  const { count } = await prisma.session.deleteMany({
+    where: {
+      OR: [
+        { expiresAt: { lte: new Date(now) } },
+        { createdAt: { lte: new Date(now - SESSION_ABSOLUTE_TTL_MS) } },
+      ],
+    },
+  });
   return count;
 }

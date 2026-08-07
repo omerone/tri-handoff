@@ -19,10 +19,9 @@ import {
   packCookie,
   SESSION_COOKIE,
   SESSION_COOKIE_MAX_AGE_MS,
-  SESSION_REFRESH_AFTER_MS,
-  SESSION_TTL_MS,
   unpackCookie,
 } from './cookie';
+import { SESSION_IDLE_TTL_MS, SESSION_REFRESH_AFTER_MS } from '@/lib/auth/session-limits';
 
 /**
  * The session is always read *through the tenant resolved from the request host*. A cookie
@@ -40,10 +39,10 @@ export const getSession = cache(async (): Promise<TenantSession | null> => {
   const record = await findSession(hashToken(token), tenantLookup.tenant.id);
   if (!record) return null;
 
-  // Rolling expiry, written at most once a day.
+  // Rolling idle window, written at most once every few minutes.
   const remaining = record.expiresAt.getTime() - Date.now();
-  if (remaining < SESSION_TTL_MS - SESSION_REFRESH_AFTER_MS) {
-    await touchSession(record.sessionId, new Date(Date.now() + SESSION_TTL_MS));
+  if (remaining < SESSION_IDLE_TTL_MS - SESSION_REFRESH_AFTER_MS) {
+    await touchSession(record.sessionId, new Date(Date.now() + SESSION_IDLE_TTL_MS));
   }
 
   return {
@@ -58,6 +57,7 @@ export const getSession = cache(async (): Promise<TenantSession | null> => {
       lastLoginAt: record.lastLoginAt,
     },
     ctx: makeTenantContext(record.tenantId, record.userId),
+    startedAt: record.createdAt,
   };
 });
 
@@ -88,7 +88,7 @@ export async function startSession(userId: string): Promise<void> {
   await createSession({
     userId,
     tokenHash: hashToken(token),
-    expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    expiresAt: new Date(Date.now() + SESSION_IDLE_TTL_MS),
     // The socket peer as the proxy saw it, never the first hop of X-Forwarded-For: that list
     // is one a caller may prepend to, and this address is what an investigation would trust.
     ip: await clientIpForRecord(),

@@ -66,14 +66,9 @@ vi.mock('@/lib/db/unscoped', async () => ({
 }));
 
 const { hashToken } = await import('@/lib/crypto/tokens');
-const {
-  SESSION_COOKIE,
-  SESSION_COOKIE_MAX_AGE_MS,
-  SESSION_REFRESH_AFTER_MS,
-  SESSION_TTL_MS,
-  packCookie,
-  unpackCookie,
-} = await import('./cookie');
+const { SESSION_COOKIE, SESSION_COOKIE_MAX_AGE_MS, packCookie, unpackCookie } =
+  await import('./cookie');
+const { SESSION_IDLE_TTL_MS, SESSION_REFRESH_AFTER_MS } = await import('./session-limits');
 const { endSession, getSession, requireSession, startSession } = await import('./session');
 
 // --- fixtures ---------------------------------------------------------------
@@ -96,7 +91,8 @@ function record(overrides: Partial<SessionRecord> = {}): SessionRecord {
     tenantName: TENANT.name,
     tenantDomain: TENANT.domain,
     tenantStatus: 'active',
-    expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    expiresAt: new Date(Date.now() + SESSION_IDLE_TTL_MS),
+    createdAt: new Date(),
     ...overrides,
   };
 }
@@ -191,21 +187,34 @@ describe('getSession', () => {
   });
 });
 
-describe('rolling expiry', () => {
-  it('does not write on a session that was refreshed within the last day', async () => {
+describe('the idle window', () => {
+  it('is an hour, which is the whole point of it', () => {
+    // Named rather than inferred. It was thirty days, and the figure is the feature: a laptop
+    // left open in a café stayed signed in for a month.
+    expect(SESSION_IDLE_TTL_MS).toBe(60 * 60 * 1000);
+    // Short enough to matter, and rewritten often enough that the hour is accurate to within
+    // the refresh interval rather than to within a day.
+    expect(SESSION_REFRESH_AFTER_MS).toBeLessThan(SESSION_IDLE_TTL_MS / 4);
+  });
+
+  it('does not write on a session that was refreshed a moment ago', async () => {
     signIn();
     findSession.mockResolvedValue(
-      record({ expiresAt: new Date(Date.now() + SESSION_TTL_MS - SESSION_REFRESH_AFTER_MS + 5_000) }),
+      record({
+        expiresAt: new Date(Date.now() + SESSION_IDLE_TTL_MS - SESSION_REFRESH_AFTER_MS + 5_000),
+      }),
     );
 
     await getSession();
     expect(touchSession).not.toHaveBeenCalled();
   });
 
-  it('extends a session that has been running for more than a day', async () => {
+  it('pushes the window out again on a session that is still being used', async () => {
     signIn();
     findSession.mockResolvedValue(
-      record({ expiresAt: new Date(Date.now() + SESSION_TTL_MS - SESSION_REFRESH_AFTER_MS - 5_000) }),
+      record({
+        expiresAt: new Date(Date.now() + SESSION_IDLE_TTL_MS - SESSION_REFRESH_AFTER_MS - 5_000),
+      }),
     );
 
     await getSession();
@@ -213,8 +222,8 @@ describe('rolling expiry', () => {
 
     const [sessionId, expiresAt] = touchSession.mock.calls[0] as [string, Date];
     expect(sessionId).toBe('sess-1');
-    // Full TTL again, not the remainder — an active user is never logged out mid-session.
-    expect(expiresAt.getTime() - Date.now()).toBeGreaterThan(SESSION_TTL_MS - 5_000);
+    // A full hour again, not the remainder — somebody working is never signed out mid-session.
+    expect(expiresAt.getTime() - Date.now()).toBeGreaterThan(SESSION_IDLE_TTL_MS - 5_000);
   });
 });
 
@@ -242,7 +251,7 @@ describe('startSession', () => {
     expect(args.tokenHash).toBe(hashToken(token as string));
     // The raw token must appear nowhere in what is written to the database.
     expect(JSON.stringify(createSession.mock.calls[0])).not.toContain(token as string);
-    expect(args.expiresAt.getTime() - Date.now()).toBeGreaterThan(SESSION_TTL_MS - 5_000);
+    expect(args.expiresAt.getTime() - Date.now()).toBeGreaterThan(SESSION_IDLE_TTL_MS - 5_000);
   });
 
   it('sets the cookie httpOnly, SameSite=Lax and path-wide', async () => {
@@ -258,7 +267,7 @@ describe('startSession', () => {
       // its row authenticates nothing — findSession filters on expiresAt.
       maxAge: SESSION_COOKIE_MAX_AGE_MS / 1000,
     });
-    expect(SESSION_COOKIE_MAX_AGE_MS).toBeGreaterThan(SESSION_TTL_MS);
+    expect(SESSION_COOKIE_MAX_AGE_MS).toBeGreaterThan(SESSION_IDLE_TTL_MS);
   });
 
   it('records the first forwarded hop as the client address', async () => {
