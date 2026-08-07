@@ -38,7 +38,10 @@ function displayDate(daysAgo: number): string {
 test('records a day trade that closed before today', async ({ page }) => {
   await page.goto('/long?book=day');
 
-  const form = page.locator('form').filter({ has: page.locator('input[name="symbol"]') }).first();
+  const form = page
+    .locator('form')
+    .filter({ has: page.locator('input[name="symbol"]') })
+    .first();
   await form.locator('input[name="symbol"]').fill(SYMBOL);
   // The close date only — the open date stays untouched, which is the whole point.
   await form.locator('input[placeholder="dd/mm/yyyy"]').first().fill(displayDate(5));
@@ -49,8 +52,17 @@ test('records a day trade that closed before today', async ({ page }) => {
   await expect(form.getByText('The open date is later than the close date.')).toHaveCount(0);
 
   // It landed in the shared book, with the R multiple the typed risk implies.
+  //
+  // Found in whichever of the two the viewport is showing: the trades screen renders a table
+  // from `md` up and a list of cards below it, each hiding the other, so a locator naming only
+  // `tbody tr` resolves to thirteen rows on a phone and every one of them hidden. Both carry
+  // the symbol and the multiple, which is the only part this test is about.
   await page.goto('/trades?range=max');
-  const row = page.locator('tbody tr').filter({ hasText: SYMBOL }).first();
-  await expect(row).toBeVisible();
-  await expect(row).toContainText('2.50R');
+  const entry = page
+    .locator('tbody tr, li')
+    .filter({ hasText: SYMBOL })
+    .filter({ visible: true })
+    .first();
+  await expect(entry).toBeVisible();
+  await expect(entry).toContainText('2.50R');
 });

@@ -64,12 +64,44 @@ export type RiskResult =
       risk: null;
       reason:
         | 'no-stop-loss'
+        /** The stop and the entry were the same price: a distance of zero risks nothing. */
         | 'zero-distance'
+        /** No position size, so no money behind the distance. Usually a hand-entered trade. */
+        | 'no-volume'
         /** The stop was past the entry: the exit was in profit, so nothing was at risk. */
         | 'stop-beyond-entry'
         | 'unknown-symbol'
         | 'unconvertible';
     };
+
+/**
+ * Whether the price itself is the exchange rate — the account currency is what this contract
+ * is *sized in*, so one unit of the quote currency is `1/price` of it.
+ *
+ * Exported because two places have to agree on it and did not. `computeRisk` uses it to take
+ * the shortcut, and `fetchQuoteRates` in sync.ts uses it to decide there is no rate worth
+ * asking the broker for. When the two conditions differed, symbols in the gap got neither: no
+ * rate was fetched *and* no shortcut applied, and every one of them came out `unconvertible` —
+ * the client's original symptom, reintroduced by the guard that was meant to prevent a
+ * different version of it.
+ *
+ * The test is "not an index", not "is forex", and the difference is the whole point. `1/price`
+ * follows from the contract size counting units of the base currency: true of a currency pair,
+ * true of a hundred ounces of gold or one bitcoin, and false of an index, where a contract is
+ * one index point and the base currency the broker reports is an artefact. `classifySymbol`
+ * calls a great many real currency pairs `other` — every exotic whose second currency is not in
+ * its list, and every broker suffix written without a separator, `EURUSDm` and `USDCADz` among
+ * them — so keying on `forex` quietly refused to price the exact family of names that made
+ * this bug hard to see in the first place. Metals and crypto name a base that is not a currency
+ * any account is denominated in, so admitting them costs nothing.
+ */
+export function baseImpliesRate(spec: SymbolSpec, accountCurrency: string): boolean {
+  return (
+    spec.assetClass !== 'indices' &&
+    spec.baseCurrency !== undefined &&
+    spec.baseCurrency === accountCurrency.toUpperCase()
+  );
+}
 
 /**
  * Converts one unit of the symbol's quote currency into the account currency.
@@ -80,6 +112,8 @@ export type RiskResult =
  *      price itself is the rate, so one JPY is 1/price dollars. No external data needed, and
  *      it is exact for the moment of the trade;
  *   3. anything else → an explicitly supplied rate, or nothing.
+ *
+ * Case 2 is `baseImpliesRate` below, and the condition there is load-bearing rather than tidy.
  */
 function quoteToAccountRate(
   spec: SymbolSpec,
@@ -90,7 +124,7 @@ function quoteToAccountRate(
   const account = accountCurrency.toUpperCase();
   if (spec.quoteCurrency === account) return 1;
 
-  if (spec.baseCurrency === account && entryPrice > 0) return 1 / entryPrice;
+  if (baseImpliesRate(spec, account) && entryPrice > 0) return 1 / entryPrice;
 
   const direct = quoteRates?.[`${spec.quoteCurrency}${account}`];
   if (typeof direct === 'number' && direct > 0) return direct;
@@ -106,22 +140,38 @@ export function computeRisk(inputs: RiskInputs): RiskResult {
     return { risk: null, reason: 'no-stop-loss' };
   }
 
-  const spec = inputs.spec ?? findSymbolSpec(inputs.symbol);
-  if (!spec) return { risk: null, reason: 'unknown-symbol' };
-
-  // Signed by the side the position faced: a long loses as the price falls, so its stop must
-  // be below the entry, and a short's above. Equal is the exact-breakeven case and is caught
-  // by the same comparison.
+  /*
+   * The trade first, the instrument second — the order matters to what the user is told.
+   *
+   * Whether a stop risks anything is a fact about the trade: the entry, the stop and the side.
+   * None of it needs a contract size. Asking for the spec first meant a trader who moved their
+   * stop to breakeven on a symbol outside the built-in table — EURJPY, or any name carrying a
+   * broker suffix — was told the instrument could not be priced and that it was worth
+   * reporting, when the truth was that they had taken their own risk off. The reason a person
+   * reads has to be the most fundamental one that applies, not the first one the code happens
+   * to reach.
+   *
+   * Signed by the side the position faced: a long loses as the price falls, so its stop must
+   * be below the entry, and a short's above.
+   */
   const distance =
     inputs.direction === 'long'
       ? inputs.entryPrice - inputs.stopLoss
       : inputs.stopLoss - inputs.entryPrice;
 
-  if (!(inputs.volume > 0)) return { risk: null, reason: 'zero-distance' };
+  if (!(inputs.volume > 0)) return { risk: null, reason: 'no-volume' };
   if (distance === 0) return { risk: null, reason: 'zero-distance' };
   if (!(distance > 0)) return { risk: null, reason: 'stop-beyond-entry' };
 
-  const rate = quoteToAccountRate(spec, inputs.entryPrice, inputs.accountCurrency, inputs.quoteRates);
+  const spec = inputs.spec ?? findSymbolSpec(inputs.symbol);
+  if (!spec) return { risk: null, reason: 'unknown-symbol' };
+
+  const rate = quoteToAccountRate(
+    spec,
+    inputs.entryPrice,
+    inputs.accountCurrency,
+    inputs.quoteRates,
+  );
   if (rate === null) return { risk: null, reason: 'unconvertible' };
 
   const risk = distance * spec.contractSize * inputs.volume * rate;
@@ -144,7 +194,11 @@ export type RrResult = {
 
 export function computeRr(
   deal: Mt5Deal,
-  context: { accountCurrency: string; quoteRates?: Record<string, number>; spec?: SymbolSpec | null },
+  context: {
+    accountCurrency: string;
+    quoteRates?: Record<string, number>;
+    spec?: SymbolSpec | null;
+  },
 ): RrResult {
   const result = computeRisk({
     symbol: deal.symbol,
@@ -170,7 +224,13 @@ export function computeRr(
  */
 export function stopDistanceForRisk(
   targetRisk: number,
-  inputs: { spec: SymbolSpec; volume: number; entryPrice: number; accountCurrency: string; quoteRates?: Record<string, number> },
+  inputs: {
+    spec: SymbolSpec;
+    volume: number;
+    entryPrice: number;
+    accountCurrency: string;
+    quoteRates?: Record<string, number>;
+  },
 ): number | null {
   const rate = quoteToAccountRate(
     inputs.spec,
@@ -185,7 +245,54 @@ export function stopDistanceForRisk(
 /** Price move (in quote currency) that yields a given account-currency profit. */
 export function priceMoveForProfit(
   targetProfit: number,
-  inputs: { spec: SymbolSpec; volume: number; entryPrice: number; accountCurrency: string; quoteRates?: Record<string, number> },
+  inputs: {
+    spec: SymbolSpec;
+    volume: number;
+    entryPrice: number;
+    accountCurrency: string;
+    quoteRates?: Record<string, number>;
+  },
 ): number | null {
   return stopDistanceForRisk(targetProfit, inputs);
+}
+
+/**
+ * Why a stored trade has no R multiple, worked out from the row itself.
+ *
+ * `computeRisk` already returns a reason and the sync throws it away — it is not a column, and
+ * no screen ever asked for it. So both places that had to say something said the same thing:
+ * "this trade had no stop loss". On a trade whose stop loss is printed two lines further down
+ * the same card, that is not a shortcut, it is the screen contradicting itself, and it sent a
+ * trader looking for a broken import when the real answer was a symbol the contract-size table
+ * had never heard of.
+ *
+ * Derived rather than persisted, deliberately. Every input this needs is on the row — a
+ * migration would add a column that can go stale against the very tables it is derived from,
+ * and it would still say nothing about the forty-nine rows already written. The one reason it
+ * cannot distinguish is `unconvertible`, which needs the account currency; that case falls to
+ * `rate`, which is the honest answer for it anyway.
+ */
+/**
+ * Why a trade shows no R multiple — the four words the dash on the trade card stands for, plus
+ * the one that means the dash is stale.
+ *
+ * It re-runs `computeRisk` rather than restating its rules. An earlier version walked the same
+ * checks in the same order by hand, which is a second copy of the logic that decides a money
+ * figure and would drift from the first the moment either changed. Whatever `computeRisk`
+ * refuses on is what the reader is told.
+ *
+ * `stale` is the case that reading the row alone cannot explain: everything needed is present
+ * and the number computes right now, so the stored null is not a property of the trade — it is
+ * a leftover from a sync that ran while the specification fetch was broken. Saying "no
+ * exchange rate was available" there would be a confident wrong answer, which is the failure
+ * this whole investigation started from.
+ */
+export type MissingRrReason = NonNullable<RiskResult['reason']> | 'stale';
+
+export function explainMissingRr(
+  trade: Pick<RiskInputs, 'symbol' | 'direction' | 'entryPrice' | 'stopLoss' | 'volume'>,
+  accountCurrency: string,
+): MissingRrReason {
+  const { reason } = computeRisk({ ...trade, accountCurrency });
+  return reason ?? 'stale';
 }

@@ -308,7 +308,10 @@ export function readFtmoCsv(text: string, options: FtmoParseOptions = {}): FtmoP
   // Separators are decided once, from every numeric cell in the file, before a single value
   // is read. See `detectDecimalSeparator` for why per-cell detection cannot work.
   const decimalSeparator = detectDecimalSeparator(
-    numericCells(dataRows.map((row) => row.cells), columns),
+    numericCells(
+      dataRows.map((row) => row.cells),
+      columns,
+    ),
   );
 
   const parsed = dataRows.map((row) =>
@@ -318,7 +321,7 @@ export function readFtmoCsv(text: string, options: FtmoParseOptions = {}): FtmoP
   const deals = assignTickets(parsed);
 
   const trades = deals.map((deal) => {
-    const { risk, rr } = computeRr(deal, {
+    const { risk, rr, reason } = computeRr(deal, {
       accountCurrency,
       quoteRates: options.quoteRates,
       spec: findSymbolSpec(deal.symbol),
@@ -350,6 +353,11 @@ export function readFtmoCsv(text: string, options: FtmoParseOptions = {}): FtmoP
       profit: deal.profit + deal.commission + deal.swap,
       risk,
       rr,
+      // Why there is no risk, when there is none — `upsertTrades` uses it to tell a pricing
+      // failure from a trade that genuinely had nothing at stake. A CSV import is a one-shot
+      // write rather than a repeating sync, so it never protects an existing figure here; it
+      // is passed because the field is not optional and a guess would be wrong somewhere else.
+      riskReason: reason,
       // A CSV export carries results, not price history, so there is nothing to measure an
       // excursion from. Null is the honest answer and keeps these rows out of the MAE and MFE
       // aggregates rather than dragging them toward zero.
@@ -630,7 +638,8 @@ function readRow(
   };
 }
 
-const zeroAsNull = (value: number | null): number | null => (value === null || value === 0 ? null : value);
+const zeroAsNull = (value: number | null): number | null =>
+  value === null || value === 0 ? null : value;
 
 /**
  * Day or swing, by the same calendar rule the MT5 sync applies (see `styleOf` in

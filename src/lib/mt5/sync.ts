@@ -6,6 +6,7 @@ import {
   newestCloseAt,
   readCredentialCiphertexts,
   recordSnapshot,
+  repairMissingRisk,
   ticketsWithExcursions,
   recordSyncFailure,
   recordSyncSuccess,
@@ -18,7 +19,7 @@ import { sameZonedDay } from '@/lib/time/zone';
 import type { TenantContext } from '@/lib/tenant/context';
 import { computeExcursion, NO_EXCURSION, type Excursion } from './excursion';
 import { mt5Provider } from './index';
-import { computeRr } from './risk';
+import { baseImpliesRate, computeRr } from './risk';
 import { classifySymbol, findSymbolSpec, type SymbolSpec } from './symbols';
 import type {
   Mt5AccountState,
@@ -74,6 +75,9 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
   let updated = 0;
   let accountCurrency: string | null = null;
   const failures: string[] = [];
+  // Per account, not one for the run: a trader can hold a dollar account and a euro one, and
+  // pricing either one's trades in the other's currency is a wrong number that looks fine.
+  const currencyByAccount = new Map<string, string>();
 
   for (const stored of accounts) {
     try {
@@ -81,6 +85,7 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
       imported += result.imported;
       updated += result.updated;
       accountCurrency ??= result.currency;
+      currencyByAccount.set(stored.id, result.currency);
     } catch (error) {
       // Deliberately not rethrown. The credentials are in scope in the frame below, and an
       // unhandled error would put a stack trace containing them in front of a user.
@@ -95,6 +100,24 @@ export async function syncMt5(ctx: TenantContext, trigger: SyncTrigger): Promise
     const message = failures.join('; ');
     await finishSyncLog(ctx, logId, { status: 'error', error: message });
     return { status: 'error', message };
+  }
+
+  /*
+   * Trades the loop above could not have touched.
+   *
+   * `upsertTrades` matches on `(userId, mt5AccountId, ticket)`, so a row whose account link was
+   * cleared by an old disconnect is invisible to every sync that will ever run — and the client
+   * whose report started this had 48 of those, 37 with a valid stop and no risk. Repairing them
+   * is not part of importing from a broker, but this is the only moment the app knows both that
+   * a user is looking and what their account is denominated in.
+   *
+   * Each account's own currency goes with it, and an account that failed this run contributes
+   * none — so its trades are left rather than priced against a neighbour's denomination.
+   */
+  if (currencyByAccount.size > 0) {
+    const repaired = await repairMissingRisk(ctx, currencyByAccount);
+    if (repaired > 0)
+      console.warn('[mt5] priced', repaired, 'trade(s) that had a stop but no risk');
   }
 
   await finishSyncLog(ctx, logId, {
@@ -233,7 +256,13 @@ async function toTradeRecords(
 
   const symbols = [...new Set(deals.filter((d) => d.symbol).map((d) => d.symbol))];
   const overrides = await fetchSpecOverrides(provider, credentials, symbols);
-  const quoteRates = await fetchQuoteRates(provider, credentials, symbols, account.currency, overrides);
+  const quoteRates = await fetchQuoteRates(
+    provider,
+    credentials,
+    symbols,
+    account.currency,
+    overrides,
+  );
   const excursions = await fetchExcursions(ctx, provider, credentials, deals, {
     accountCurrency: account.currency,
     quoteRates,
@@ -243,7 +272,7 @@ async function toTradeRecords(
 
   return deals.map((deal) => {
     const spec = specFor(deal.symbol, overrides);
-    const { risk, rr } = computeRr(deal, {
+    const { risk, rr, reason } = computeRr(deal, {
       accountCurrency: account.currency,
       quoteRates,
       spec,
@@ -270,6 +299,10 @@ async function toTradeRecords(
       profit: deal.profit + deal.commission + deal.swap,
       risk,
       rr,
+      // Carried through so the write can tell "nothing was at risk" from "we could not work
+      // out what was". See the note on the guard in db/trades.ts; the two look identical here
+      // and mean opposite things to a row that already has a figure.
+      riskReason: reason,
       mae,
       mfe,
     } satisfies TradeUpsert;
@@ -316,7 +349,9 @@ async function fetchExcursions(
   const result = new Map<string, Excursion>();
   if (!provider.fetchBars) return result;
 
-  const closed = deals.filter((deal) => deal.kind === 'trade' && deal.closeAt !== null && deal.symbol);
+  const closed = deals.filter(
+    (deal) => deal.kind === 'trade' && deal.closeAt !== null && deal.symbol,
+  );
 
   /*
    * Trades that already have an answer are not asked about again.
@@ -413,7 +448,12 @@ async function fetchSpecOverrides(
 
   try {
     const specs = await provider.fetchSymbolSpecs(credentials, symbols);
-    for (const override of specs) map.set(override.symbol.toUpperCase(), merge(override));
+    for (const override of specs) {
+      // A spec with no honest contract size is dropped rather than stored: `specFor` then
+      // falls through to the static table, which is where it would have looked anyway.
+      const spec = merge(override);
+      if (spec) map.set(override.symbol.toUpperCase(), spec);
+    }
   } catch (error) {
     // The broker's own numbers are better than the built-in table, but not so much better
     // that failing to fetch them should fail the sync — the fallback is a documented table,
@@ -426,15 +466,44 @@ async function fetchSpecOverrides(
   return map;
 }
 
-function merge(override: SymbolSpecOverride): SymbolSpec {
+/**
+ * The broker's numbers on top of what we already know — never instead of it.
+ *
+ * An override used to replace the static spec wholesale, which meant a field the broker did
+ * not send arrived as `undefined` and took a good value with it. That is not hypothetical: the
+ * provider read `quoteCurrency` from a MetaApi response that calls it `profitCurrency`, so
+ * every override carried no currency, `quoteToAccountRate` could match nothing, and the whole
+ * account's risk came out `unconvertible` — but *only* when the spec call succeeded. When it
+ * 404'd, the static table was used and risk worked. Better data made the answer worse.
+ *
+ * So each field falls back rather than the object replacing: the broker is authoritative on
+ * contract size and digits, which vary per broker and are exactly why this call exists, and
+ * the static table stands in for anything the broker left blank. `??` is wrong here for the
+ * currency — an empty string is what a missing field becomes — hence the explicit checks.
+ *
+ * Returns null when neither side can say what a lot of this instrument is worth. Defaulting to
+ * 1 was the tempting alternative and it is the worse failure by far: `computeRisk` refuses on a
+ * spec it does not have, but a spec claiming a contract size of one produces a real number,
+ * with no reason attached, off by whatever the true size is — a hundred thousand for an FX
+ * pair. No spec means no R multiple, which is the documented and visible outcome.
+ */
+export function merge(override: SymbolSpecOverride): SymbolSpec | null {
   const base = findSymbolSpec(override.symbol);
+
+  // Brokers vary the case and pad the field; `usd` is not a different currency from `USD`, and
+  // treating it as one is how the original bug becomes reachable a second way.
+  const currency = (value: string | undefined) => value?.trim().toUpperCase() || undefined;
+
+  const contractSize = override.contractSize > 0 ? override.contractSize : base?.contractSize;
+  if (!contractSize || !(contractSize > 0)) return null;
+
   return {
     symbol: override.symbol,
     assetClass: base?.assetClass ?? classifySymbol(override.symbol),
-    contractSize: override.contractSize,
-    quoteCurrency: override.quoteCurrency,
-    baseCurrency: base?.baseCurrency,
-    digits: override.digits,
+    contractSize,
+    quoteCurrency: currency(override.quoteCurrency) ?? base?.quoteCurrency ?? '',
+    baseCurrency: currency(override.baseCurrency) ?? base?.baseCurrency,
+    digits: override.digits >= 0 ? override.digits : (base?.digits ?? 2),
   };
 }
 
@@ -459,7 +528,11 @@ async function fetchQuoteRates(
     const spec = specFor(symbol, overrides);
     if (!spec) continue;
     if (spec.quoteCurrency === accountCurrency) continue;
-    if (spec.baseCurrency === accountCurrency) continue; // Derived from the price itself.
+    // The one shared predicate, not a second copy of the condition. When this said only
+    // `spec.baseCurrency === accountCurrency` while `computeRisk` also demanded forex, every
+    // symbol between the two got neither a fetched rate nor the shortcut — and came out
+    // `unconvertible`, which is the exact symptom this whole change set is about.
+    if (baseImpliesRate(spec, accountCurrency)) continue;
     needed.add(`${spec.quoteCurrency}${accountCurrency}`);
   }
 

@@ -67,7 +67,9 @@ test.describe('the finance screen', () => {
   test('shows the month, the four tiles and the entry form', async ({ page }) => {
     await page.goto('/finance');
 
-    for (const label of ['Income', 'Expenses', 'Monthly net', 'Total wealth']) {
+    // "All-time net", not "Monthly net": the default view is unbounded and spans every entry
+    // ever recorded, so the third tile is only labelled by a period when a range is set.
+    for (const label of ['Income', 'Expenses', 'All-time net', 'Total wealth']) {
       await expect(tile(page, label)).toBeVisible();
     }
     await expect(page.getByText('Personal finance')).toBeVisible();
@@ -107,7 +109,9 @@ test.describe('shekel figures are not converted at the trading rate', () => {
     // component that moved, and it must move by its own, unconverted amount. One shekel of
     // slack for the rounding of the trading component, nothing like the thousands a
     // misapplied rate would cost.
-    expect(Math.abs((await figure(page, 'Total wealth')) - beforeWealth - 1_000)).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs((await figure(page, 'Total wealth')) - beforeWealth - 1_000),
+    ).toBeLessThanOrEqual(1);
   });
 
   test('deleting the entry puts the tile back where it was', async ({ page }) => {

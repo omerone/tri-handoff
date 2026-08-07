@@ -12,6 +12,47 @@ import { displayMoney } from '@/lib/money/display';
 import { JournalForm } from '@/components/journal/journal-form';
 import { saveTradeJournalAction } from '../journal-actions';
 import { formatDateTimeAt, formatDuration } from '@/lib/time/format';
+import { explainMissingRr, type MissingRrReason } from '@/lib/mt5/risk';
+
+/**
+ * What the dash beside "RR" means, one answer per reason instead of one for all of them.
+ *
+ * It used to say the trade had no stop loss whatever the cause, on a card that prints the stop
+ * loss six rows below it — which is the contradiction the client wrote in about. Each of these
+ * says something a trader can act on: move the stop and the R comes back, report the instrument
+ * and it gets a contract size, press refresh and a figure that was never stored gets computed.
+ *
+ * Two lengths, because the tile has room for three words and the explanation needs a sentence.
+ * The short one sits under the value; the full one opens from the ⓘ. Four wrapped lines of
+ * explanation under a KPI stretches its grid row and takes the three tiles beside it with it.
+ *
+ * Written out as a switch rather than a lookup keyed by reason, which is what this was. The
+ * keys have to appear as string literals: `messages.test.ts` finds translation call sites by
+ * scanning for a quoted argument, and it is the only thing standing between a typo here and a
+ * runtime error on a production screen. A key assembled from a template literal is invisible
+ * to it, so the version of this that read well was the version with no safety net.
+ */
+function noRrMessages(
+  reason: MissingRrReason,
+  t: Awaited<ReturnType<typeof getTranslations>>,
+): { short: string; full: string } {
+  switch (reason) {
+    case 'no-stop-loss':
+      return { short: t('journal.noRrStopMissingShort'), full: t('journal.noRrStopMissing') };
+    case 'stop-beyond-entry':
+      return { short: t('journal.noRrStopBeyondShort'), full: t('journal.noRrStopBeyond') };
+    case 'zero-distance':
+      return { short: t('journal.noRrZeroDistanceShort'), full: t('journal.noRrZeroDistance') };
+    case 'no-volume':
+      return { short: t('journal.noRrNoVolumeShort'), full: t('journal.noRrNoVolume') };
+    case 'unknown-symbol':
+      return { short: t('journal.noRrUnknownShort'), full: t('journal.noRrUnknown') };
+    case 'unconvertible':
+      return { short: t('journal.noRrRateShort'), full: t('journal.noRrRate') };
+    case 'stale':
+      return { short: t('journal.noRrStaleShort'), full: t('journal.noRrStale') };
+  }
+}
 
 /**
  * One trade, everything about it, plus the journal (SPEC §1.1 — the "trade report" adopted
@@ -54,6 +95,13 @@ export default async function TradeDetailPage({ params }: { params: Promise<{ id
 
   const Back = rtl ? ChevronRight : ChevronLeft;
 
+  // Only asked when there is a dash to explain, and answered by re-running the same arithmetic
+  // the sync ran rather than a second copy of its rules.
+  const noRr =
+    trade.rr === null
+      ? noRrMessages(explainMissingRr(trade, account?.accountCurrency ?? 'USD'), t)
+      : null;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
@@ -93,7 +141,9 @@ export default async function TradeDetailPage({ params }: { params: Promise<{ id
           label={t('table.rr')}
           value={trade.rr === null ? '—' : `${formatNumber(trade.rr, locale, 2)}R`}
           tone={(trade.rr ?? 0) >= 0 ? 'pos' : 'neg'}
-          sub={trade.rr === null ? t('journal.noRr') : undefined}
+          sub={noRr?.short}
+          info={noRr?.full}
+          infoLabel={t('table.rr')}
         />
         <KPI label={t('table.risk')} value={trade.risk === null ? '—' : money(trade.risk)} />
         <KPI
@@ -181,4 +231,3 @@ function priceDecimals(value: number): number {
   if (value >= 10) return 2;
   return 5;
 }
-

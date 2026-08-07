@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeRisk, computeRr, netProfit, stopDistanceForRisk } from './risk';
+import { computeRisk, computeRr, explainMissingRr, netProfit, stopDistanceForRisk } from './risk';
+import { merge } from './sync';
 import { findSymbolSpec } from './symbols';
 import type { Mt5Deal } from './types';
 
@@ -142,7 +143,7 @@ describe('computeRisk', () => {
         stopLoss: 151,
         accountCurrency: 'USD',
         direction: 'long',
-    });
+      });
       expect(result.risk).toBeCloseTo(100_000 / 152, 4);
     });
 
@@ -154,7 +155,7 @@ describe('computeRisk', () => {
         stopLoss: 18_400,
         accountCurrency: 'USD',
         direction: 'long',
-    });
+      });
       expect(result).toEqual({ risk: null, reason: 'unconvertible' });
     });
   });
@@ -163,7 +164,7 @@ describe('computeRisk', () => {
     it('has no risk without a stop loss', () => {
       expect(
         computeRisk({
-        direction: 'long',
+          direction: 'long',
           symbol: 'EURUSD',
           volume: 1,
           entryPrice: 1.1,
@@ -182,7 +183,7 @@ describe('computeRisk', () => {
           stopLoss: 1.1,
           accountCurrency: 'USD',
           direction: 'long',
-    }).reason,
+        }).reason,
       ).toBe('zero-distance');
     });
 
@@ -197,7 +198,7 @@ describe('computeRisk', () => {
           stopLoss: 99,
           accountCurrency: 'USD',
           direction: 'long',
-    }),
+        }),
       ).toEqual({ risk: null, reason: 'unknown-symbol' });
     });
 
@@ -210,14 +211,14 @@ describe('computeRisk', () => {
           stopLoss: 1.09,
           accountCurrency: 'USD',
           direction: 'long',
-    }).risk,
+        }).risk,
       ).toBeNull();
     });
 
     it('ignores a non-finite stop loss', () => {
       expect(
         computeRisk({
-        direction: 'long',
+          direction: 'long',
           symbol: 'EURUSD',
           volume: 1,
           entryPrice: 1.1,
@@ -414,5 +415,217 @@ describe('a stop on the wrong side of the entry', () => {
       expect(result.risk).toBeNull();
       expect(result.reason).toBe('zero-distance');
     }
+  });
+});
+
+/**
+ * The bug a client found: risk and R missing on almost every trade, while the stop loss sat on
+ * screen two rows below the dash explaining that there was no stop loss.
+ *
+ * Three separate causes, all reproduced here against the real production shapes. The first is
+ * the one worth remembering, because better data made the answer worse: the broker override
+ * was read from a field MetaApi does not have, arrived with no currency, replaced a static
+ * spec that worked, and turned every trade on the account `unconvertible`. When the same call
+ * 404'd, risk came out fine.
+ */
+describe('the missing-R bug', () => {
+  it('keeps the static currency when the broker sends none', () => {
+    // What `fetchSymbolSpecs` produced while it read a field that does not exist.
+    const spec = merge({ symbol: 'GBPUSD', contractSize: 100_000, quoteCurrency: '', digits: 5 });
+    expect(spec?.quoteCurrency, 'an empty override currency displaced a known-good one').toBe(
+      'USD',
+    );
+
+    const risk = computeRisk({
+      symbol: 'GBPUSD',
+      volume: 2,
+      entryPrice: 1.34057,
+      stopLoss: 1.34111,
+      direction: 'short',
+      accountCurrency: 'USD',
+      spec,
+    });
+    expect(risk.risk).toBeCloseTo(108, 2);
+  });
+
+  it('reads a currency the broker shouted or padded as the same currency', () => {
+    // Same hole, reachable a second way: `usd` is not a different currency from `USD`, and an
+    // override that says so displaces the static value and makes the account unconvertible
+    // again — with the field populated this time, so it looks like it worked.
+    const spec = merge({
+      symbol: 'GBPUSD',
+      contractSize: 100_000,
+      quoteCurrency: ' usd ',
+      digits: 5,
+    });
+    expect(spec?.quoteCurrency).toBe('USD');
+  });
+
+  it('still lets the broker correct the numbers it is authoritative on', () => {
+    // The whole reason the override exists: contract size varies per broker.
+    const spec = merge({ symbol: 'GBPUSD', contractSize: 10_000, quoteCurrency: 'USD', digits: 5 });
+    expect(spec?.contractSize).toBe(10_000);
+  });
+
+  it('refuses a spec nobody can supply a contract size for', () => {
+    /*
+     * The tempting default here is 1, and it is the worse answer by a hundred thousand.
+     *
+     * A symbol absent from the static table, on a broker that sent no contract size, has no
+     * honest lot value anywhere. A spec claiming 1 produces a real risk figure with no reason
+     * attached — USDMXN would come out at half a cent instead of $588 and land in the average
+     * R and the coverage percentage as a good number. No spec means no R, which is visible.
+     */
+    expect(
+      merge({ symbol: 'USDMXN', contractSize: 0, quoteCurrency: 'MXN', digits: 5 }),
+    ).toBeNull();
+    // Known symbol, so the table still answers even though the broker did not.
+    expect(
+      merge({ symbol: 'GBPUSD', contractSize: 0, quoteCurrency: 'USD', digits: 5 }),
+    ).toMatchObject({
+      contractSize: 100_000,
+    });
+  });
+
+  it('prices a currency pair the classifier does not recognise as one', () => {
+    /*
+     * The gap the first version of the index guard opened, and it opened it onto the exact
+     * symptom this file is about.
+     *
+     * `classifySymbol` calls a great many real pairs `other`: every exotic whose second
+     * currency is missing from its list, and every broker suffix written without a separator —
+     * `EURUSDm`, `USDCADz`, the naming family that made this bug hard to see to begin with.
+     * Keying the `1/price` shortcut on `assetClass === 'forex'` refused all of them, and the
+     * sync had already decided not to fetch a rate for them on the other half of the same
+     * condition. Neither path, so `unconvertible`: a stop printed on the card and no R beside
+     * it, which is what the client wrote in about.
+     */
+    const spec = merge({
+      symbol: 'USDSEK',
+      contractSize: 100_000,
+      quoteCurrency: 'SEK',
+      baseCurrency: 'USD',
+      digits: 5,
+    });
+    expect(spec?.assetClass, 'the premise of this test has changed').toBe('other');
+
+    const risk = computeRisk({
+      symbol: 'USDSEK',
+      volume: 1,
+      entryPrice: 10,
+      stopLoss: 9.9,
+      direction: 'long',
+      accountCurrency: 'USD',
+      spec,
+    });
+    // 0.1 SEK per unit × 100,000 units, converted at the price itself: 10,000 SEK = $1,000.
+    expect(risk.risk).toBeCloseTo(1_000, 6);
+  });
+
+  it('says the stop risks nothing before it says it cannot price the instrument', () => {
+    /*
+     * Which of two true refusals the reader is given.
+     *
+     * Whether a stop risks anything is a fact about the trade — entry, stop, side — and needs
+     * no contract size. Checking the spec first meant a trader who moved their stop to
+     * breakeven on a symbol outside the built-in table was told the instrument could not be
+     * priced and that it was worth reporting. The most common harmless thing a trader does,
+     * answered with a support ticket.
+     */
+    const trailed = {
+      symbol: 'EURJPY', // A real pair, deliberately absent from the static table.
+      volume: 1,
+      entryPrice: 160,
+      stopLoss: 161,
+      direction: 'long' as const,
+      accountCurrency: 'USD',
+    };
+    expect(findSymbolSpec(trailed.symbol), 'the premise of this test has changed').toBeNull();
+    expect(computeRisk(trailed).reason).toBe('stop-beyond-entry');
+    expect(explainMissingRr(trailed, 'USD')).toBe('stop-beyond-entry');
+  });
+
+  it('separates having no size from having no distance', () => {
+    // Both used to answer `zero-distance`, whose message says the stop sat on the entry — on a
+    // card printing an entry of 5,000 and a stop of 4,980 two rows below.
+    const sized = {
+      symbol: 'EURUSD',
+      entryPrice: 1.1,
+      stopLoss: 1.09,
+      direction: 'long' as const,
+      accountCurrency: 'USD',
+    };
+    expect(computeRisk({ ...sized, volume: 0 }).reason).toBe('no-volume');
+    expect(computeRisk({ ...sized, stopLoss: 1.1, volume: 1 }).reason).toBe('zero-distance');
+  });
+
+  it('does not divide an index by its own price', () => {
+    /*
+     * MetaApi marks `baseCurrency` required, so it names one for every instrument — including
+     * indices, where it is USD. `1/price` is the rate only when the contract size counts units
+     * of the base currency, which is a fact about currency pairs and about nothing else.
+     *
+     * Unguarded, an S&P position at 5000 with a ten-dollar risk reported two tenths of a cent,
+     * `reason: null`, straight into the averages. A refusal would have been better; a correct
+     * answer is better still, and that is what the quote currency gives here.
+     */
+    const spec = merge({
+      symbol: 'SPX500',
+      contractSize: 1,
+      quoteCurrency: 'USD',
+      baseCurrency: 'USD',
+      digits: 1,
+    });
+    const risk = computeRisk({
+      symbol: 'SPX500',
+      volume: 1,
+      entryPrice: 5000,
+      stopLoss: 4990,
+      direction: 'long',
+      accountCurrency: 'USD',
+      spec,
+    });
+    expect(risk.risk, 'the index was priced as if it were a currency pair').toBeCloseTo(10, 6);
+  });
+
+  it('prices the symbols this broker actually sends', () => {
+    // US100 is NAS100 under another house's name, and USDCAD was simply absent. Four live
+    // trades apiece came out with no risk and the screen blamed a missing stop.
+    for (const symbol of ['US100', 'USTEC', 'USDCAD', 'NAS100']) {
+      expect(findSymbolSpec(symbol), `${symbol} has no contract size`).not.toBeNull();
+    }
+  });
+
+  it('says which reason it was, rather than always the same one', () => {
+    const base = { symbol: 'GBPUSD', direction: 'long' as const, entryPrice: 1.3, volume: 1 };
+    const why = (over: Partial<typeof base> & { stopLoss: number | null }) =>
+      explainMissingRr({ ...base, ...over }, 'USD');
+
+    expect(why({ stopLoss: null })).toBe('no-stop-loss');
+    // A stop moved past the entry: nothing at risk, and correctly no R.
+    expect(why({ stopLoss: 1.31 })).toBe('stop-beyond-entry');
+    // Exactly on the entry — breakeven, which is a different sentence to the reader.
+    expect(why({ stopLoss: 1.3 })).toBe('zero-distance');
+    expect(why({ symbol: 'WHEATX', stopLoss: 1.29 })).toBe('unknown-symbol');
+    expect(why({ symbol: 'GER40', stopLoss: 1.29 })).toBe('unconvertible');
+  });
+
+  it('does not invent a reason for a row that prices perfectly well', () => {
+    /*
+     * The 37 trades this nearly got wrong.
+     *
+     * Production had a batch with valid stops on USD-quoted pairs and no stored risk — rows
+     * left behind by a disconnect, which no re-sync can reach. Walking the checks by hand fell
+     * through to the last one and told the trader their instrument was priced in a currency
+     * the account does not hold. GBPUSD on a dollar account: confidently, specifically wrong.
+     *
+     * Nothing on the row explains the missing number, so the answer has to say that.
+     */
+    expect(
+      explainMissingRr(
+        { symbol: 'GBPUSD', direction: 'short', entryPrice: 1.34361, stopLoss: 1.34434, volume: 5 },
+        'USD',
+      ),
+    ).toBe('stale');
   });
 });

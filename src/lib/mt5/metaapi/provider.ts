@@ -681,10 +681,28 @@ export class MetaApiProvider implements Mt5Provider {
     const specs = await Promise.all(
       symbols.map(async (symbol) => {
         try {
+          /*
+           * `profitCurrency`, not `quoteCurrency`.
+           *
+           * MetaApi's symbol specification has no field called `quoteCurrency`. It carries
+           * `baseCurrency`, `profitCurrency` and `marginCurrency`, and the one a price is
+           * quoted in — the one `|entry − sl| × contractSize × volume` comes out in — is
+           * `profitCurrency`. Reading a name that is not there returned `undefined`, and
+           * TypeScript could not object because the shape is asserted on an untyped response.
+           *
+           * `contractSize` and `digits` are real fields, so the override arrived looking
+           * healthy and poisoned only the currency. The effect was inverted and invisible:
+           * when this call *succeeded* the override displaced the static table and every
+           * risk on the account became `unconvertible`; when it 404'd the static table was
+           * used and risk worked. One broker's symbol names survived normalisation and got
+           * 200s — forty-one stopped trades, no risk. Another's were suffixed, 404'd, and
+           * came out right.
+           */
           const spec = await this.request<{
             symbol: string;
             contractSize: number;
-            quoteCurrency: string;
+            profitCurrency?: string;
+            baseCurrency?: string;
             digits: number;
           }>(
             `${this.clientUrl}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(symbol)}/specification`,
@@ -692,7 +710,8 @@ export class MetaApiProvider implements Mt5Provider {
           return {
             symbol: spec.symbol,
             contractSize: spec.contractSize,
-            quoteCurrency: spec.quoteCurrency,
+            quoteCurrency: spec.profitCurrency ?? '',
+            baseCurrency: spec.baseCurrency,
             digits: spec.digits,
           } satisfies SymbolSpecOverride;
         } catch {
@@ -703,7 +722,7 @@ export class MetaApiProvider implements Mt5Provider {
       }),
     );
 
-    return specs.filter((spec): spec is SymbolSpecOverride => spec !== null);
+    return specs.filter((spec) => spec !== null);
   }
 }
 

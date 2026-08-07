@@ -3,8 +3,11 @@ import { MANUAL_ONLY } from './manual-trades';
 import type { Prisma } from '@prisma/client';
 import type { TenantContext } from '@/lib/tenant/context';
 import type { AssetClass, DealKind, Direction, TradeStyle } from '@/lib/mt5/types';
+import type { RiskResult } from '@/lib/mt5/risk';
 import type { TpTiming } from '@/lib/review/types';
 import { assertContext } from './context';
+import { computeRisk } from '@/lib/mt5/risk';
+import { findSymbolSpec } from '@/lib/mt5/symbols';
 import { SYNCED_ONLY } from './manual-trades';
 import { prisma } from './prisma';
 
@@ -63,9 +66,19 @@ export type TradeRecord = {
 export type TradeUpsert = Omit<
   TradeRecord,
   'id' | 'note' | 'tags' | 'rating' | 'mood' | 'strategy' | 'tpTiming' | 'tookOriginalTp'
->;
+> & {
+  /**
+   * Why `risk` is null, when it is. Not stored — it decides whether the null is written.
+   *
+   * A null risk beside a stop loss is two different events wearing the same face: the stop
+   * moved past the entry so there is genuinely nothing at risk, or the symbol could not be
+   * priced this run. The row cannot tell them apart and the write has to.
+   */
+  riskReason: RiskResult['reason'];
+};
 
-const num = (value: Prisma.Decimal | null): number | null => (value === null ? null : Number(value));
+const num = (value: Prisma.Decimal | null): number | null =>
+  value === null ? null : Number(value);
 
 type TradeRow = {
   id: string;
@@ -181,8 +194,26 @@ export async function upsertTrades(
     commission: trade.commission,
     swap: trade.swap,
     profit: trade.profit,
-    risk: trade.risk,
-    rr: trade.rr,
+    /*
+     * The same rule as MAE below, and the same reason: do not let a failure erase an answer.
+     *
+     * Risk needs a symbol specification, and that comes over the network. When the call fails,
+     * or the broker names a currency nothing converts from, risk comes back null — and writing
+     * it would blank a figure an earlier sync worked out correctly. A re-sync re-reads the last
+     * two days every time, so one bad fetch takes the R multiple off every recent trade.
+     *
+     * **Only those two reasons.** Every other null is the truth about the trade and must be
+     * written: a stop removed, a stop trailed past the entry, a stop sitting exactly on it.
+     * Those all mean nothing is at risk any more, and keeping the old number leaves an R
+     * measured against a stop that no longer exists — a trailed stop is the exact case, because
+     * the stop-loss field beside it updates to the new level and nothing on screen contradicts
+     * the stale multiple. That is the 213.66R failure `mt5/risk.ts` opens by describing,
+     * reached from the write side instead of the arithmetic side.
+     */
+    ...(trade.risk === null &&
+    (trade.riskReason === 'unconvertible' || trade.riskReason === 'unknown-symbol')
+      ? {}
+      : { risk: trade.risk, rr: trade.rr }),
     /*
      * Only written when a value was computed.
      *
@@ -220,6 +251,115 @@ export async function upsertTrades(
 
   const imported = trades.filter((trade) => !known.has(trade.ticket)).length;
   return { imported, updated: trades.length - imported };
+}
+
+/**
+ * Prices trades that carry a stop loss but no risk — including the ones no sync can reach.
+ *
+ * This exists because fixing the code was not enough. A broken symbol-specification fetch left
+ * a book where 56 of 74 trades had a stop and 10 had an R multiple, and a re-sync only rewrites
+ * what the broker still reports: `upsertTrades` keys on `(userId, mt5AccountId, ticket)`, so a
+ * row whose account link was cleared by an old disconnect can never be matched again. In the
+ * client's data that was 48 of the 74 trades, 37 of them with a perfectly good stop. Without
+ * this pass they stay blank forever and the client's complaint stands after the fix.
+ *
+ * **Only the unambiguous conversion.** A risk figure is money, and every shortcut here is a
+ * chance to write a plausible one that is wrong. So four things are refused rather than
+ * guessed:
+ *
+ *   - **A rate.** A row is priced only when the symbol is quoted in the currency of the
+ *     account it belongs to, which needs no conversion at all. That covered all 37 in
+ *     practice — dollar pairs on a dollar account — and nothing else is attempted.
+ *   - **Which currency an orphan was in.** The row's own account is what decides, and an
+ *     orphan has none. Its currency is taken from the trader's accounts only when they all
+ *     agree; with a dollar account and a euro account open, an orphan is left alone rather
+ *     than priced in whichever one happened to sync first.
+ *   - **A hand-entered trade.** Those carry a risk the trader typed, and the entry price is
+ *     optional on that form — a blank one is stored as zero, which makes the distance to the
+ *     stop the stop's whole price. Left as it is, that produces five thousand dollars of risk
+ *     on a trade that never had any, and it looks entirely real.
+ *   - **An open trade.** There is no result to divide by the risk yet, and writing a risk with
+ *     no R would both break the invariant the schema states and put "re-sync to fill this in"
+ *     under a figure no sync will ever fill in, because the row now has a risk.
+ *
+ * Idempotent, and narrow by construction: it reads only rows that are missing the value, and
+ * writes only rows it could compute. Running it twice does nothing the second time.
+ */
+export async function repairMissingRisk(
+  ctx: TenantContext,
+  currencyByAccount: ReadonlyMap<string, string>,
+): Promise<number> {
+  assertContext(ctx);
+
+  // The one currency to price an account-less row in, or nothing when the trader's accounts
+  // disagree and there is therefore no answer that is not a guess.
+  const currencies = new Set([...currencyByAccount.values()].map((code) => code.toUpperCase()));
+  const orphanCurrency = currencies.size === 1 ? [...currencies][0]! : null;
+
+  const rows = await prisma.trade.findMany({
+    where: {
+      userId: ctx.userId,
+      user: { tenantId: ctx.tenantId },
+      kind: 'trade',
+      sl: { not: null },
+      risk: null,
+      // Closed only: an open trade has no R to go with the risk.
+      exitPrice: { not: null },
+      ...SYNCED_ONLY,
+    },
+    select: {
+      id: true,
+      symbol: true,
+      direction: true,
+      volume: true,
+      entryPrice: true,
+      sl: true,
+      profit: true,
+      mt5AccountId: true,
+    },
+  });
+
+  const repairs: { id: string; risk: number; rr: number }[] = [];
+
+  for (const row of rows) {
+    const account =
+      row.mt5AccountId === null
+        ? orphanCurrency
+        : (currencyByAccount.get(row.mt5AccountId)?.toUpperCase() ?? null);
+    if (account === null) continue;
+
+    const spec = findSymbolSpec(row.symbol);
+    if (!spec || spec.quoteCurrency !== account) continue;
+
+    const entryPrice = Number(row.entryPrice);
+    if (!(entryPrice > 0)) continue;
+
+    const { risk } = computeRisk({
+      symbol: row.symbol,
+      volume: Number(row.volume),
+      entryPrice,
+      stopLoss: Number(row.sl),
+      direction: row.direction,
+      accountCurrency: account,
+      spec,
+    });
+    if (risk === null) continue;
+
+    // `profit` is already net of commission and swap — see the column's own note in
+    // schema.prisma, and `upsertTrades` above, which stores it that way. Adding the costs
+    // again here subtracted them twice and cost a fifth of an R on a trade with real
+    // commission, which is the sort of wrong that reads as right.
+    repairs.push({ id: row.id, risk, rr: Number(row.profit) / risk });
+  }
+
+  for (const repair of repairs) {
+    await prisma.trade.update({
+      where: { id: repair.id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+      data: { risk: repair.risk, rr: repair.rr },
+    });
+  }
+
+  return repairs.length;
 }
 
 /**

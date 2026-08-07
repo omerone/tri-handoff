@@ -36,6 +36,9 @@ const SPECS: readonly SymbolSpec[] = [
   { symbol: 'USDJPY', assetClass: 'forex', contractSize: 100_000, baseCurrency: 'USD', quoteCurrency: 'JPY', digits: 3 },
   { symbol: 'USDCHF', assetClass: 'forex', contractSize: 100_000, baseCurrency: 'USD', quoteCurrency: 'CHF', digits: 5 },
   { symbol: 'AUDUSD', assetClass: 'forex', contractSize: 100_000, baseCurrency: 'AUD', quoteCurrency: 'USD', digits: 5 },
+  // A major that was simply missing. On a USD account it is priced through `baseCurrency`,
+  // which is why the entry carries one: the pair is quoted in CAD and no rate is needed.
+  { symbol: 'USDCAD', assetClass: 'forex', contractSize: 100_000, baseCurrency: 'USD', quoteCurrency: 'CAD', digits: 5 },
 
   // --- Metals: one lot of gold is 100 troy ounces, silver 5,000 ---
   { symbol: 'XAUUSD', assetClass: 'commodities', contractSize: 100, baseCurrency: 'XAU', quoteCurrency: 'USD', digits: 2 },
@@ -50,6 +53,17 @@ const SPECS: readonly SymbolSpec[] = [
   // --- Index CFDs: one contract = one index point ---
   { symbol: 'US500', assetClass: 'indices', contractSize: 1, quoteCurrency: 'USD', digits: 2 },
   { symbol: 'NAS100', assetClass: 'indices', contractSize: 1, quoteCurrency: 'USD', digits: 2 },
+  /*
+   * The same index as NAS100, under the names other brokers print.
+   *
+   * There is no canonical spelling for a CFD: one house's NAS100 is another's US100, USTEC
+   * or NDX. A table keyed to one house's vocabulary silently drops every trade on the others
+   * — four live trades with perfectly good stops came out with no risk for exactly this, and
+   * the screen blamed a missing stop loss. Duplicated rather than aliased because a spec is
+   * cheap and an alias table is a second thing to keep in step.
+   */
+  { symbol: 'US100', assetClass: 'indices', contractSize: 1, quoteCurrency: 'USD', digits: 2 },
+  { symbol: 'USTEC', assetClass: 'indices', contractSize: 1, quoteCurrency: 'USD', digits: 2 },
   { symbol: 'US30', assetClass: 'indices', contractSize: 1, quoteCurrency: 'USD', digits: 2 },
   // Quoted in euros by most brokers — the case that proves the risk calculation has to
   // convert to the account currency rather than assume it already is.
@@ -85,7 +99,11 @@ export function findSymbolSpec(symbol: string): SymbolSpec | null {
 
 const CRYPTO_HINTS = ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'LTC', 'BNB'];
 const METAL_HINTS = ['XAU', 'XAG', 'XPT', 'XPD', 'OIL', 'GAS', 'WTI', 'BRENT'];
-const INDEX_HINTS = ['US500', 'US30', 'NAS', 'GER', 'UK100', 'JP225', 'FRA40', 'AUS200', 'SPX', 'DAX'];
+// `NAS` already catches every suffixed spelling of the Nasdaq that uses that name; the
+// other three are the names it goes by elsewhere, and without them `US100m` from the house
+// that prints it that way classified as 'other'.
+// prettier-ignore
+const INDEX_HINTS = ['US500', 'US30', 'NAS', 'GER', 'UK100', 'JP225', 'FRA40', 'AUS200', 'SPX', 'DAX', 'US100', 'USTEC', 'NDX'];
 const FX_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'NZD', 'CAD'];
 
 /**

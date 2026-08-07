@@ -72,6 +72,7 @@ function trade(overrides: Partial<TradeUpsert> & { ticket: string }): TradeUpser
     profit: 100,
     risk: null,
     rr: null,
+    riskReason: 'no-stop-loss',
     ...overrides,
   };
 }

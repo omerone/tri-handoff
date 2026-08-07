@@ -270,8 +270,13 @@ test.describe('dashboard', () => {
   test('reports RR coverage next to the RR figure', async ({ page }) => {
     // RR is the client's headline metric; a coverage figure that stopped rendering would
     // leave an average over an unknown share of the book looking authoritative.
+    //
+    // It counts trades that produced an R multiple, not trades that have a stop loss, and it
+    // says so. Those were assumed to be the same number and were not: the client's book had a
+    // stop on 56 trades and an R on 10, so the line read "76% covered" over an average taken
+    // from thirteen percent of the book. The wording is the assertion here.
     await page.goto('/dashboard');
-    await expect(page.getByText(/% of trades have an SL/)).toBeVisible();
+    await expect(page.getByText(/% of trades have an R multiple/)).toBeVisible();
   });
 });
 

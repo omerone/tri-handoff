@@ -113,6 +113,7 @@ function synced(ticket: string, over: Partial<TradeUpsert> = {}): TradeUpsert {
     profit: 93,
     risk: 100,
     rr: 0.93,
+    riskReason: null,
     mae: null,
     mfe: null,
     ...over,

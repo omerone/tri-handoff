@@ -212,6 +212,9 @@ export type PriceBar = {
 export type SymbolSpecOverride = {
   symbol: string;
   contractSize: number;
+  /** Empty when the broker did not say — see `merge` in sync.ts, which then keeps the static spec. */
   quoteCurrency: string;
+  /** The pair's base, when the broker reports one. Lets a USD account price a USD-based pair. */
+  baseCurrency?: string;
   digits: number;
 };
