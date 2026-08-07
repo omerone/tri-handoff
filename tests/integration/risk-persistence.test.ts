@@ -5,6 +5,7 @@ import {
   createManualTrade,
   getTrade,
   listClosedTrades,
+  repairStoredFigures,
   upsertTrades,
 } from '@/lib/db';
 import type { TradeUpsert } from '@/lib/db';
@@ -164,6 +165,62 @@ describe('a re-sync where the null is the truth', () => {
     // The guard must not make the column write-once — a stop moved closer changes the answer.
     await resync({ risk: 250, rr: 1.5, riskReason: null });
     expect(await stored()).toMatchObject({ risk: 250, rr: 1.5 });
+  });
+});
+
+describe('the hourly sweep', () => {
+  it('prices and re-files without anybody pressing anything', async () => {
+    /*
+     * The repairs live inside `syncMt5`, which is the right place and was the only one.
+     * Automatic sync on sign-in is off by default — MetaApi bills by the hour a terminal is
+     * deployed — so nothing ran them until a trader pressed refresh, and a book sat with a
+     * stale R in every average for as long as nobody did.
+     */
+    await resync();
+    await testDb.trade.update({
+      where: { id: tradeId },
+      // A stale figure the rules now refuse, and an asset class the table has since learned.
+      data: { sl: baseline.entryPrice, risk: 0.09, rr: 2126.67, assetClass: 'other' },
+    });
+
+    const swept = await repairStoredFigures();
+    expect(swept.priced + swept.reclassified, 'the sweep found nothing to do').toBeGreaterThan(0);
+
+    const after = await getTrade(fixture.ctx, tradeId);
+    expect(after!.rr, 'a stop on the entry kept its R through the sweep').toBeNull();
+    expect(after!.assetClass, 'the asset class was left as the classifier once had it').not.toBe(
+      'other',
+    );
+  });
+
+  it('leaves other tenants' + "'" + ' books alone', async () => {
+    /*
+     * Cross-tenant at the top and scoped underneath. The sweep picks users out with an
+     * unscoped read and then does every write through a real `TenantContext`, so the tenant
+     * join is still on each one — a timer is not a reason to widen the boundary the whole
+     * schema is built around.
+     */
+    const other = await createTenantFixture();
+    const account = await connectMt5Account(other.ctx, {
+      login: '50214437',
+      server: 'MetaQuotes-Demo',
+      investorPwEncrypted: encryptSecret('read-only'),
+      accountCurrency: 'USD',
+    });
+    await syncMt5(other.ctx, 'backfill');
+
+    const theirs = (await listClosedTrades(other.ctx))[0]!;
+    await testDb.trade.update({ where: { id: theirs.id }, data: { assetClass: 'other' } });
+
+    await repairStoredFigures();
+
+    // Their row was repaired too — the sweep is for everyone — but through their own context.
+    const after = await getTrade(other.ctx, theirs.id);
+    expect(after!.assetClass).not.toBe('other');
+    // And nothing of theirs leaked into this fixture's book.
+    const mine = await listClosedTrades(fixture.ctx);
+    expect(mine.every((trade) => trade.id !== theirs.id)).toBe(true);
+    expect(account.id).toBeTruthy();
   });
 });
 

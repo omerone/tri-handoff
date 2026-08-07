@@ -7,7 +7,8 @@ import type { RiskResult } from '@/lib/mt5/risk';
 import type { TpTiming } from '@/lib/review/types';
 import { assertContext } from './context';
 import { computeRisk } from '@/lib/mt5/risk';
-import { findSymbolSpec } from '@/lib/mt5/symbols';
+import { classifySymbol, findSymbolSpec } from '@/lib/mt5/symbols';
+import { makeTenantContext } from './context';
 import { SYNCED_ONLY } from './manual-trades';
 import { prisma } from './prisma';
 
@@ -285,6 +286,84 @@ export async function upsertTrades(
  * Idempotent, and narrow by construction: it reads only rows that are missing the value, and
  * writes only rows it could compute. Running it twice does nothing the second time.
  */
+/**
+ * Re-files trades whose asset class was decided by a table that has since learned more.
+ *
+ * `assetClass` is written at sync time from `classifySymbol` and then stored, so a symbol the
+ * classifier did not recognise on the day it arrived keeps that answer forever. US100 is the
+ * live example: it is the Nasdaq under another broker's name, it was added to the index
+ * hints, and every row already in the book still reads "other" — on a screen where asset class
+ * is a filter and a chip, so the trades are both mislabelled and unfindable.
+ *
+ * Safe to run repeatedly and safe to run over everything: the stored value has always been
+ * exactly `classifySymbol(symbol)`, so this rewrites nothing that was decided any other way.
+ */
+export async function repairAssetClasses(ctx: TenantContext): Promise<number> {
+  assertContext(ctx);
+
+  const rows = await prisma.trade.findMany({
+    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, kind: 'trade' },
+    select: { id: true, symbol: true, assetClass: true },
+  });
+
+  const wrong = rows
+    .map((row) => ({ id: row.id, correct: classifySymbol(row.symbol), stored: row.assetClass }))
+    .filter((row) => row.correct !== row.stored);
+
+  for (const row of wrong) {
+    await prisma.trade.update({
+      where: { id: row.id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+      data: { assetClass: row.correct },
+    });
+  }
+
+  return wrong.length;
+}
+
+/**
+ * Both repairs, for every trader on the box, from a timer rather than a button.
+ *
+ * The repairs themselves run inside `syncMt5`, which is the right place for them and the wrong
+ * *only* place: automatic sync on sign-in is off by default — MetaApi bills by the hour a
+ * terminal is deployed — so nothing runs them until somebody presses refresh. That left a book
+ * with a stale 2,126R in every average it appears in, and a client who had been told the fix
+ * was live, waiting on a press nobody had a reason to make. Neither repair touches a broker;
+ * neither has any reason to wait for one.
+ *
+ * Cross-tenant at the top and scoped underneath: this picks the users out and then does the
+ * work through a real `TenantContext`, so every query below still carries the tenant join. A
+ * sweep is not a reason to widen the boundary the whole schema is built around.
+ */
+export async function repairStoredFigures(): Promise<{ priced: number; reclassified: number }> {
+  const users = await prisma.user.findMany({ select: { id: true, tenantId: true } });
+
+  let priced = 0;
+  let reclassified = 0;
+
+  for (const user of users) {
+    const ctx = makeTenantContext(user.tenantId, user.id);
+
+    // The account currency each row is priced in, straight from the stored account rows —
+    // the last successful sync wrote them, and no broker call is needed to read them back.
+    const accounts = await prisma.mt5Account.findMany({
+      where: { userId: user.id, user: { tenantId: user.tenantId } },
+      select: { id: true, accountCurrency: true },
+    });
+    const currencyByAccount = new Map(
+      accounts
+        .filter((account): account is typeof account & { accountCurrency: string } =>
+          Boolean(account.accountCurrency),
+        )
+        .map((account) => [account.id, account.accountCurrency]),
+    );
+
+    reclassified += await repairAssetClasses(ctx);
+    if (currencyByAccount.size > 0) priced += await repairMissingRisk(ctx, currencyByAccount);
+  }
+
+  return { priced, reclassified };
+}
+
 export async function repairMissingRisk(
   ctx: TenantContext,
   currencyByAccount: ReadonlyMap<string, string>,

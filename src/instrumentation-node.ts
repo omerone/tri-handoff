@@ -3,6 +3,7 @@ import {
   pruneExpiredRateLimits,
   pruneExpiredSessions,
   pruneExpiredTwoFactorChallenges,
+  repairStoredFigures,
 } from '@/lib/db';
 import { initializeEnv } from '@/lib/env';
 import { verifyMailTransport } from '@/lib/mail/mailer';
@@ -54,6 +55,25 @@ export async function startMaintenanceSweep(): Promise<void> {
         console.warn(
           `[maintenance] pruned ${sessions} sessions, ${limits} rate-limit rows, ` +
             `${auditRows} audit rows, ${challenges} two-factor challenges`,
+        );
+      }
+
+      /*
+       * Figures that are wrong in the database rather than on the screen.
+       *
+       * Both repairs already run inside `syncMt5`, which is the right place and the wrong only
+       * place: automatic sync on sign-in is off by default, because MetaApi bills by the hour a
+       * terminal is deployed, so neither runs until somebody presses refresh. A client was left
+       * reading a 2,126R average from one bad row for as long as nobody did. Neither repair
+       * talks to a broker, so neither has any business waiting for one.
+       *
+       * Separately from the prune above so a failure in either is still only its own.
+       */
+      const repaired = await repairStoredFigures();
+      if (repaired.priced > 0 || repaired.reclassified > 0) {
+        console.warn(
+          `[maintenance] priced ${repaired.priced} trade(s) and re-filed ` +
+            `${repaired.reclassified} by asset class`,
         );
       }
     } catch (error) {
