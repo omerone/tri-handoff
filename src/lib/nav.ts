@@ -53,7 +53,12 @@ export const NAV: readonly NavDefinition[] = [
   { key: 'dash', href: '/dashboard', label: 'dash', enabled: true, ranged: true, inStrip: true },
   { key: 'trades', href: '/trades', label: 'trades', enabled: true, ranged: true, inStrip: true }, // M1.6
   { key: 'long', href: '/long', label: 'long', enabled: true, ranged: false, inStrip: true },
-  { key: 'calendar', href: '/calendar', label: 'calendar', enabled: true, ranged: true, inStrip: true }, // M1.7
+  /*
+   * Not ranged. The calendar's unit *is* a month — it draws one, titled with its name, and
+   * steps with its own arrows. A range picker above it was a second control for the same
+   * thing, able to disagree with the arrows and to ask for a period the grid cannot draw.
+   */
+  { key: 'calendar', href: '/calendar', label: 'calendar', enabled: true, ranged: false, inStrip: true }, // M1.7
   { key: 'analytics', href: '/analytics', label: 'analytics', enabled: true, ranged: true, inStrip: true }, // M1.5
   { key: 'learning', href: '/learning', label: 'learning', enabled: true, ranged: true, inStrip: true },
   { key: 'settings', href: '/settings', label: 'settings', enabled: true, ranged: false, inStrip: false },

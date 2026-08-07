@@ -394,20 +394,21 @@ test.describe('calendar', () => {
     await expect(page.locator('main').getByText(monthBefore(opened))).toBeVisible();
   });
 
-  test('still steps a month when a range is chosen', async ({ page }) => {
-    // The arrows used to disappear the moment a range was picked, on the reasoning that
-    // stepping out of it would show a month the picker says is not selected. That left the
-    // screen with no way to reach last month at all: someone on "this month" had to reopen
-    // the picker and build a custom range for the most ordinary move a calendar has. They
-    // shift the range itself now, so the picker above stays true to what is on screen.
-    await page.goto('/calendar?range=this-month');
+  test('steps a month with its own arrows, and takes no range', async ({ page }) => {
+    // The arrows used to move a *range*, because this screen followed the shared picker as
+    // well as its own header. Two controls for one decision: they could disagree, and a range
+    // of days asked for a period a grid of months cannot draw. The month is the unit here, so
+    // `?m=` is the whole of it.
+    await page.goto('/calendar');
     const opened = await shownMonth(page);
 
     await page.getByRole('link', { name: 'Previous month' }).click();
     await expect(page.locator('main').getByText(monthBefore(opened))).toBeVisible();
-    // The range moved with it, rather than the month escaping the range.
-    expect(page.url()).toMatch(/range=\d{4}-\d{2}\.\.\d{4}-\d{2}/);
+    await expect(page).toHaveURL(/\?m=\d{4}-\d{2}/);
+    // One grid, always — a range can no longer turn this into a stack of months.
+    await expect(page.locator('main .grid')).toHaveCount(1);
   });
+
 });
 
 test.describe('Hebrew', () => {

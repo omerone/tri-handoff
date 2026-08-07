@@ -85,9 +85,13 @@ describe('ranged routes', () => {
       .sort();
     // Learning is here because the study ledger is a period like any other — "how many hours
     // this month" is the question it exists to answer.
+    //
+    // The calendar is not, and it is the one screen where that is not obvious: it reads a
+    // period in the sense that it draws trades from one, but the period it draws is a month
+    // and it names its own with arrows. A picker above it was a second control for the same
+    // decision, and the two could disagree.
     expect(ranged).toEqual([
       '/analytics',
-      '/calendar',
       '/dashboard',
       '/finance',
       '/learning',
@@ -100,6 +104,9 @@ describe('ranged routes', () => {
     // control that changes nothing on screen.
     expect(isRangedPath('/long')).toBe(false);
     expect(isRangedPath('/settings')).toBe(false);
+    // The calendar's unit is a month and it steps with its own arrows; a range above it was a
+    // second control for the same thing, able to ask for a period the grid cannot draw.
+    expect(isRangedPath('/calendar')).toBe(false);
   });
 
   it('matches the list route but not a single trade', () => {

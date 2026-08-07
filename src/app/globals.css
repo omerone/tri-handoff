@@ -367,6 +367,23 @@ button {
   transform-origin: top center;
 }
 
+/*
+ * A sheet rising from the bottom edge — the phone's answer to a form that was inline.
+ *
+ * Separate from `tri-sheet` because it comes from somewhere else: that one unfolds out of the
+ * button that opened it, this one slides up off the screen edge, which is the motion a person
+ * expects from something anchored to the bottom of a phone.
+ */
+@keyframes tri-sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.tri-sheet-up {
+  animation: tri-sheet-up 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @keyframes tri-tip {
   from {
     opacity: 0;
@@ -396,5 +413,49 @@ button {
   [data-recent-index='4'],
   [data-recent-index='5'] {
     display: none;
+  }
+}
+
+/*
+ * A left-to-right field inside a right-to-left form still starts where the form does.
+ *
+ * Numbers and dates carry `dir="ltr"` for a reason that has nothing to do with alignment: a
+ * signed figure or `07/08/2026` inside an RTL run is a string of bidi-neutral characters, and
+ * the algorithm will happily render "-₪2,085" as "₪2,085-" or reorder the parts of a date.
+ * Isolating the value fixes what it says.
+ *
+ * It also moved where it sat. `text-align: start` inside `dir="ltr"` is the left, so in a
+ * Hebrew form every date, amount, price and quantity sat hard against the left edge of its
+ * box while the labels above them and the text fields beside them were right-aligned — the
+ * one thing on the screen that did not line up with anything else.
+ *
+ * So the value keeps its own direction and gives back its alignment. Scoped to an RTL
+ * document, because in English these are already where they belong, and to fields only: a
+ * `<Num>` in a table cell takes its position from the cell, which is right.
+ *
+ * The date and symbol fields reserve room for their trailing button with `pr-*`, so the text
+ * lands clear of the icon rather than under it.
+ */
+[dir='rtl'] input[dir='ltr'],
+[dir='rtl'] textarea[dir='ltr'] {
+  text-align: right;
+}
+
+/*
+ * A screen that is allowed to be wider than the rest of them.
+ *
+ * The shell centres every page in `max-w-6xl` — 1152px — which is a good measure for reading
+ * a table and a poor one for a calendar: on a 1920px monitor the month sat in the middle two
+ * thirds of the window with its squares squashed and a third of the screen empty either side.
+ *
+ * A child cannot simply exceed a parent's max-width, so this pulls itself back out with a
+ * negative inline margin — the width it wants, minus the width it was given, halved on each
+ * side. Below `xl` it does nothing at all and the page is centred like every other.
+ */
+@media (min-width: 1280px) {
+  .tri-wide {
+    --tri-wide: min(96rem, calc(100vw - 2rem));
+    width: var(--tri-wide);
+    margin-inline: calc((72rem - var(--tri-wide)) / 2);
   }
 }

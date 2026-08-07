@@ -71,7 +71,7 @@ export function DayCell({
       // Focusable only when there is something to show: a quiet month should not cost thirty
       // tab stops on the way to the next control.
       tabIndex={total ? 0 : undefined}
-      className="group relative rounded-xl border px-1 py-1.5 focus-visible:outline-2 md:px-2"
+      className="group relative rounded-xl border px-1 py-1.5 focus-visible:outline-2 md:min-h-[5.5rem] md:px-2 md:py-2"
       style={{ background, borderColor: border }}
     >
       <div className="text-dim text-[11px]">{day}</div>

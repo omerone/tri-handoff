@@ -91,14 +91,18 @@ async function expectShowing(page: Page, name: string) {
 
 test.describe('the picker', () => {
   test('is on every screen that reads a period, and on no others', async ({ page }) => {
-    for (const path of ['/dashboard', '/analytics', '/trades', '/calendar', '/finance']) {
+    for (const path of ['/dashboard', '/analytics', '/trades', '/finance']) {
       await page.goto(path);
       // The trigger is the picker at every width; the presets are beside it or behind it.
       await expect(picker(page)).toBeVisible();
     }
 
     // Open positions are what is held right now, and Settings is not data at all.
-    for (const path of ['/long', '/settings']) {
+    //
+    // The calendar is the interesting one: it draws trades from a period, but the period is a
+    // month and it names its own with the arrows in its header. A picker above it was a second
+    // control for the same decision, and the two could disagree.
+    for (const path of ['/long', '/settings', '/calendar']) {
       await page.goto(path);
       await expect(picker(page)).toHaveCount(0);
     }
@@ -169,31 +173,18 @@ test.describe('what the range does to a screen', () => {
     await expect(page.getByText(/Connect your MT5 account/)).toHaveCount(0);
   });
 
-  test('turns the calendar into the months it covers', async ({ page }) => {
-    await page.goto('/calendar?range=2026-05..2026-07');
+  test('is not something the calendar listens to', async ({ page }) => {
+    // A range set anywhere else must not follow the reader here. The calendar draws the month
+    // in `?m=`, and the arrows in its header are the only thing that moves it — so a stale
+    // range in the cookie cannot silently decide which month is on screen, with no control on
+    // the page to change it back.
+    await page.goto('/trades?range=2026-05..2026-07');
+    await page.goto('/calendar');
 
-    // Newest first, and every month in the range. Scoped to `main`: the picker's own summary
-    // names the same months, which is the point of it, and it sits outside `main` so that
-    // asking whether the calendar shows July does not also find the picker saying so.
-    for (const month of ['July 2026', 'June 2026', 'May 2026']) {
-      await expect(page.locator('main').getByText(new RegExp(month))).toBeVisible();
-    }
-
-    // Arriving on a custom range opens the panel — see 'opens showing the bounds it is
-    // responsible for'. On a phone it is 290px of month fields laid over the first card, so
-    // it has to be dismissed before anything under it can be reached, which is what a person
-    // does. Escape rather than a click elsewhere: a click would land on a card.
-    await page.keyboard.press('Escape');
-
-    // The arrows shift the window rather than escaping it. They used to be absent here, on
-    // the reasoning that stepping out of the range would show a month the picker says is not
-    // selected — true, and it left a calendar with a range on it unable to reach last month
-    // at all. Moving the range keeps the picker honest and the arrow obvious.
+    await expect(page.locator('main .grid')).toHaveCount(1);
     await page.getByRole('link', { name: 'Previous month' }).click();
-    for (const month of ['June 2026', 'May 2026', 'April 2026']) {
-      await expect(page.locator('main').getByText(new RegExp(month))).toBeVisible();
-    }
-    await expect(page.locator('main').getByText(/July 2026/)).toHaveCount(0);
+    await expect(page).toHaveURL(/\?m=\d{4}-\d{2}/);
+    await expect(page.locator('main .grid')).toHaveCount(1);
   });
 
   test('leaves the calendar browsable when nothing is pinned down', async ({ page }) => {
