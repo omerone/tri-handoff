@@ -54,7 +54,7 @@ export function EntryForm({
   const options = type === 'income' ? categories.income : categories.expense;
 
   const field =
-    'border-line bg-raised text-text placeholder:text-dim/60 rounded-[10px] border px-3 py-2 text-sm';
+    'border-line bg-raised text-text placeholder:text-dim/60 min-h-11 w-full rounded-[10px] border px-3 py-2 text-sm sm:min-h-9 sm:w-auto';
 
   return (
     <form action={action} className="flex flex-col gap-3">
@@ -62,7 +62,9 @@ export function EntryForm({
       <input type="hidden" name="windowFrom" value={window.from} />
       <input type="hidden" name="windowTo" value={window.to} />
 
-      <div className="flex flex-wrap items-end gap-2">
+      {/* Two columns on a phone, the original inline row from `sm` — see the note on the
+          same grid in `long/manual-trade-form.tsx`. */}
+      <div className="grid grid-cols-2 items-end gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-dim text-[11px] font-semibold">{labels.typeExpense}</span>
           <select
@@ -86,7 +88,7 @@ export function EntryForm({
           <input
             name="category"
             list="tri-finance-categories"
-            className={`${field} w-36`}
+            className={`${field} sm:w-36`}
             autoComplete="off"
           />
           <datalist id="tri-finance-categories">
@@ -105,7 +107,7 @@ export function EntryForm({
             min="0.01"
             required
             dir="ltr"
-            className={`${field} w-28`}
+            className={`${field} sm:w-28`}
           />
         </label>
 
@@ -114,10 +116,11 @@ export function EntryForm({
           defaultValue={defaultDate}
           label={labels.date}
           required
-          className={`${field} w-40`}
+          className={`${field} sm:w-40`}
+          wrapperClassName="col-span-2 sm:col-auto"
         />
 
-        <SubmitButton>
+        <SubmitButton className="col-span-2 w-full sm:col-auto sm:w-auto">
           <span className="inline-flex items-center gap-1.5">
             <Plus size={14} aria-hidden /> {labels.add}
           </span>

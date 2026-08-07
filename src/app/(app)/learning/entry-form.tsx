@@ -36,30 +36,21 @@ export function LearningEntryForm({
   );
 
   const field =
-    'border-line bg-raised text-text placeholder:text-dim/60 rounded-[10px] border px-3 py-2 text-sm';
+    'border-line bg-raised text-text placeholder:text-dim/60 min-h-11 w-full rounded-[10px] border px-3 py-2 text-sm sm:min-h-9 sm:w-auto';
 
   return (
     <form action={action} className="flex flex-col gap-3">
       <FormMessage error={state.error} />
 
-      <div className="flex flex-wrap items-end gap-2">
+      {/* Two columns on a phone, the original inline row from `sm` — see the note on the
+          same grid in `long/manual-trade-form.tsx`. */}
+      <div className="grid grid-cols-2 items-end gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-dim text-[11px] font-semibold">{labels.topic}</span>
-          <select name="topic" defaultValue="technical" className={`${field} w-36`}>
+          <select name="topic" defaultValue="technical" className={`${field} sm:w-36`}>
             <option value="technical">{labels.topics.technical}</option>
             <option value="psychology">{labels.topics.psychology}</option>
           </select>
-        </label>
-
-        <label className="flex min-w-[12rem] flex-1 flex-col gap-1">
-          <span className="text-dim text-[11px] font-semibold">{labels.what}</span>
-          <input
-            name="title"
-            required
-            maxLength={120}
-            placeholder={labels.whatPlaceholder}
-            className={field}
-          />
         </label>
 
         <label className="flex flex-col gap-1">
@@ -70,7 +61,27 @@ export function LearningEntryForm({
             inputMode="decimal"
             dir="ltr"
             placeholder="1.5"
-            className={`${field} w-24`}
+            className={`${field} sm:w-24`}
+          />
+        </label>
+
+        {/*
+          Ordered in the source rather than with `order` utilities, which is the lesson of the
+          first attempt: the submit button carries no order of its own, so giving three fields
+          one sorted the button ahead of them and it landed in the middle of the form.
+
+          Hours sits beside the topic because both are short. This field then takes the whole
+          row, which on a phone it needs — a half cell gave it 169px and the placeholder is
+          three examples long, clipped before the first one ended.
+        */}
+        <label className="col-span-2 flex flex-col gap-1 sm:col-auto sm:min-w-[12rem] sm:flex-1">
+          <span className="text-dim text-[11px] font-semibold">{labels.what}</span>
+          <input
+            name="title"
+            required
+            maxLength={120}
+            placeholder={labels.whatPlaceholder}
+            className={field}
           />
         </label>
 
@@ -79,10 +90,11 @@ export function LearningEntryForm({
           defaultValue={defaultDate}
           label={labels.date}
           required
-          className={`${field} w-40`}
+          className={`${field} sm:w-40`}
+          wrapperClassName="col-span-2 sm:col-auto"
         />
 
-        <SubmitButton>
+        <SubmitButton className="col-span-2 w-full sm:col-auto sm:w-auto">
           <span className="inline-flex items-center gap-1.5">
             <Plus size={14} aria-hidden /> {labels.add}
           </span>

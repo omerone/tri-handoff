@@ -26,6 +26,7 @@ export function DateField({
   label,
   required,
   className = '',
+  wrapperClassName = '',
 }: {
   name: string;
   /** `yyyy-mm-dd`, as the server expects it back. */
@@ -33,6 +34,8 @@ export function DateField({
   label: string;
   required?: boolean;
   className?: string;
+  /** Goes on the label, not the input — for a grid cell the field has to span. */
+  wrapperClassName?: string;
 }) {
   const [text, setText] = useState(() => isoToDisplay(defaultValue));
   const picker = useRef<HTMLInputElement>(null);
@@ -44,7 +47,7 @@ export function DateField({
   const invalid = text.trim() !== '' && iso === '';
 
   return (
-    <label className="flex flex-col gap-1">
+    <label className={`flex flex-col gap-1 ${wrapperClassName}`}>
       <span className="text-dim text-[11px] font-semibold">{label}</span>
 
       <span className="relative inline-flex items-center">

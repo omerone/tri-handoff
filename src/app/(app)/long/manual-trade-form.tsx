@@ -29,8 +29,15 @@ export type ManualTradeLabels = {
   moreHint: string;
 };
 
+/*
+ * `min-h-11` is 44px — the size a finger actually hits, and the one number in here that is not
+ * taste. It relaxes to the denser desktop height from `sm`, where the pointer is a mouse.
+ * `w-full` because every field now sits in a grid cell and the cell decides the width; the
+ * fixed widths these used to carry are what made the row wrap into a ragged staircase on a
+ * phone, with the submit button washing up beside whichever field ended a line.
+ */
 const field =
-  'border-line bg-raised text-text placeholder:text-dim/60 rounded-[10px] border px-3 py-2 text-sm';
+  'border-line bg-raised text-text placeholder:text-dim/60 min-h-11 w-full rounded-[10px] border px-3 py-2 text-sm sm:min-h-9 sm:w-auto';
 
 /**
  * Typing in a trade the broker will never tell us about.
@@ -68,7 +75,15 @@ export function ManualTradeForm({
       <FormMessage error={state.error} notice={state.notice} />
       <input type="hidden" name="style" value={style} />
 
-      <div className="flex flex-wrap items-end gap-2">
+      {/*
+        Two columns on a phone, the original inline row from `sm`.
+
+        `flex-wrap` put the fields where they fell: five fixed widths against a 380px screen
+        wrapped into uneven rows, and the submit button — the last flex child — ended up
+        sharing a line with the risk box, which reads as an accident rather than a layout.
+        A grid gives every field the same width and the button a row of its own.
+      */}
+      <div className="grid grid-cols-2 items-end gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-2">
         <Field label={labels.symbol}>
           <input
             name="symbol"
@@ -76,12 +91,12 @@ export function ManualTradeForm({
             dir="ltr"
             autoCapitalize="characters"
             placeholder={labels.symbolHint}
-            className={`${field} w-32`}
+            className={`${field} sm:w-32`}
           />
         </Field>
 
         <Field label={labels.direction}>
-          <select name="direction" defaultValue="long" className={`${field} w-28`}>
+          <select name="direction" defaultValue="long" className={`${field} sm:w-28`}>
             <option value="long">{labels.long}</option>
             <option value="short">{labels.short}</option>
           </select>
@@ -92,7 +107,7 @@ export function ManualTradeForm({
           defaultValue={defaultDate}
           label={labels.date}
           required
-          className={`${field} w-40`}
+          className={`${field} sm:w-40`}
         />
 
         <Field label={labels.profit}>
@@ -106,11 +121,13 @@ export function ManualTradeForm({
             step="any"
             required
             dir="ltr"
-            className={`${field} w-28`}
+            className={`${field} sm:w-28`}
           />
         </Field>
 
-        <Field label={labels.risk}>
+        {/* Spans the row: five fields over two columns leaves the last one beside an empty
+            cell, which reads as a field that failed to load rather than the end of the form. */}
+        <Field label={labels.risk} className="col-span-2 sm:col-auto">
           <input
             name="risk"
             type="number"
@@ -118,11 +135,13 @@ export function ManualTradeForm({
             min="0"
             dir="ltr"
             placeholder={labels.riskHint}
-            className={`${field} w-28`}
+            className={`${field} sm:w-28`}
           />
         </Field>
 
-        <SubmitButton>
+        {/* Its own row, spanning both columns — the primary action of the form should not be
+            something you find beside a number box. */}
+        <SubmitButton className="col-span-2 w-full sm:col-auto sm:w-auto">
           <span className="inline-flex items-center gap-1.5">
             <Plus size={14} aria-hidden /> {labels.add}
           </span>
@@ -151,7 +170,10 @@ export function ManualTradeForm({
         */}
         <div className={open ? 'mt-3' : 'hidden'}>
           <p className="text-dim mb-2 text-[11px] leading-relaxed">{labels.moreHint}</p>
-          <div className="flex flex-wrap items-end gap-2">
+          {/* The same grid as the row above, so the fold does not change the shape of the form
+              underneath it — eight boxes wrapping raggedly is exactly what this section is
+              most at risk of, since it has the most of them. */}
+          <div className="grid grid-cols-2 items-end gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-2">
             {/*
               Empty by default, not today — and this section being kept mounted is exactly why
               it matters. A pre-filled open date submits whether or not anyone opened the fold,
@@ -165,15 +187,15 @@ export function ManualTradeForm({
               name="openDate"
               defaultValue=""
               label={labels.openDate}
-              className={`${field} w-40`}
+              className={`${field} sm:w-40`}
             />
-            <Num name="volume" label={labels.volume} width="w-24" />
-            <Num name="entryPrice" label={labels.entryPrice} width="w-28" />
-            <Num name="exitPrice" label={labels.exitPrice} width="w-28" />
-            <Num name="stopLoss" label={labels.stopLoss} width="w-28" />
-            <Num name="takeProfit" label={labels.takeProfit} width="w-28" />
-            <Num name="commission" label={labels.commission} width="w-24" signed />
-            <Num name="swap" label={labels.swap} width="w-24" signed />
+            <Num name="volume" label={labels.volume} width="sm:w-24" />
+            <Num name="entryPrice" label={labels.entryPrice} width="sm:w-28" />
+            <Num name="exitPrice" label={labels.exitPrice} width="sm:w-28" />
+            <Num name="stopLoss" label={labels.stopLoss} width="sm:w-28" />
+            <Num name="takeProfit" label={labels.takeProfit} width="sm:w-28" />
+            <Num name="commission" label={labels.commission} width="sm:w-24" signed />
+            <Num name="swap" label={labels.swap} width="sm:w-24" signed />
           </div>
         </div>
       </div>
@@ -207,9 +229,18 @@ function Num({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  className = '',
+}: {
+  label: string;
+  children: React.ReactNode;
+  /** Lets a field claim the whole row — see the risk box, which would otherwise sit alone. */
+  className?: string;
+}) {
   return (
-    <label className="flex flex-col gap-1">
+    <label className={`flex flex-col gap-1 ${className}`}>
       <span className="text-dim text-[11px] font-semibold">{label}</span>
       {children}
     </label>

@@ -24,14 +24,28 @@ export function Field({
   );
 }
 
-export function SubmitButton({ children }: { children: ReactNode }) {
+/**
+ * `className` is additive, and exists for one reason: on a phone this button belongs on a row
+ * of its own at full width, and only the form around it knows that. Every caller that says
+ * nothing keeps the shape it always had.
+ *
+ * `min-h-11` is 44px, the size a finger actually hits. It is a floor rather than a height, so
+ * a button whose label wraps grows instead of clipping.
+ */
+export function SubmitButton({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className="bg-brand rounded-[10px] px-4 py-2.5 text-sm font-bold text-white transition-opacity disabled:opacity-60"
+      className={`bg-brand inline-flex min-h-11 items-center justify-center rounded-[10px] px-4 py-2.5 text-sm font-bold text-white transition-opacity disabled:opacity-60 sm:min-h-9 ${className}`}
     >
       {children}
     </button>

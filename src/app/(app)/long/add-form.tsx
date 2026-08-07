@@ -16,8 +16,10 @@ export type AddFormLabels = SymbolFieldLabels & {
   add: string;
 };
 
+/* 44px on a phone, the denser desktop height from `sm`, and the grid cell decides the width —
+   see the note on the same constant in `manual-trade-form.tsx`. */
 const field =
-  'border-line bg-raised text-text placeholder:text-dim/60 rounded-[10px] border px-3 py-2 text-sm';
+  'border-line bg-raised text-text placeholder:text-dim/60 min-h-11 w-full rounded-[10px] border px-3 py-2 text-sm sm:min-h-9 sm:w-auto';
 
 export function AddPositionForm({
   labels,
@@ -43,8 +45,16 @@ export function AddPositionForm({
     <form action={action} className="flex flex-col gap-3">
       <FormMessage error={state.error} />
 
-      <div className="flex flex-wrap items-end gap-2">
-        <SymbolField labels={labels} onPick={onPick} />
+      {/*
+        Two columns on a phone, the original inline row from `sm` — the same rule the manual
+        trade form follows, and for the same reason: six fixed widths wrapped into an uneven
+        staircase and left "add position" sharing a line with the date.
+
+        The symbol search spans both columns. It is the field the form starts with, it holds a
+        menu of results, and half a row is not enough to read a company name in.
+      */}
+      <div className="grid grid-cols-2 items-end gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-2">
+        <SymbolField labels={labels} onPick={onPick} className="col-span-2 sm:col-auto" />
 
         <Field label={labels.qty}>
           <input
@@ -54,7 +64,7 @@ export function AddPositionForm({
             min="0"
             required
             dir="ltr"
-            className={`${field} w-24`}
+            className={`${field} sm:w-24`}
           />
         </Field>
 
@@ -66,7 +76,7 @@ export function AddPositionForm({
             min="0"
             required
             dir="ltr"
-            className={`${field} w-28`}
+            className={`${field} sm:w-28`}
           />
         </Field>
 
@@ -78,7 +88,7 @@ export function AddPositionForm({
             min="0"
             defaultValue={0}
             dir="ltr"
-            className={`${field} w-24`}
+            className={`${field} sm:w-24`}
           />
         </Field>
 
@@ -87,7 +97,7 @@ export function AddPositionForm({
             name="currency"
             value={currency}
             onChange={(event) => setCurrency(event.target.value)}
-            className={`${field} w-24`}
+            className={`${field} sm:w-24`}
           >
             {currencies.map((code) => (
               <option key={code} value={code}>
@@ -97,15 +107,17 @@ export function AddPositionForm({
           </select>
         </Field>
 
+        {/* Last of an odd number of cells, so it spans rather than sitting beside a gap. */}
         <DateField
           name="buyDate"
           defaultValue={defaultDate}
           label={labels.buyDate}
           required
-          className={`${field} w-40`}
+          className={`${field} sm:w-40`}
+          wrapperClassName="col-span-2 sm:col-auto"
         />
 
-        <SubmitButton>
+        <SubmitButton className="col-span-2 w-full sm:col-auto sm:w-auto">
           <span className="inline-flex items-center gap-1.5">
             <Plus size={14} aria-hidden /> {labels.add}
           </span>

@@ -162,7 +162,7 @@ export function SymbolField({
             // which inside the Hebrew layout is the *left*. Space reserved on one side and the
             // icon drawn on the other is what put the magnifier on top of the "T" in "TSLA".
             // Both are physical now, so they cannot disagree.
-            className="border-line bg-raised text-text placeholder:text-dim/60 w-52 rounded-[10px] border px-3 py-2 pr-7 text-sm"
+            className="border-line bg-raised text-text placeholder:text-dim/60 min-h-11 w-full rounded-[10px] border px-3 py-2 pr-7 text-sm sm:min-h-9 sm:w-52"
           />
           <span className="text-dim pointer-events-none absolute right-2">
             {searching ? (
@@ -183,7 +183,9 @@ export function SymbolField({
         <ul
           id={listId}
           role="listbox"
-          className="border-line bg-raised absolute z-30 mt-1 max-h-96 w-72 overflow-auto rounded-[10px] border py-1 shadow-lg"
+          // `w-full` on a phone: a 288px menu hanging off a field that is now the width of the
+          // screen either overflowed the card or sat under the wrong half of it.
+          className="border-line bg-raised absolute z-30 mt-1 max-h-96 w-full overflow-auto rounded-[10px] border py-1 shadow-lg sm:w-72"
         >
           {results.length === 0 ? (
             <li className="text-dim px-3 py-2 text-xs">
