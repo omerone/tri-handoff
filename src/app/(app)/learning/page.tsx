@@ -13,6 +13,13 @@ import { TOPIC_COLOR } from '@/lib/review/colors';
 import { formatDateAt } from '@/lib/time/format';
 import { toTradeFilter } from '@/lib/time/range';
 import { deleteLearningEntryAction } from './actions';
+import { deleteLearningEntriesAction } from '../bulk-delete-actions';
+import {
+  BulkSelect,
+  BulkSelectAll,
+  BulkSelectRow,
+  BulkSelectToggle,
+} from '@/components/ui/bulk-select';
 import { LearningEntryForm } from './entry-form';
 
 /**
@@ -102,43 +109,56 @@ export default async function LearningPage({
         {entries.length === 0 ? (
           <EmptyState>{t('empty')}</EmptyState>
         ) : (
-          <ul className="divide-line divide-y">
-            {entries.map((entry) => (
-              <li key={entry.id} className="flex items-start gap-3 py-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-2">
-                    <span className="text-text text-sm font-semibold">{entry.title}</span>
-                    <Chip>{t(`topics.${entry.topic as LearningTopic}`)}</Chip>
-                  </div>
-                  {entry.note ? (
-                    <p className="text-dim mt-1 text-xs leading-relaxed">{entry.note}</p>
-                  ) : null}
-                  <div className="text-dim mt-1 text-[11px]">
-                    <Num>{formatDateAt(entry.learnedOn)}</Num>
-                  </div>
-                </div>
+          <BulkSelect
+            keys={entries.map((entry) => entry.id)}
+            onDelete={deleteLearningEntriesAction}
+          >
+            {/* The row control that is always drawn, and the only one until it is pressed.
+                Beside "select all" so the boxes appear under the button that asked for them. */}
+            <div className="border-line flex items-center gap-3 border-b py-2">
+              <BulkSelectAll />
+              <BulkSelectToggle />
+            </div>
 
-                <span className="tri-num text-text shrink-0 text-sm font-bold">
-                  {hours(entry.hours)}
-                </span>
+            <ul className="divide-line divide-y">
+              {entries.map((entry) => (
+                <li key={entry.id} className="flex items-start gap-3 py-3">
+                  <BulkSelectRow rowKey={entry.id} label={entry.title} className="self-center" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <span className="text-text text-sm font-semibold">{entry.title}</span>
+                      <Chip>{t(`topics.${entry.topic as LearningTopic}`)}</Chip>
+                    </div>
+                    {entry.note ? (
+                      <p className="text-dim mt-1 text-xs leading-relaxed">{entry.note}</p>
+                    ) : null}
+                    <div className="text-dim mt-1 text-[11px]">
+                      <Num>{formatDateAt(entry.learnedOn)}</Num>
+                    </div>
+                  </div>
 
-                {/*
+                  <span className="tri-num text-text shrink-0 text-sm font-bold">
+                    {hours(entry.hours)}
+                  </span>
+
+                  {/*
                   A plain form rather than a confirm dialog: one user per tenant, an entry is
                   two fields, and re-adding it is faster than reading a modal.
                 */}
-                <form action={deleteLearningEntryAction} className="shrink-0">
-                  <input type="hidden" name="id" value={entry.id} />
-                  <button
-                    type="submit"
-                    aria-label={t('delete')}
-                    className="text-dim/60 hover:text-neg flex size-7 items-center justify-center rounded-lg"
-                  >
-                    <Trash2 size={14} aria-hidden />
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
+                  <form action={deleteLearningEntryAction} className="shrink-0">
+                    <input type="hidden" name="id" value={entry.id} />
+                    <button
+                      type="submit"
+                      aria-label={t('delete')}
+                      className="text-dim/60 hover:text-neg flex size-7 items-center justify-center rounded-lg"
+                    >
+                      <Trash2 size={14} aria-hidden />
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </BulkSelect>
         )}
       </Card>
 

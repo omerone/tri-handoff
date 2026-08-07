@@ -1,4 +1,11 @@
 import { EmptyState } from '@/components/ui/kpi';
+import { deleteManualTradesAction } from '../bulk-delete-actions';
+import {
+  BulkSelect,
+  BulkSelectAll,
+  BulkSelectHeaderCell,
+  BulkSelectToggle,
+} from '@/components/ui/bulk-select';
 import { OpenRowProvider } from './open-row';
 import {
   ManualTradeRow,
@@ -58,27 +65,37 @@ export function ManualTradeList({
 
   return (
     <OpenRowProvider>
-      <div className="overflow-x-auto">
-        <table className="tri-stack w-full border-collapse text-[13px]">
-          <thead>
-            <tr className="text-dim text-[11px]">
-              {headers.map((header, index) => (
-                <th
-                  key={index}
-                  className={`border-line border-b px-3 py-2.5 font-semibold ${align}`}
-                >
-                  {header}
-                </th>
+      <BulkSelect keys={trades.map((trade) => trade.id)} onDelete={deleteManualTradesAction}>
+        {/* The one control that is always drawn, on the side the tick column appears on so
+            the boxes arrive under the button that asked for them. */}
+        <div className="border-line flex items-center gap-3 border-b px-1 py-2">
+          <BulkSelectAll />
+          <BulkSelectToggle />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="tri-stack w-full border-collapse text-[13px]">
+            <thead>
+              <tr className="text-dim text-[11px]">
+                <BulkSelectHeaderCell />
+                {headers.map((header, index) => (
+                  <th
+                    key={index}
+                    className={`border-line border-b px-3 py-2.5 font-semibold ${align}`}
+                  >
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {trades.map((trade) => (
+                <ManualTradeRow key={trade.id} trade={trade} labels={labels.row} />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {trades.map((trade) => (
-              <ManualTradeRow key={trade.id} trade={trade} labels={labels.row} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </tbody>
+          </table>
+        </div>
+      </BulkSelect>
     </OpenRowProvider>
   );
 }

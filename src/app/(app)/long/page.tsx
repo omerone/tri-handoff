@@ -25,6 +25,13 @@ import { BookTabs, isBookTab, type BookTab } from './book-tabs';
 import { ManualBook } from './manual-book';
 import { OpenRowProvider } from './open-row';
 import { PositionRow } from './position-row';
+import { deleteLongPositionsAction } from '../bulk-delete-actions';
+import {
+  BulkSelect,
+  BulkSelectAll,
+  BulkSelectHeaderCell,
+  BulkSelectToggle,
+} from '@/components/ui/bulk-select';
 import { trackAllAction } from './actions';
 import { formatDateAt } from '@/lib/time/format';
 
@@ -321,51 +328,64 @@ export default async function LongPositionsPage({
           <EmptyState>{t('empty')}</EmptyState>
         ) : (
           <OpenRowProvider>
-            <div className="overflow-x-auto">
-              <table className="tri-stack w-full border-collapse text-[13px]">
-                <thead>
-                  <tr className="text-dim text-[11px]">
-                    {headers.map((header, index) => (
-                      <th
-                        key={index}
-                        className={`border-line border-b px-3 py-2.5 font-semibold ${align}`}
-                      >
-                        {header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {open.map((position) => (
-                    <PositionRow key={position.id} position={rowFor(position)} labels={labels} />
-                  ))}
-                </tbody>
+            <BulkSelect
+              keys={positions.map((position) => position.id)}
+              onDelete={deleteLongPositionsAction}
+            >
+              {/* The one control that is always drawn, on the side the tick column appears on
+                  so the boxes arrive under the button that asked for them. */}
+              <div className="border-line flex items-center gap-3 border-b px-1 py-2">
+                <BulkSelectAll />
+                <BulkSelectToggle />
+              </div>
 
-                {closed.length > 0 ? (
-                  <>
-                    <thead className="tri-stack-keep">
-                      <tr>
+              <div className="overflow-x-auto">
+                <table className="tri-stack w-full border-collapse text-[13px]">
+                  <thead>
+                    <tr className="text-dim text-[11px]">
+                      <BulkSelectHeaderCell />
+                      {headers.map((header, index) => (
                         <th
-                          colSpan={headers.length}
-                          className={`text-dim border-line border-y px-3 py-2 text-[11px] font-semibold ${align}`}
+                          key={index}
+                          className={`border-line border-b px-3 py-2.5 font-semibold ${align}`}
                         >
-                          {t('closed')}
+                          {header}
                         </th>
-                      </tr>
-                    </thead>
-                    <tbody className="opacity-70">
-                      {closed.map((position) => (
-                        <PositionRow
-                          key={position.id}
-                          position={rowFor(position)}
-                          labels={labels}
-                        />
                       ))}
-                    </tbody>
-                  </>
-                ) : null}
-              </table>
-            </div>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {open.map((position) => (
+                      <PositionRow key={position.id} position={rowFor(position)} labels={labels} />
+                    ))}
+                  </tbody>
+
+                  {closed.length > 0 ? (
+                    <>
+                      <thead className="tri-stack-keep">
+                        <tr>
+                          <th
+                            colSpan={headers.length}
+                            className={`text-dim border-line border-y px-3 py-2 text-[11px] font-semibold ${align}`}
+                          >
+                            {t('closed')}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="opacity-70">
+                        {closed.map((position) => (
+                          <PositionRow
+                            key={position.id}
+                            position={rowFor(position)}
+                            labels={labels}
+                          />
+                        ))}
+                      </tbody>
+                    </>
+                  ) : null}
+                </table>
+              </div>
+            </BulkSelect>
           </OpenRowProvider>
         )}
       </Card>

@@ -82,6 +82,26 @@ export async function createLearningEntry(
 }
 
 /** Returns false when the row does not belong to this context, rather than throwing. */
+/**
+ * The rows a user picked out of the list, in one statement.
+ *
+ * One `deleteMany` rather than a loop: a screenful of rows should cost one query, and a partial
+ * failure halfway through a loop leaves a list the person has to re-read to find out what
+ * happened. Scoped inside the statement, so an id belonging to another tenant matches nothing
+ * rather than relying on a check that could be forgotten at a call site.
+ */
+export async function deleteLearningEntriesByIds(
+  ctx: TenantContext,
+  ids: readonly string[],
+): Promise<number> {
+  assertContext(ctx);
+  if (ids.length === 0) return 0;
+  const { count } = await prisma.learningEntry.deleteMany({
+    where: { id: { in: [...ids] }, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+  });
+  return count;
+}
+
 export async function deleteLearningEntry(ctx: TenantContext, id: string): Promise<boolean> {
   assertContext(ctx);
   const { count } = await prisma.learningEntry.deleteMany({

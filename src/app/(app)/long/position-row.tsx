@@ -1,11 +1,25 @@
 'use client';
 
 import { useActionState } from 'react';
+import { BulkSelectCell } from '@/components/ui/bulk-select';
 import { useRowMode, type RowMode } from './open-row';
 import Link from 'next/link';
-import { Check, Clock, NotebookPen, Pencil, RefreshCw, Trash2, TriangleAlert, X } from 'lucide-react';
+import {
+  Check,
+  Clock,
+  NotebookPen,
+  Pencil,
+  RefreshCw,
+  Trash2,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
 import { Num } from '@/components/ui/kpi';
-import { PositionEditForm, type PositionEditLabels, type PositionEditValues } from './position-edit-form';
+import {
+  PositionEditForm,
+  type PositionEditLabels,
+  type PositionEditValues,
+} from './position-edit-form';
 import {
   closePositionAction,
   deletePositionAction,
@@ -98,6 +112,7 @@ export function PositionRow({
   if (mode === 'edit') {
     return (
       <tr className="border-line bg-raised/30 border-b">
+        <BulkSelectCell rowKey={position.id} label={position.symbol} />
         <td colSpan={8} className="px-3 py-3">
           <PositionEditForm
             id={position.id}
@@ -113,6 +128,7 @@ export function PositionRow({
 
   return (
     <tr className="border-line border-b last:border-b-0">
+      <BulkSelectCell rowKey={position.id} label={position.symbol} />
       <td data-title className={`${cell} font-bold`}>
         {position.symbol}
         {position.closed ? <span className="text-dim ms-2 text-[10px]">·</span> : null}

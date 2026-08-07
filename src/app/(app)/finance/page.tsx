@@ -11,7 +11,13 @@ import { getMt5Account, listFinanceEntries, listLongPositions } from '@/lib/db';
 import { computeMetrics } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { portfolioTotals } from '@/lib/positions/valuation';
-import { cumulativeCash, expensesByCategory, rangeBalance, totalWealth, yearBalance } from '@/lib/finance/balance';
+import {
+  cumulativeCash,
+  expensesByCategory,
+  rangeBalance,
+  totalWealth,
+  yearBalance,
+} from '@/lib/finance/balance';
 import { isKnownCategory, suggestedCategories } from '@/lib/finance/categories';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { formatMoney, formatNumber } from '@/lib/money/currency';
@@ -20,6 +26,13 @@ import { getFxRate, hasRate } from '@/lib/money/fx';
 import { wallClock } from '@/lib/time/zone';
 import { EntryForm } from './entry-form';
 import { EntryRow } from './entry-row';
+import { deleteFinanceEntriesAction } from '../bulk-delete-actions';
+import {
+  BulkSelect,
+  BulkSelectAll,
+  BulkSelectRow,
+  BulkSelectToggle,
+} from '@/components/ui/bulk-select';
 import { formatDayMonthAt, type DateParts } from '@/lib/time/format';
 
 /**
@@ -38,6 +51,7 @@ export default async function FinancePage({
 }) {
   const session = await requireSession();
   const t = await getTranslations('finance');
+  const tBulk = await getTranslations('bulk');
   const locale = (await getLocale()) as Locale;
   const rtl = LOCALE_DIR[locale] === 'rtl';
   const params = await searchParams;
@@ -166,8 +180,7 @@ export default async function FinancePage({
 
   // Net worth needs all three legs in one currency. Missing any rate makes the sum
   // meaningless, so it is withheld rather than approximated.
-  const wealthAvailable =
-    cashMoney.converted && tradingMoney.converted && longValue !== null;
+  const wealthAvailable = cashMoney.converted && tradingMoney.converted && longValue !== null;
   const wealth = wealthAvailable
     ? totalWealth({
         trading: fromTrading(tradingValue),
@@ -187,7 +200,8 @@ export default async function FinancePage({
    * whether that came from a preset, a custom range or an arrow.
    */
   const viewedMonth =
-    range.months && range.months.from.year === range.months.to.year &&
+    range.months &&
+    range.months.from.year === range.months.to.year &&
     range.months.from.month === range.months.to.month
       ? range.months.from
       : null;
@@ -224,7 +238,9 @@ export default async function FinancePage({
               ? t('fxUnavailable')
               : [
                   `${t('trading')} ${tradingMoney.money(tradingValue)}`,
-                  longValue && longValue > 0 ? `${t('longPositions')} ${inDisplay(longValue)}` : null,
+                  longValue && longValue > 0
+                    ? `${t('longPositions')} ${inDisplay(longValue)}`
+                    : null,
                   `${t('cash')} ${ils(cash)}`,
                 ]
                   .filter(Boolean)
@@ -297,39 +313,64 @@ export default async function FinancePage({
         {balance.entries.length === 0 ? (
           <EmptyState>{t('empty')}</EmptyState>
         ) : (
-          <div className="flex flex-col">
+          <BulkSelect
+            keys={balance.entries.map(
+              (occurrence) => `${occurrence.id}:${occurrence.occurrenceDate.toISOString()}`,
+            )}
+            onDelete={deleteFinanceEntriesAction}
+            /* A recurring row is drawn once per month it falls in, and deleting takes the
+               entry rather than the occurrence — so removing October's salary removes every
+               month's. "End series" beside it is the other answer, and this says which one
+               the trader is about to give. */
+            warning={tBulk('recurringWarning')}
+          >
+            <div className="border-line flex items-center gap-3 border-b py-2">
+              <BulkSelectAll />
+              <BulkSelectToggle />
+            </div>
+
             {balance.entries.map((occurrence) => (
-              <EntryRow
+              <div
                 key={`${occurrence.id}:${occurrence.occurrenceDate.toISOString()}`}
-                // The occurrence's own month, not the window's. "End series" ends it *here*,
-                // and a range spanning a quarter would otherwise end a December salary in
-                // October.
-                month={{
-                  year: occurrence.occurrenceDate.getUTCFullYear(),
-                  month: occurrence.occurrenceDate.getUTCMonth() + 1,
-                }}
-                entry={{
-                  id: occurrence.id,
-                  type: occurrence.type,
-                  label: occurrence.label,
-                  category: categoryLabel(occurrence.category),
-                  amount: ils(occurrence.amountIls),
-                  // Stored as UTC midnight: a calendar date, not an instant.
-                  date: formatDayMonthAt(occurrence.occurrenceDate, 'UTC'),
-                  isRecurring: occurrence.isRecurring,
-                  generated: occurrence.generated,
-                }}
-                labels={{
-                  recurringBadge: t('recurringBadge'),
-                  delete: t('delete'),
-                  deleteConfirm: t('deleteConfirm'),
-                  endSeries: t('endSeries'),
-                  endSeriesConfirm: t('endSeriesConfirm'),
-                  deleteSeriesConfirm: t('deleteSeriesConfirm'),
-                }}
-              />
+                className="flex items-center gap-3"
+              >
+                <BulkSelectRow
+                  rowKey={`${occurrence.id}:${occurrence.occurrenceDate.toISOString()}`}
+                  label={occurrence.label}
+                />
+                <div className="min-w-0 flex-1">
+                  <EntryRow
+                    // The occurrence's own month, not the window's. "End series" ends it *here*,
+                    // and a range spanning a quarter would otherwise end a December salary in
+                    // October.
+                    month={{
+                      year: occurrence.occurrenceDate.getUTCFullYear(),
+                      month: occurrence.occurrenceDate.getUTCMonth() + 1,
+                    }}
+                    entry={{
+                      id: occurrence.id,
+                      type: occurrence.type,
+                      label: occurrence.label,
+                      category: categoryLabel(occurrence.category),
+                      amount: ils(occurrence.amountIls),
+                      // Stored as UTC midnight: a calendar date, not an instant.
+                      date: formatDayMonthAt(occurrence.occurrenceDate, 'UTC'),
+                      isRecurring: occurrence.isRecurring,
+                      generated: occurrence.generated,
+                    }}
+                    labels={{
+                      recurringBadge: t('recurringBadge'),
+                      delete: t('delete'),
+                      deleteConfirm: t('deleteConfirm'),
+                      endSeries: t('endSeries'),
+                      endSeriesConfirm: t('endSeriesConfirm'),
+                      deleteSeriesConfirm: t('deleteSeriesConfirm'),
+                    }}
+                  />
+                </div>
+              </div>
             ))}
-          </div>
+          </BulkSelect>
         )}
       </Card>
 
@@ -363,7 +404,6 @@ export default async function FinancePage({
 
 const iso = (parts: DateParts) =>
   `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
-
 
 /**
  * Today when today is inside the window, otherwise where the window starts — so adding an

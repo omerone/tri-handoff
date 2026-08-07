@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowDownRight, ArrowUpRight, NotebookPen, Pencil, Trash2, X } from 'lucide-react';
+import { BulkSelectCell } from '@/components/ui/bulk-select';
 import Link from 'next/link';
 import { useActionState, useEffect } from 'react';
 import { useRowMode } from './open-row';
@@ -124,6 +125,7 @@ export function ManualTradeRow({
   if (editing) {
     return (
       <tr className="border-line bg-raised/30 border-b">
+        <BulkSelectCell rowKey={trade.id} label={trade.symbol} />
         <td colSpan={8} className="px-3 py-3">
           <form action={action} className="flex flex-col gap-3">
             <input type="hidden" name="id" value={trade.id} />
@@ -170,11 +172,24 @@ export function ManualTradeRow({
               <Num_ name="profit" label={labels.fields.profit} value={trade.edit.profit} signed />
               <Num_ name="risk" label={labels.fields.risk} value={trade.edit.risk} />
               <Num_ name="volume" label={labels.fields.volume} value={trade.edit.volume} />
-              <Num_ name="entryPrice" label={labels.fields.entryPrice} value={trade.edit.entryPrice} />
+              <Num_
+                name="entryPrice"
+                label={labels.fields.entryPrice}
+                value={trade.edit.entryPrice}
+              />
               <Num_ name="exitPrice" label={labels.fields.exitPrice} value={trade.edit.exitPrice} />
               <Num_ name="stopLoss" label={labels.fields.stopLoss} value={trade.edit.stopLoss} />
-              <Num_ name="takeProfit" label={labels.fields.takeProfit} value={trade.edit.takeProfit} />
-              <Num_ name="commission" label={labels.fields.commission} value={trade.edit.commission} signed />
+              <Num_
+                name="takeProfit"
+                label={labels.fields.takeProfit}
+                value={trade.edit.takeProfit}
+              />
+              <Num_
+                name="commission"
+                label={labels.fields.commission}
+                value={trade.edit.commission}
+                signed
+              />
               <Num_ name="swap" label={labels.fields.swap} value={trade.edit.swap} signed />
             </div>
 
@@ -198,6 +213,7 @@ export function ManualTradeRow({
 
   return (
     <tr className="border-line border-b last:border-b-0">
+      <BulkSelectCell rowKey={trade.id} label={trade.symbol} />
       <td className="text-dim px-3 py-2.5 text-xs whitespace-nowrap">
         <Num>{trade.closedAt}</Num>
       </td>
