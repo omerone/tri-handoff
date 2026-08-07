@@ -559,6 +559,66 @@ describe('the missing-R bug', () => {
     expect(computeRisk({ ...sized, stopLoss: 1.1, volume: 1 }).reason).toBe('zero-distance');
   });
 
+  it('refuses a stop that sits inside the spread', () => {
+    /*
+     * The three trades that would have made the client's average R meaningless.
+     *
+     * A broker stores the stop the trade *ended* with, so a position that ran well records the
+     * level the stop was trailed to. Cross the entry and `stop-beyond-entry` catches it; stop a
+     * tenth of a pip short and every check passes, the risk comes out at a dollar, and a $283
+     * win reads 189R. Three rows like this took the average of forty-one from a median of
+     * −1.13R to a mean of +10.22R.
+     *
+     * These are the real production values, to the tick.
+     */
+    const trailed = [
+      { symbol: 'GBPUSD', entryPrice: 1.34156, stopLoss: 1.34155, volume: 1 },
+      { symbol: 'EURUSD', entryPrice: 1.16918, stopLoss: 1.16916, volume: 1 },
+    ];
+    for (const trade of trailed) {
+      expect(
+        computeRisk({ ...trade, direction: 'long', accountCurrency: 'USD' }).reason,
+        `${trade.symbol} priced a stop one tick from the entry`,
+      ).toBe('zero-distance');
+    }
+
+    // And the smallest stop the same book actually contains, which has to survive: 22 ticks.
+    const real = computeRisk({
+      symbol: 'GBPUSD',
+      entryPrice: 1.34156,
+      stopLoss: 1.33936,
+      volume: 1,
+      direction: 'long',
+      accountCurrency: 'USD',
+    });
+    expect(real.risk, 'the guard swallowed a genuine stop').toBeCloseTo(220, 6);
+  });
+
+  it('measures that closeness against the price, not against the tick', () => {
+    /*
+     * The first version of the guard was ten ticks of the instrument's own resolution, which
+     * is a pip on a five-digit pair and nonsense anywhere the tick is coarse next to the
+     * price. On something quoted to two decimals and trading at 1.10 it is nine percent — it
+     * refused every real stop on the instrument, and two existing tests said so.
+     */
+    const result = computeRisk({
+      symbol: 'UNKNOWN.X',
+      entryPrice: 1.1,
+      stopLoss: 1.09,
+      volume: 1,
+      direction: 'long',
+      accountCurrency: 'USD',
+      spec: {
+        symbol: 'UNKNOWN.X',
+        assetClass: 'indices',
+        contractSize: 10,
+        quoteCurrency: 'USD',
+        digits: 2,
+      },
+    });
+    expect(result.risk).toBeCloseTo(0.1, 6);
+  });
+
   it('does not divide an index by its own price', () => {
     /*
      * MetaApi marks `baseCurrency` required, so it names one for every instrument — including

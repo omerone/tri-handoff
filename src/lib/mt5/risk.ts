@@ -166,6 +166,32 @@ export function computeRisk(inputs: RiskInputs): RiskResult {
   const spec = inputs.spec ?? findSymbolSpec(inputs.symbol);
   if (!spec) return { risk: null, reason: 'unknown-symbol' };
 
+  /*
+   * A stop inside the spread is not a stop, it is breakeven recorded a hair short of it — the
+   * same event as `stop-beyond-entry`, caught on the wrong side of the line.
+   *
+   * The broker stores the *final* stop, not the one the trade opened with, so what lands in
+   * this column on a trade that went well is a stop trailed up to lock the profit in. The
+   * docstring at the top of this file describes the version that crosses the entry and reads
+   * 213.66R. The version that stops a tenth of a pip short is the same absurdity and passes
+   * every check above it: three trades in the client's book had stops one and two ticks out,
+   * priced at a dollar of risk apiece, and read 189R, 162R and 104R. Three rows out of
+   * forty-one moved the average from a median of −1.13R to a mean of +10.22R.
+   *
+   * A basis point of the entry price, and it is a fact about dealing rather than a number that
+   * happened to work: one basis point of GBPUSD is 1.3 pips, which is a normal spread, so a
+   * stop that close could not have been placed and survived to be recorded. It is relative to
+   * the price on purpose — ten ticks of the instrument's own resolution was the first version
+   * of this and it is only meaningful while ticks are fine next to the price. On something
+   * quoted to two decimals and trading at 1.10, ten ticks is nine percent, and it would have
+   * refused every genuine stop on the instrument.
+   *
+   * The line is drawn through an empty gap rather than through the data: production has three
+   * stops at 0.07–0.17 basis points and then nothing until 1.6.
+   */
+  if (!(inputs.entryPrice > 0)) return { risk: null, reason: 'zero-distance' };
+  if (distance / inputs.entryPrice < 0.0001) return { risk: null, reason: 'zero-distance' };
+
   const rate = quoteToAccountRate(
     spec,
     inputs.entryPrice,

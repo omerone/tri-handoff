@@ -302,7 +302,8 @@ export async function repairMissingRisk(
       user: { tenantId: ctx.tenantId },
       kind: 'trade',
       sl: { not: null },
-      risk: null,
+      // Both directions: rows with no risk that should have one, and rows carrying one the
+      // rules now refuse. See the note below on why the second half cannot be left out.
       // Closed only: an open trade has no R to go with the risk.
       exitPrice: { not: null },
       ...SYNCED_ONLY,
@@ -315,13 +316,57 @@ export async function repairMissingRisk(
       entryPrice: true,
       sl: true,
       profit: true,
+      risk: true,
       mt5AccountId: true,
     },
   });
 
-  const repairs: { id: string; risk: number; rr: number }[] = [];
+  const repairs: { id: string; risk: number | null; rr: number | null }[] = [];
+
+  /*
+   * The reasons that are facts about the trade itself, and so are safe to act on here.
+   *
+   * Each of these is decided from the entry, the stop, the side and the size — nothing that
+   * depends on which symbol specification was in scope when the sync ran. `unconvertible` and
+   * `unknown-symbol` are deliberately absent: the sync may have priced a row with a rate or a
+   * broker contract size this pass has no access to, and clearing on those would delete a good
+   * figure because the pass is less well informed than the run that wrote it.
+   */
+  const INTRINSIC = new Set(['no-stop-loss', 'no-volume', 'zero-distance', 'stop-beyond-entry']);
 
   for (const row of rows) {
+    const entryPrice = Number(row.entryPrice);
+    const stored = row.risk === null ? null : Number(row.risk);
+
+    /*
+     * Clearing a stored figure the rules now refuse, which is the half that cannot be left out.
+     *
+     * A stop trailed to within a basis point of the entry gives a risk of pennies and an R in
+     * the thousands. Production carried exactly one — ETHUSD, a stop 0.75 of a basis point out,
+     * nine cents of risk, **2,126.67R** — and it was already stored, so the pass that fills in
+     * missing values would never look at it. Nothing else would either: it closed in May, and a
+     * refresh only re-reads the last two days. One row, sitting in every average the trader
+     * reads, permanently.
+     *
+     * Only the reasons above, and only against the row's own numbers, so this needs no spec.
+     */
+    if (stored !== null) {
+      const { reason } = computeRisk({
+        symbol: row.symbol,
+        volume: Number(row.volume),
+        entryPrice,
+        stopLoss: Number(row.sl),
+        direction: row.direction,
+        // Any code works: none of the intrinsic reasons is reached through a conversion.
+        accountCurrency: 'USD',
+        spec: findSymbolSpec(row.symbol) ?? undefined,
+      });
+      if (reason !== null && INTRINSIC.has(reason)) {
+        repairs.push({ id: row.id, risk: null, rr: null });
+      }
+      continue;
+    }
+
     const account =
       row.mt5AccountId === null
         ? orphanCurrency
@@ -330,8 +375,6 @@ export async function repairMissingRisk(
 
     const spec = findSymbolSpec(row.symbol);
     if (!spec || spec.quoteCurrency !== account) continue;
-
-    const entryPrice = Number(row.entryPrice);
     if (!(entryPrice > 0)) continue;
 
     const { risk } = computeRisk({

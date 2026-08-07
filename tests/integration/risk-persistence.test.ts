@@ -43,8 +43,17 @@ async function stored() {
   return { risk: trade.risk, rr: trade.rr, stopLoss: trade.stopLoss };
 }
 
-/** Write the trade back as the sync found it originally, with fields overridden. */
+/**
+ * Put the trade back as the sync first found it, with fields overridden.
+ *
+ * The account link is restored first, and that is not tidiness. `upsertTrades` keys on
+ * `(userId, mt5AccountId, ticket)`, so once the orphan test below clears the link the same
+ * call stops updating this row and quietly *inserts a second one* beside it — which is the
+ * property the whole feature exists for, met from the direction of the test suite. Without
+ * this line every test after that one reads a row nobody has written to.
+ */
 async function resync(patch: Partial<TradeUpsert> = {}) {
+  await testDb.trade.update({ where: { id: tradeId }, data: { mt5AccountId: accountId } });
   await upsertTrades(fixture.ctx, accountId, [{ ...baseline, ...patch }]);
 }
 
@@ -232,6 +241,42 @@ describe('the trades no sync can reach', () => {
     } finally {
       await testDb.mt5Account.update({ where: { id: accountId }, data: good });
     }
+  });
+
+  it('clears a stored R that the rules now refuse', async () => {
+    /*
+     * The half that fills in missing values would never look at this row, and nothing else
+     * would either.
+     *
+     * Production carried one ETHUSD trade whose stop had been trailed to within three quarters
+     * of a basis point of the entry: nine cents of risk against a real profit, stored as
+     * **2,126.67R**. It closed in May, and a refresh only re-reads the last two days, so no
+     * sync would ever recompute it — it simply sat in every average the trader read.
+     */
+    await resync();
+    const beyond = baseline.entryPrice * (baseline.direction === 'long' ? 0.999995 : 1.000005);
+    await testDb.trade.update({
+      where: { id: tradeId },
+      // What the old rules wrote: a stop inside the spread, priced, and stored.
+      data: { sl: beyond, risk: 0.09, rr: 2126.67 },
+    });
+    expect((await stored()).rr, 'the fixture did not reproduce the bad row').toBe(2126.67);
+
+    await syncMt5(fixture.ctx, 'manual');
+
+    const after = await stored();
+    expect(after.risk, 'a risk measured against a stop inside the spread survived').toBeNull();
+    expect(after.rr).toBeNull();
+  });
+
+  it('leaves a good stored figure alone', async () => {
+    // The guard must not turn the pass into something that rewrites the book on every sync.
+    await resync();
+    const before = await stored();
+    expect(before.risk).not.toBeNull();
+
+    await syncMt5(fixture.ctx, 'manual');
+    expect(await stored()).toMatchObject({ risk: before.risk, rr: before.rr });
   });
 
   it('leaves a hand-entered trade alone', async () => {
