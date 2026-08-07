@@ -283,7 +283,17 @@
     "search": "Search",
     "searchHint": "Symbol, note, tag…",
     "searchClear": "Clear search",
-    "emptySearch": "No trades match \"{query}\""
+    "emptySearch": "No trades match \"{query}\"",
+    "sort": "Sort",
+    "sortNewest": "Newest first",
+    "sortOldest": "Oldest first",
+    "sortPnlHigh": "P&L — highest",
+    "sortPnlLow": "P&L — lowest",
+    "sortRrHigh": "R — highest",
+    "sortRrLow": "R — lowest",
+    "sortRiskHigh": "Risk — highest",
+    "sortRiskLow": "Risk — lowest",
+    "sortSymbol": "Symbol — A to Z"
   },
   "finance": {
     "income": "Income",

@@ -464,7 +464,7 @@ export type TradeFilter = {
    * exactly what happened here: one press of disconnect left forty-nine synced trades with a
    * null account. The prefix survives that, because it is on the row itself.
    */
-  mt5AccountId?: string | 'manual';
+  mt5AccountId?: string | 'manual' | 'mt5';
 };
 
 /**
@@ -526,7 +526,13 @@ function whereClause(
       ? {}
       : filter.mt5AccountId === 'manual'
         ? MANUAL_ONLY
-        : { mt5AccountId: filter.mt5AccountId }),
+        : // `'mt5'` is every broker account rather than a named one, and it is the ticket
+          // namespace for the same reason `'manual'` is: a disconnect sets the foreign key
+          // null, so keying on the column would drop a whole imported history the moment its
+          // connection was removed.
+          filter.mt5AccountId === 'mt5'
+          ? SYNCED_ONLY
+          : { mt5AccountId: filter.mt5AccountId }),
     ...(filter.query ? { OR: textSearch(filter.query) } : {}),
     ...(Object.keys(closeAt).length > 0 ? { closeAt } : {}),
   };

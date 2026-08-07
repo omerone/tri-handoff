@@ -283,7 +283,17 @@
     "search": "חיפוש",
     "searchHint": "נכס, הערה, תגית…",
     "searchClear": "ניקוי החיפוש",
-    "emptySearch": "לא נמצאו עסקאות עבור \"{query}\""
+    "emptySearch": "לא נמצאו עסקאות עבור \"{query}\"",
+    "sort": "מיון",
+    "sortNewest": "החדשות תחילה",
+    "sortOldest": "הישנות תחילה",
+    "sortPnlHigh": "רווח — מהגבוה",
+    "sortPnlLow": "רווח — מהנמוך",
+    "sortRrHigh": "R — מהגבוה",
+    "sortRrLow": "R — מהנמוך",
+    "sortRiskHigh": "סיכון — מהגבוה",
+    "sortRiskLow": "סיכון — מהנמוך",
+    "sortSymbol": "נכס — א׳ עד ת׳"
   },
   "finance": {
     "income": "הכנסות",

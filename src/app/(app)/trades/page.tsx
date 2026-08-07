@@ -16,7 +16,16 @@ import { currentResolvedRange } from '@/lib/preferences/range';
 import { toTradeFilter } from '@/lib/time/range';
 import { displayMoney } from '@/lib/money/display';
 import { TradeFilters } from './filters';
-import { summarize, toRows, type RowStyle, type TableRow } from './rows';
+import {
+  DEFAULT_SORT,
+  isSortKey,
+  summarize,
+  toRows,
+  type RowStyle,
+  type Sort,
+  type TableRow,
+} from './rows';
+import { SortHeader, SortSelect } from './sort-control';
 import { ReviewControl, type ReviewLabels } from './review-control';
 import { TradeSearch } from './search-field';
 import { Pager } from './pager';
@@ -43,8 +52,13 @@ type SearchParams = {
   strategy?: string;
   tag?: string;
   q?: string;
+  /** `mt5` or `manual` — who produced the row's figures. See `trades/rows.ts`. */
+  source?: string;
   page?: string;
   range?: string;
+  /** Which column the table is arranged by, and which way. See `rows.ts`. */
+  sort?: string;
+  order?: string;
 };
 
 /**
@@ -83,6 +97,7 @@ export default async function TradesPage({
   // `toRows` uses it to drop deals and keep holdings instead.
   const rowStyle = isRowStyle(params.style) ? params.style : undefined;
   const query = (params.q ?? '').trim().slice(0, MAX_QUERY_LENGTH);
+  const source = params.source === 'mt5' || params.source === 'manual' ? params.source : undefined;
   const filter: TradeFilter = {
     ...toTradeFilter(range),
     ...(isAssetClass(params.class) ? { assetClass: params.class } : {}),
@@ -91,7 +106,19 @@ export default async function TradesPage({
     ...(params.strategy ? { strategy: params.strategy } : {}),
     ...(params.tag ? { tag: params.tag } : {}),
     ...(query ? { query } : {}),
+    ...(source ? { mt5AccountId: source } : {}),
   };
+
+  /*
+   * The ordering, read the same way the filters are.
+   *
+   * An unrecognised key falls back rather than throwing: this is a URL a person can edit and a
+   * link that can outlive a column, and a table that refuses to render because a stale
+   * bookmark names a sort it no longer has is worse than one that opens on its default.
+   */
+  const sort: Sort = isSortKey(params.sort)
+    ? { key: params.sort, order: params.order === 'asc' ? 'asc' : 'desc' }
+    : DEFAULT_SORT;
 
   const page = Math.max(1, Number(params.page) || 1);
 
@@ -132,6 +159,7 @@ export default async function TradesPage({
    */
   const allRows = await toRows(filteredRecords, closedPositions, {
     accountCurrency: account?.accountCurrency ?? 'USD',
+    sort,
     filter: {
       ...(isAssetClass(params.class) ? { assetClass: params.class } : {}),
       ...(isDirection(params.dir) ? { direction: params.dir } : {}),
@@ -139,6 +167,7 @@ export default async function TradesPage({
       ...(params.strategy ? { strategy: params.strategy } : {}),
       ...(params.tag ? { tag: params.tag } : {}),
       ...(query ? { query } : {}),
+      ...(source ? { source } : {}),
     },
   });
   const summary = summarize(allRows);
@@ -203,6 +232,7 @@ export default async function TradesPage({
               style: params.style ?? 'all',
               strategy: params.strategy ?? 'all',
               tag: params.tag ?? 'all',
+              source: params.source ?? 'all',
             }}
             options={{
               all: t('table.all'),
@@ -213,15 +243,46 @@ export default async function TradesPage({
                 style: t('table.style'),
                 strategy: t('table.strategy'),
                 tag: t('journal.tags'),
+                source: t('trades.source.label'),
               },
               classes: ASSET_CLASSES.map((key) => [key, t(`enum.assetClass.${key}`)] as const),
               directions: DIRECTIONS.map((key) => [key, t(`enum.direction.${key}`)] as const),
               styles: ROW_STYLES.map((key) => [key, t(`enum.style.${key}`)] as const),
+              sources: [
+                ['mt5', t('trades.source.mt5')],
+                ['manual', t('trades.source.manual')],
+              ] as const,
               strategies: vocabulary.strategies.map((value) => [value, value] as const),
               tags: vocabulary.tags.map((value) => [value, value] as const),
               allTags: t('table.all'),
             }}
           />
+
+          {/*
+            The ordering, in the filter bar rather than only on the headings.
+
+            `md:hidden` because from the tablet breakpoint up the headings are the control and
+            two ways to set the same thing side by side is one too many. Below it there is no
+            table at all — the rows are cards — so without this there is no way to ask for the
+            biggest loss on a phone, which is the screen most of this gets read on.
+          */}
+          <div className="md:hidden">
+            <SortSelect
+              current={sort}
+              label={t('table.sort')}
+              options={[
+                ['closeAt', 'desc', t('table.sortNewest')],
+                ['closeAt', 'asc', t('table.sortOldest')],
+                ['profit', 'desc', t('table.sortPnlHigh')],
+                ['profit', 'asc', t('table.sortPnlLow')],
+                ['rr', 'desc', t('table.sortRrHigh')],
+                ['rr', 'asc', t('table.sortRrLow')],
+                ['risk', 'desc', t('table.sortRiskHigh')],
+                ['risk', 'asc', t('table.sortRiskLow')],
+                ['symbol', 'asc', t('table.sortSymbol')],
+              ]}
+            />
+          </div>
 
           <div className="text-dim col-span-2 flex gap-4 text-xs sm:col-span-1 sm:ms-auto">
             <span>{t('kpi.tradesCount', { count: summary.trades })}</span>
@@ -384,23 +445,44 @@ export default async function TradesPage({
                     {/* Its own cell rather than sharing the date's, so the column stays put
                         when a date wraps and the header box lines up over the row boxes. */}
                     <SelectAllHeaderCell />
-                    {[
-                      t('table.closed'),
-                      t('table.symbol'),
-                      '',
-                      t('table.direction'),
-                      t('table.style'),
-                      t('table.risk'),
-                      t('table.rr'),
-                      t('table.pnl'),
-                      t('review.tpTiming'),
-                      '',
-                    ].map((header, index) => (
+                    {/*
+                      A heading is either a sort control or a word, and which it is depends on
+                      whether the column holds something with an order. Asset class, direction
+                      and style are the ones you narrow by, not the ones you arrange by — the
+                      dropdowns above answer those better than a table split into two blocks.
+                    */}
+                    {(
+                      [
+                        [t('table.closed'), 'closeAt'],
+                        [t('table.symbol'), 'symbol'],
+                        ['', null],
+                        [t('table.direction'), null],
+                        [t('table.style'), null],
+                        [t('table.risk'), 'risk'],
+                        [t('table.rr'), 'rr'],
+                        [t('table.pnl'), 'profit'],
+                        [t('review.tpTiming'), null],
+                        ['', null],
+                      ] as const
+                    ).map(([header, sortKey], index) => (
                       <th
                         key={index}
+                        /* On the cell, which is where the role that supports it lives — a
+                           button has no sort state, the column does. */
+                        aria-sort={
+                          sortKey && sort.key === sortKey
+                            ? sort.order === 'asc'
+                              ? 'ascending'
+                              : 'descending'
+                            : undefined
+                        }
                         className={`border-line border-b px-3.5 py-2.5 font-semibold ${align}`}
                       >
-                        {header}
+                        {sortKey ? (
+                          <SortHeader label={header} sortKey={sortKey} current={sort} />
+                        ) : (
+                          header
+                        )}
                       </th>
                     ))}
                   </tr>

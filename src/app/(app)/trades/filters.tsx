@@ -15,15 +15,30 @@ export function TradeFilters({
   current,
   options,
 }: {
-  current: { class: string; dir: string; style: string; strategy: string; tag: string };
+  current: {
+    class: string;
+    dir: string;
+    style: string;
+    strategy: string;
+    tag: string;
+    source: string;
+  };
   options: {
     all: string;
     allStrategies: string;
     /** What each dropdown filters by. See `Filter` below for why these are not optional. */
-    names: { class: string; direction: string; style: string; strategy: string; tag: string };
+    names: {
+      class: string;
+      direction: string;
+      style: string;
+      strategy: string;
+      tag: string;
+      source: string;
+    };
     classes: readonly Option[];
     directions: readonly Option[];
     styles: readonly Option[];
+    sources: readonly Option[];
     strategies: readonly Option[];
     tags: readonly Option[];
     allTags: string;
@@ -105,6 +120,18 @@ export function TradeFilters({
         param="style"
         empty={options.all}
         items={options.styles}
+      />
+
+      {/* Where the figures came from, which is the question the badge in the table answers
+          one row at a time. Narrowing to the broker's rows is how a trader checks their own
+          record against the account, and narrowing to their own is how they find what they
+          typed — and a holding is always the second, so it drops out of the first. */}
+      <Filter
+        name={options.names.source}
+        value={current.source}
+        param="source"
+        empty={options.all}
+        items={options.sources}
       />
 
       {/* Only shown once the trader has actually labelled something — an empty dropdown is

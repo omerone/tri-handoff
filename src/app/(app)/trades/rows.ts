@@ -16,6 +16,74 @@ import { classifySymbol } from '@/lib/mt5/symbols';
  * property the page was already built around.
  */
 
+/**
+ * What the table can be ordered by, and how.
+ *
+ * Every column carrying a quantity or a name is here; the ones left out — asset class,
+ * direction, style, the source badge — are the ones you *filter* by, because sorting a table
+ * into two blocks of "long" and "short" answers no question that the dropdown above it does
+ * not answer better.
+ *
+ * The order lives in the URL beside the filters, for the reason given at the top of page.tsx:
+ * a table someone has arranged is a view worth sending to somebody, and the back button should
+ * undo the arranging.
+ */
+export const SORT_KEYS = ['closeAt', 'symbol', 'risk', 'rr', 'profit'] as const;
+export type SortKey = (typeof SORT_KEYS)[number];
+export type SortOrder = 'asc' | 'desc';
+export type Sort = { key: SortKey; order: SortOrder };
+
+export const DEFAULT_SORT: Sort = { key: 'closeAt', order: 'desc' };
+
+export const isSortKey = (value: unknown): value is SortKey =>
+  typeof value === 'string' && (SORT_KEYS as readonly string[]).includes(value);
+
+/**
+ * The value a row is ordered by, or null when it has none.
+ *
+ * Null is not a small number and must not sort like one. A trade with no R is not the worst
+ * trade in the book, and putting the dashes at the top of "best R first" buries the answer to
+ * the question that was asked under every row that cannot answer it. They go last either way —
+ * see `compare`.
+ */
+function sortValue(row: TableRow, key: SortKey): number | string | null {
+  switch (key) {
+    case 'closeAt':
+      return row.closeAt?.getTime() ?? null;
+    case 'symbol':
+      return row.symbol;
+    case 'risk':
+      return row.risk;
+    case 'rr':
+      return row.rr;
+    case 'profit':
+      // A holding whose currency had no rate today has a figure, just not in this currency.
+      // It cannot be compared against the rest, so it sorts as absent rather than as zero.
+      return row.profit;
+  }
+}
+
+function compare(a: TableRow, b: TableRow, sort: Sort): number {
+  const left = sortValue(a, sort.key);
+  const right = sortValue(b, sort.key);
+
+  // Rows with nothing to compare sit at the bottom of both directions.
+  if (left === null && right === null) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
+
+  const sign = sort.order === 'asc' ? 1 : -1;
+  const diff =
+    typeof left === 'string' && typeof right === 'string'
+      ? left.localeCompare(right)
+      : Number(left) - Number(right);
+
+  // Ties break by the date, newest first, so paging through a sort by symbol is stable
+  // instead of shuffling on every request.
+  if (diff !== 0) return diff * sign;
+  return (b.closeAt?.getTime() ?? 0) - (a.closeAt?.getTime() ?? 0);
+}
+
 /** `long` is a row style, not a `TradeStyle`: the database enum has only `day` and `swing`. */
 export type RowStyle = 'day' | 'swing' | 'long';
 
@@ -89,6 +157,11 @@ export type RowFilter = {
    */
   strategy?: string;
   tag?: string;
+  /**
+   * Who produced the row's figures. A holding is always the trader's own, so narrowing to the
+   * broker's excludes every one of them — which is the honest answer, not an omission.
+   */
+  source?: 'mt5' | 'manual';
   /**
    * The free-text box. The deals were already narrowed by it in SQL — see `textSearch` in
    * db/trades.ts — so this only has to decide the holdings, and a holding has none of the
@@ -188,6 +261,7 @@ function matches(row: TableRow, filter: RowFilter): boolean {
   if (filter.assetClass && row.assetClass !== filter.assetClass) return false;
   if (filter.direction && row.direction !== filter.direction) return false;
   if (filter.style && row.style !== filter.style) return false;
+  if (filter.source && row.source !== filter.source) return false;
   if (filter.query && !row.symbol.toLowerCase().includes(filter.query.toLowerCase())) return false;
   return true;
 }
@@ -202,7 +276,7 @@ function matches(row: TableRow, filter: RowFilter): boolean {
 export async function toRows(
   trades: readonly TradeRecord[],
   positions: readonly StoredLongPosition[],
-  options: { accountCurrency: string; filter: RowFilter },
+  options: { accountCurrency: string; filter: RowFilter; sort?: Sort },
 ): Promise<TableRow[]> {
   // A strategy filter is a question about deals, so no holding can answer it, and narrowing
   // to a deal style excludes them for the same reason. Narrowing to `long` is the mirror
@@ -220,7 +294,8 @@ export async function toRows(
     rows.push(...built.filter((row) => matches(row, options.filter)));
   }
 
-  return rows.sort((a, b) => (b.closeAt?.getTime() ?? 0) - (a.closeAt?.getTime() ?? 0));
+  const sort = options.sort ?? DEFAULT_SORT;
+  return rows.sort((a, b) => compare(a, b, sort));
 }
 
 /**
