@@ -29,5 +29,9 @@ e2e/.auth/
 
 # Deployment credentials — never commit. This repo is public.
 ops/.secrets.env
+# Belt and braces: this repository is public, and a backup identity is the one
+# secret whose loss is silent — it decrypts every dump ever taken.
+ops/*identity*
+ops/*.age
 ops/deploy_key
 ops/deploy_key.pub

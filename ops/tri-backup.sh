@@ -18,6 +18,23 @@
 # 0755 directory, which was safe only because this box happens to have no
 # unprivileged users today. That is a fact about the box, not about the backup,
 # and the next thing installed here can change it without anyone deciding to.
+#
+# And then they are encrypted to a key this machine does not have.
+#
+# File modes protect a backup while it sits here. They protect nothing once it
+# travels, and travelling is what a backup is *for* — the copy that matters is
+# the one somewhere else, and this box currently holds the only one, on the same
+# disk as the database it is a backup of. Encrypting now is what makes that copy
+# safe to make: a bucket left public, a disk image sold on, a tarball attached to
+# a support thread, all become a file nobody can read.
+#
+# The server holds the recipient — the public half — and nothing else, so a root
+# compromise here cannot read last month's dumps. It could of course dump the
+# live database directly, which is the point: this protects the *history*, and
+# history is what an attacker cannot otherwise reach.
+#
+# The private half lives in `ops/.secrets.env`, off this machine. Losing it makes
+# every dump unreadable, so it belongs in a password manager as well.
 
 set -euo pipefail
 
@@ -32,10 +49,29 @@ BACKUP_DIR=${BACKUP_DIR:-/var/backups/tri}
 RETENTION_DAYS=${RETENTION_DAYS:-14}
 DB_USER=${DB_USER:-tri}
 DB_NAME=${DB_NAME:-tri}
-LOG=/var/log/tri-backup.log
+LOG=${LOG:-/var/log/tri-backup.log}
+
+# The public half. Written by the install step; see ops/README.md. Not a secret —
+# it can only turn a dump into ciphertext, never the reverse.
+RECIPIENT_FILE=${RECIPIENT_FILE:-/etc/tri/backup-recipient}
+
+# The private half, for `restore` and `verify-restore`. Deliberately absent on the
+# server: an operator supplies it for the few minutes a restore takes.
+IDENTITY_FILE=${TRI_BACKUP_IDENTITY:-}
 
 # A dump missing these is not a usable restore point, whatever its size.
 REQUIRED_TABLES=(tenants users trades)
+
+# The unencrypted dump currently on disk, if any, so that no exit path can leave
+# one behind.
+#
+# An `EXIT` trap and not a `RETURN` one: a RETURN trap set inside a function stays
+# installed after that function returns, and then fires again on the next
+# function to return — by which point the `local` it referred to is gone and
+# `set -u` kills the script. That happened here, after a restore drill that had
+# already succeeded, turning a passing run into a systemd failure.
+PLAINTEXT=""
+trap 'if [ -n "$PLAINTEXT" ]; then rm -f "$PLAINTEXT"; fi' EXIT
 
 log() {
   local line="$(date '+%Y-%m-%d %H:%M:%S') $*"
@@ -53,60 +89,131 @@ tri-backup — nightly database dumps
   tri-backup restore <file>     restore a dump (asks first — destroys current data)
   tri-backup verify-restore     restore the newest dump into a scratch database
                                 and compare it to the live one (touches neither)
+
+Dumps are encrypted to the key in /etc/tri/backup-recipient. Reading one back —
+`restore` and `verify-restore` — needs the private half, which is not kept on
+this machine:
+
+  TRI_BACKUP_IDENTITY=/path/to/identity tri-backup verify-restore
+
+It is the BACKUP_AGE_IDENTITY line in ops/.secrets.env.
 USAGE
 }
 
 compose() { cd "$COMPOSE_DIR" && docker compose "$@"; }
+
+# Every dump on disk, newest first, encrypted and legacy alike. One place, so a
+# new extension cannot be added to `run` and forgotten in `list` and `status` —
+# which is how a retention sweep quietly stops expiring anything.
+#
+# `|| true` because an unmatched glob is the normal case, not a failure: once the
+# last legacy dump expires only one of these two patterns matches anything, `ls`
+# exits 2 over the other, and under `set -e` that took `status` down to printing
+# nothing at all.
+dumps() { ls -t "$BACKUP_DIR"/tri-*.sql.gz.age "$BACKUP_DIR"/tri-*.sql.gz 2>/dev/null || true; }
+
+# Writes the plaintext of a dump to stdout, whichever kind it is.
+#
+# The legacy branch is not politeness towards old files: the dumps taken before
+# this change are the only restore points that exist for the days they cover, and
+# a restore path that cannot read them is a restore path that fails on the one
+# night it is needed.
+decrypt_to_stdout() {
+  local file=$1
+  case "$file" in
+    *.age)
+      if [ -z "$IDENTITY_FILE" ]; then
+        echo "This dump is encrypted. Set TRI_BACKUP_IDENTITY to the private key file." >&2
+        echo "It is the BACKUP_AGE_IDENTITY line in ops/.secrets.env." >&2
+        return 3
+      fi
+      [ -f "$IDENTITY_FILE" ] || { echo "no such identity file: $IDENTITY_FILE" >&2; return 3; }
+      age -d -i "$IDENTITY_FILE" "$file"
+      ;;
+    *) cat "$file" ;;
+  esac
+}
 
 do_run() {
   mkdir -p "$BACKUP_DIR"
   # Existing directories keep the mode they were made with, so `umask` above only
   # covers a fresh install. This is what fixes the one already on disk.
   chmod 700 "$BACKUP_DIR"
-  local stamp file
-  stamp=$(date '+%Y%m%d-%H%M%S')
-  file="$BACKUP_DIR/tri-$stamp.sql.gz"
+  local recipient
+  recipient=$(grep -m1 '^age1' "$RECIPIENT_FILE" 2>/dev/null || true)
+  if [ -z "$recipient" ]; then
+    log "FAIL no recipient key in $RECIPIENT_FILE; refusing to write a plaintext dump"
+    exit 1
+  fi
 
-  if ! compose exec -T postgres pg_dump -U "$DB_USER" -d "$DB_NAME" | gzip -9 >"$file"; then
-    log "FAIL pg_dump failed; removing partial $file"
-    rm -f "$file"
+  local stamp file plain
+  stamp=$(date '+%Y%m%d-%H%M%S')
+  file="$BACKUP_DIR/tri-$stamp.sql.gz.age"
+  # Verified before it is encrypted, because every check below reads the dump —
+  # and the whole point of the key model is that this machine cannot read it back
+  # afterwards. The plaintext exists for the seconds between, inside a 0700
+  # directory under `umask 077`, and the trap removes it however this run ends.
+  plain="$BACKUP_DIR/.tri-$stamp.sql.gz.plain"
+  PLAINTEXT="$plain"
+
+  if ! compose exec -T postgres pg_dump -U "$DB_USER" -d "$DB_NAME" | gzip -9 >"$plain"; then
+    log "FAIL pg_dump failed; removing partial dump"
+    rm -f "$plain"
     exit 1
   fi
 
   # Verify before trusting it.
-  if ! gzip -t "$file" 2>/dev/null; then
-    log "FAIL $(basename "$file") is not a valid gzip archive; removing"
-    rm -f "$file"
+  if ! gzip -t "$plain" 2>/dev/null; then
+    log "FAIL $(basename "$file") is not a valid gzip archive; discarding"
     exit 1
   fi
 
   local body
-  body=$(gunzip -c "$file")
+  body=$(gunzip -c "$plain")
   for table in "${REQUIRED_TABLES[@]}"; do
     if ! grep -q "CREATE TABLE public.$table" <<<"$body"; then
-      log "FAIL $(basename "$file") has no definition for '$table'; removing"
-      rm -f "$file"
+      log "FAIL $(basename "$file") has no definition for '$table'; discarding"
       exit 1
     fi
   done
 
+  if ! age -r "$recipient" -o "$file" "$plain"; then
+    log "FAIL could not encrypt $(basename "$file"); removing"
+    rm -f "$file"
+    exit 1
+  fi
+  # An empty or truncated ciphertext passes every check above, because every
+  # check above ran on the plaintext.
+  if [ ! -s "$file" ]; then
+    log "FAIL $(basename "$file") encrypted to an empty file; removing"
+    rm -f "$file"
+    exit 1
+  fi
+
+  # Immediately, not at exit: `verify-restore` calls this and then spends minutes
+  # restoring and comparing, and the plaintext has no reason to exist for any of
+  # it. The trap is the net for the paths that leave through `exit`.
+  rm -f "$plain"
+  PLAINTEXT=""
+
   local size rows
   size=$(du -h "$file" | cut -f1)
   rows=$(grep -c '^COPY ' <<<"$body" || true)
-  log "OK $(basename "$file") $size, $rows COPY blocks, all required tables present"
+  log "OK $(basename "$file") $size encrypted, $rows COPY blocks, all required tables present"
 
   # Expire old dumps only after a good one has landed, so a run of failures can
   # never leave the directory empty.
   local expired
-  expired=$(find "$BACKUP_DIR" -name 'tri-*.sql.gz' -mtime +"$RETENTION_DAYS" -print -delete | wc -l)
+  expired=$(find "$BACKUP_DIR" \( -name 'tri-*.sql.gz.age' -o -name 'tri-*.sql.gz' \) -mtime +"$RETENTION_DAYS" -print -delete | wc -l)
   [ "$expired" -gt 0 ] && log "expired $expired dump(s) older than ${RETENTION_DAYS}d"
 
   return 0
 }
 
 do_list() {
-  if [ -d "$BACKUP_DIR" ] && compgen -G "$BACKUP_DIR/tri-*.sql.gz" >/dev/null; then
-    ls -lh "$BACKUP_DIR"/tri-*.sql.gz | awk '{print "  " $9 "  " $5 "  " $6 " " $7 " " $8}'
+  if [ -d "$BACKUP_DIR" ] && [ -n "$(dumps)" ]; then
+    # shellcheck disable=SC2046
+    ls -lh $(dumps) | awk '{print "  " $9 "  " $5 "  " $6 " " $7 " " $8}'
   else
     echo "  (no dumps yet)"
   fi
@@ -114,11 +221,12 @@ do_list() {
 
 do_status() {
   local count total
-  count=$(find "$BACKUP_DIR" -name 'tri-*.sql.gz' 2>/dev/null | wc -l)
+  count=$(dumps 2>/dev/null | wc -l)
   total=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1 || echo 0)
   echo "TRi backups"
   echo "  location  : $BACKUP_DIR"
   echo "  dumps     : $count (keeping ${RETENTION_DAYS} days)"
+  echo "  encrypted : to $(grep -m1 '^age1' "$RECIPIENT_FILE" 2>/dev/null || echo 'NOBODY — no recipient key installed')"
   echo "  disk used : ${total:-0}"
   if command -v systemctl >/dev/null; then
     echo "  next run  : $(systemctl list-timers tri-backup.timer --no-pager --no-legend 2>/dev/null | awk '{print $1, $2, $3}' | head -1)"
@@ -136,6 +244,14 @@ do_restore() {
   [ -n "$file" ] || { echo "usage: tri-backup restore <file>"; exit 2; }
   [ -f "$file" ] || { echo "no such dump: $file"; exit 2; }
 
+  # Fail here rather than after the live database has been dropped: `do_run`
+  # below takes a snapshot first, and finding out at *that* point that the dump
+  # cannot be read leaves the operator having destroyed nothing but also having
+  # learned it too late to plan around.
+  if [ "${file##*.}" = "age" ] && [ -z "$IDENTITY_FILE" ]; then
+    decrypt_to_stdout "$file" >/dev/null || exit 3
+  fi
+
   echo "This REPLACES the live database with $(basename "$file")."
   echo "Everything currently in '$DB_NAME' is dropped. There is no undo."
   read -r -p "Type the word RESTORE to continue: " answer
@@ -146,7 +262,7 @@ do_restore() {
   log "restore requested from $(basename "$file"); snapshotting current state first"
   do_run || { echo "pre-restore snapshot failed; refusing to restore"; exit 1; }
 
-  gunzip -c "$file" | compose exec -T postgres psql -U "$DB_USER" -d "$DB_NAME"
+  decrypt_to_stdout "$file" | gunzip -c | compose exec -T postgres psql -U "$DB_USER" -d "$DB_NAME"
   log "RESTORED from $(basename "$file")"
 }
 
@@ -167,17 +283,28 @@ do_restore() {
 do_verify_restore() {
   local scratch=tri_restore_drill
 
+  # The drill needs to read a stored dump, and stored dumps are encrypted — so it
+  # needs the private key. That is not a gap in the drill; it is the drill being
+  # honest. A restore rehearsal that runs unattended with no secret is a
+  # rehearsal against a backup anybody who reaches this disk could also read.
+  if [ -z "$IDENTITY_FILE" ]; then
+    echo "verify-restore reads a stored dump, and stored dumps are encrypted." >&2
+    echo "  TRI_BACKUP_IDENTITY=/path/to/identity tri-backup verify-restore" >&2
+    echo "The key is the BACKUP_AGE_IDENTITY line in ops/.secrets.env." >&2
+    exit 3
+  fi
+
   log "verify-restore: taking a fresh dump so live and restored describe one moment"
   do_run >/dev/null || { log "FAIL could not take a dump to verify"; exit 1; }
   local file
-  file=$(ls -t "$BACKUP_DIR"/tri-*.sql.gz | head -1)
+  file=$(dumps | head -1)
 
   psql_in() { compose exec -T postgres psql -U "$DB_USER" -d "$1" -t -A "${@:2}"; }
 
   psql_in postgres -q -c "DROP DATABASE IF EXISTS $scratch;" >/dev/null 2>&1 || true
   psql_in postgres -q -c "CREATE DATABASE $scratch;" >/dev/null
 
-  if ! gunzip -c "$file" | compose exec -T postgres psql -U "$DB_USER" -d "$scratch" -q -v ON_ERROR_STOP=1 >/tmp/tri-verify-restore.log 2>&1; then
+  if ! decrypt_to_stdout "$file" | gunzip -c | compose exec -T postgres psql -U "$DB_USER" -d "$scratch" -q -v ON_ERROR_STOP=1 >/tmp/tri-verify-restore.log 2>&1; then
     log "FAIL $(basename "$file") did not restore; see /tmp/tri-verify-restore.log"
     psql_in postgres -q -c "DROP DATABASE IF EXISTS $scratch;" >/dev/null 2>&1 || true
     exit 1

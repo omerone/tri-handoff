@@ -80,7 +80,7 @@ is open for writing, so that growth is bounded at the source instead.
 
 ## tri-backup
 
-Nightly `pg_dump`, gzipped, kept 14 days in `/var/backups/tri`. The database is
+Nightly `pg_dump`, gzipped, encrypted, kept 14 days in `/var/backups/tri`. The database is
 the only thing here that cannot be rebuilt from this repo, and it had exactly
 one copy before this existed. A dump of the current data is 12 KB, so retention
 costs nothing worth measuring.
@@ -111,17 +111,67 @@ front of them. They were `0644` in a `0755` directory, which was safe only
 because this box has no unprivileged users today; that is a fact about the box
 rather than about the backup.
 
-Still on the same disk as the database they protect, and unencrypted. That covers
-the failure this was written for — a bad migration, a dropped table — and not the
-two it cannot: the disk dying, and someone reaching root. Copies off the box are
-the open item, and they need somewhere to go.
+### Encrypted to a key this machine does not have
 
+File modes protect a dump while it sits here. They protect nothing once it
+travels, and travelling is what a backup is for — the copy that matters is the
+one somewhere else. Every dump is now `age`-encrypted to a recipient in
+`/etc/tri/backup-recipient`, so the offsite copy, whenever it exists, is already
+safe to make: a bucket left public, a disk image sold on, a tarball attached to a
+support thread all become a file nobody can read.
+
+The server holds only the public half. A root compromise here cannot read last
+month's dumps — it could of course dump the live database directly, which is the
+point of the split: this protects the *history*, and history is what an attacker
+cannot otherwise reach. It was generated off this machine and has never been on
+it.
+
+The private half is the `BACKUP_AGE_IDENTITY` line in `ops/.secrets.env`, which
+is gitignored — **this repository is public.** Losing it makes every dump
+unreadable, by us as much as by anyone, so it belongs in a password manager as
+well as in that file.
+
+Reading a dump back therefore takes the key:
+
+    # write the identity to a file the tool can read
+    grep '^BACKUP_AGE_IDENTITY=' ops/.secrets.env | cut -d= -f2- > /tmp/id && chmod 600 /tmp/id
+
+    TRI_BACKUP_IDENTITY=/tmp/id tri-backup verify-restore
+    TRI_BACKUP_IDENTITY=/tmp/id tri-backup restore /var/backups/tri/tri-....sql.gz.age
+
+    # or, off the box entirely
+    age -d -i /tmp/id tri-....sql.gz.age | gunzip -c | psql ...
+
+That the drill needs a secret is not a gap in it. A restore rehearsal that runs
+unattended with no key is a rehearsal against a backup anybody who reaches this
+disk could also read.
+
+The nightly run needs no key: it dumps, gzip-tests, checks the table definitions
+and only then encrypts, so the guarantee that a stored dump is a real one is
+unchanged. The plaintext exists for the seconds in between, inside the `0700`
+directory, and is removed the moment the ciphertext lands — with an `EXIT` trap
+for the paths that leave early.
+
+Still on the same disk as the database it protects. That remains the open item,
+and it needs somewhere to go; encryption is what makes sending it there a
+decision about storage rather than about trust.
+
+Installing — none of this is deployed by `deploy-vps.yml`, which ships the app
+and not the host:
+
+    apt-get install -y age
+    mkdir -p /etc/tri && printf '%s\n' "$RECIPIENT" > /etc/tri/backup-recipient
     install -m 755 ops/tri-backup.sh /usr/local/bin/tri-backup
     install -m 644 ops/tri-backup.{service,timer} /etc/systemd/system/
     systemctl daemon-reload && systemctl enable --now tri-backup.timer
 
-`tri-backup status` lists what is on disk. `tri-backup restore <file>` asks for
-confirmation and takes a snapshot of the current state before overwriting it.
+`tri-backup status` lists what is on disk and names the recipient it is
+encrypting to — or says `NOBODY` if none is installed, which is also what `run`
+refuses on rather than writing a plaintext dump.
+
+`tri-backup restore <file>` asks for confirmation and takes a snapshot of the
+current state before overwriting it. It checks that it can read the dump *before*
+asking, so nobody discovers a missing key after the live database is gone.
 
 ## tri-deploy
 
