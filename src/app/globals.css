@@ -10,29 +10,57 @@
    --------------------------------------------------------------------------- */
 :root,
 [data-theme='dark'] {
-  --tri-bg: #0a0b0f;
-  --tri-surface: #12141b;
-  --tri-raised: #1a1d26;
-  --tri-line: rgba(255, 255, 255, 0.07);
-  --tri-text: #e8eaf0;
-  --tri-dim: #8a90a3;
-  --tri-brand: #5b8cff;
-  --tri-brand-2: #8b5bff;
-  --tri-pos: #2dd4a7;
-  --tri-neg: #ff5c7a;
+  --tri-bg: #0b1017;
+  /* Opaque, and deliberately so: sheets, menus and the header sit on `surface` and must
+     not show the page through themselves. Content panels use `--tri-pane` below. */
+  --tri-surface: #121a24;
+  --tri-raised: #1b2531;
+  --tri-line: rgba(255, 255, 255, 0.09);
+  --tri-text: #eaf0f6;
+  --tri-dim: #9fb0c2;
+  --tri-brand: #2fc9b8;
+  --tri-brand-2: #5b8cff;
+  --tri-pos: #4ade9b;
+  --tri-neg: #ff7a85;
   --tri-warn: #ffb454;
 
+  /*
+   * The ink that sits on a brand fill, and the reason it is a token rather than `text-white`.
+   *
+   * The accent is bright on purpose — that is what makes it read as an accent on a dark
+   * ground. White on top of it is 1.8:1, which is not a legibility opinion, it is unreadable.
+   * Flipping the ink to near-black takes the same button to 9.3:1. The light theme runs the
+   * other way: a deep teal fill with white on top. One token, opposite values, and every
+   * brand-filled control in the app stays legible in both.
+   */
+  --tri-on-brand: #04120f;
+
   /* Heat/fill tints derived from the semantic colours. */
-  --tri-pos-soft: rgba(45, 212, 167, 0.14);
-  --tri-pos-edge: rgba(45, 212, 167, 0.4);
-  --tri-neg-soft: rgba(255, 92, 122, 0.14);
-  --tri-neg-edge: rgba(255, 92, 122, 0.4);
+  --tri-pos-soft: rgba(74, 222, 155, 0.14);
+  --tri-pos-edge: rgba(74, 222, 155, 0.4);
+  --tri-neg-soft: rgba(255, 122, 133, 0.14);
+  --tri-neg-edge: rgba(255, 122, 133, 0.4);
 
   /* The sticky header sits over scrolling content, so it needs the page colour at
      near-opacity rather than `surface`. */
-  --tri-header: rgba(10, 11, 15, 0.9);
+  --tri-header: rgba(11, 16, 23, 0.82);
   /* Text drawn on top of a saturated heat cell. */
-  --tri-on-heat: #0a0b0f;
+  --tri-on-heat: #0b1017;
+
+  /*
+   * A content panel is translucent so the ambient ground reads *through* it. That is the
+   * whole of the depth cue: the panel is not a lighter grey, it is a pane of glass over a
+   * lit surface, and it picks up the teal at the top of the page and the blue at the bottom.
+   */
+  --tri-pane: rgba(255, 255, 255, 0.045);
+  --tri-pane-hover: rgba(255, 255, 255, 0.062);
+  --tri-pane-edge: rgba(255, 255, 255, 0.06);
+  --tri-pane-shadow: inset 0 1px 0 var(--tri-pane-edge);
+
+  /* Two lights behind everything: teal off the top corner, blue off the bottom one. */
+  --tri-ambient:
+    radial-gradient(60rem 30rem at 85% -12%, rgba(47, 201, 184, 0.17), transparent 62%),
+    radial-gradient(52rem 28rem at 4% 106%, rgba(91, 140, 255, 0.13), transparent 62%);
 
   color-scheme: dark;
 }
@@ -50,25 +78,42 @@
      the depth cue the dark theme establishes.
    --------------------------------------------------------------------------- */
 [data-theme='light'] {
-  --tri-bg: #f4f5f8;
+  --tri-bg: #eef2f6;
   --tri-surface: #ffffff;
-  --tri-raised: #eef0f5;
-  --tri-line: rgba(16, 18, 27, 0.1);
-  --tri-text: #14161c;
-  --tri-dim: #5b6376;
-  --tri-brand: #3b6fe0;
-  --tri-brand-2: #7b4de0;
-  --tri-pos: #0e8f6c;
-  --tri-neg: #d42a4d;
-  --tri-warn: #a9650a;
+  --tri-raised: #e6ecf2;
+  --tri-line: rgba(11, 26, 40, 0.1);
+  --tri-text: #111820;
+  --tri-dim: #55606e;
+  --tri-brand: #0a7a6e;
+  --tri-brand-2: #3b6fe0;
+  --tri-pos: #0a7a5b;
+  --tri-neg: #c62641;
+  --tri-warn: #9a5b12;
 
-  --tri-pos-soft: rgba(14, 143, 108, 0.13);
-  --tri-pos-edge: rgba(14, 143, 108, 0.35);
-  --tri-neg-soft: rgba(212, 42, 77, 0.12);
-  --tri-neg-edge: rgba(212, 42, 77, 0.35);
+  /* Deep fill here, so the ink on it goes the other way — see the dark block. */
+  --tri-on-brand: #ffffff;
 
-  --tri-header: rgba(244, 245, 248, 0.9);
-  --tri-on-heat: #14161c;
+  --tri-pos-soft: rgba(10, 122, 91, 0.13);
+  --tri-pos-edge: rgba(10, 122, 91, 0.35);
+  --tri-neg-soft: rgba(198, 38, 65, 0.12);
+  --tri-neg-edge: rgba(198, 38, 65, 0.35);
+
+  --tri-header: rgba(238, 242, 246, 0.85);
+  --tri-on-heat: #111820;
+
+  /*
+   * The one place the two themes take different routes to the same idea. Translucent white
+   * over a light ground is invisible, so here the pane is opaque and the lift comes from a
+   * soft shadow instead. The ambient tint still sits behind it, around it rather than through.
+   */
+  --tri-pane: #ffffff;
+  --tri-pane-hover: #ffffff;
+  --tri-pane-edge: rgba(255, 255, 255, 0.9);
+  --tri-pane-shadow: 0 1px 2px rgba(17, 24, 32, 0.045), 0 12px 26px -20px rgba(17, 24, 32, 0.4);
+
+  --tri-ambient:
+    radial-gradient(60rem 30rem at 85% -12%, rgba(10, 122, 110, 0.1), transparent 62%),
+    radial-gradient(52rem 28rem at 4% 106%, rgba(59, 111, 224, 0.08), transparent 62%);
 
   color-scheme: light;
 }
@@ -83,25 +128,36 @@
 
 @media (prefers-color-scheme: light) {
   [data-theme='system'] {
-    --tri-bg: #f4f5f8;
+    --tri-bg: #eef2f6;
     --tri-surface: #ffffff;
-    --tri-raised: #eef0f5;
-    --tri-line: rgba(16, 18, 27, 0.1);
-    --tri-text: #14161c;
-    --tri-dim: #5b6376;
-    --tri-brand: #3b6fe0;
-    --tri-brand-2: #7b4de0;
-    --tri-pos: #0e8f6c;
-    --tri-neg: #d42a4d;
-    --tri-warn: #a9650a;
+    --tri-raised: #e6ecf2;
+    --tri-line: rgba(11, 26, 40, 0.1);
+    --tri-text: #111820;
+    --tri-dim: #55606e;
+    --tri-brand: #0a7a6e;
+    --tri-brand-2: #3b6fe0;
+    --tri-pos: #0a7a5b;
+    --tri-neg: #c62641;
+    --tri-warn: #9a5b12;
 
-    --tri-pos-soft: rgba(14, 143, 108, 0.13);
-    --tri-pos-edge: rgba(14, 143, 108, 0.35);
-    --tri-neg-soft: rgba(212, 42, 77, 0.12);
-    --tri-neg-edge: rgba(212, 42, 77, 0.35);
+    --tri-on-brand: #ffffff;
 
-    --tri-header: rgba(244, 245, 248, 0.9);
-    --tri-on-heat: #14161c;
+    --tri-pos-soft: rgba(10, 122, 91, 0.13);
+    --tri-pos-edge: rgba(10, 122, 91, 0.35);
+    --tri-neg-soft: rgba(198, 38, 65, 0.12);
+    --tri-neg-edge: rgba(198, 38, 65, 0.35);
+
+    --tri-header: rgba(238, 242, 246, 0.85);
+    --tri-on-heat: #111820;
+
+    --tri-pane: #ffffff;
+    --tri-pane-hover: #ffffff;
+    --tri-pane-edge: rgba(255, 255, 255, 0.9);
+    --tri-pane-shadow: 0 1px 2px rgba(17, 24, 32, 0.045), 0 12px 26px -20px rgba(17, 24, 32, 0.4);
+
+    --tri-ambient:
+      radial-gradient(60rem 30rem at 85% -12%, rgba(10, 122, 110, 0.1), transparent 62%),
+      radial-gradient(52rem 28rem at 4% 106%, rgba(59, 111, 224, 0.08), transparent 62%);
   }
 }
 
@@ -119,6 +175,7 @@
   --color-warn: var(--tri-warn);
   --color-header: var(--tri-header);
   --color-on-heat: var(--tri-on-heat);
+  --color-on-brand: var(--tri-on-brand);
 
   --font-sans: var(--font-heebo), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
@@ -137,6 +194,399 @@ body {
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------------------------
+   Depth — the ambient ground, the pane, and the motion.
+
+   The whole of this section is presentation. Nothing here reads a value, gates a
+   route or changes what a control does; every rule is a background, a shadow, a
+   transform or a transition, and the markup it attaches to is unchanged.
+
+   The performance rule it is all built to: animate `transform` and `opacity` and
+   nothing else. Those two are handed to the compositor and cost no layout and no
+   repaint. The blurs and gradients below are painted once and then never
+   animated — a moving gradient repaints its whole layer on every frame, which is
+   the usual reason a design like this ends up feeling slow.
+   --------------------------------------------------------------------------- */
+
+/*
+ * Two soft lights behind the entire app.
+ *
+ * `fixed` rather than a background on `body`, for a reason that is measurable: a fixed
+ * element becomes its own compositor layer and is painted once, so scrolling never
+ * repaints it. `background-attachment: fixed` on the page would repaint the gradient on
+ * every scroll frame instead, which on a long trades table is exactly where it hurts.
+ */
+.tri-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--tri-ambient);
+}
+
+/*
+ * The light that follows the pointer. One pre-rendered blob, moved by `transform` alone —
+ * see `pointer-glow.tsx` for why it is not a gradient recentred on every mouse move.
+ */
+.tri-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 32rem;
+  height: 32rem;
+  margin: -16rem 0 0 -16rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--tri-brand) 14%, transparent),
+    transparent 66%
+  );
+  opacity: 0;
+  transition: opacity 600ms ease;
+  pointer-events: none;
+  will-change: transform;
+}
+.tri-glow[data-lit='1'] {
+  opacity: 1;
+}
+
+/* No pointer to follow, or a reader who asked for less movement: it simply is not there. */
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .tri-glow {
+    display: none;
+  }
+}
+
+/*
+ * A content panel.
+ *
+ * In the dark theme this is translucent, and that is the whole depth cue: the panel is not
+ * a lighter grey, it is glass over a lit ground, so it picks up the teal at the top of the
+ * page and the blue at the bottom and no two panels on a screen are quite the same colour.
+ * The light theme cannot do that — translucent white over a white-ish ground is invisible —
+ * so there the pane is opaque and the lift comes from a shadow. Both routes are in the
+ * token block; this rule is the same either way.
+ */
+.tri-pane {
+  background: var(--tri-pane);
+  box-shadow: var(--tri-pane-shadow);
+}
+
+/*
+ * Entrance choreography: panels arrive in reading order rather than all at once.
+ *
+ * **Opt-in, and the opting-in is the whole point.** The first build of this put the animation
+ * on `.tri-pane` itself and took the stagger from `:nth-child`. Both halves were wrong, and
+ * the second half was wrong in a way that only moved: `:nth-child` is a *position*, so
+ * inserting or removing one sibling re-assigns `animation-delay` to every panel after it, and
+ * changing the delay on a finished animation runs it again. Any list that gains a row made
+ * the panels below it re-rise — and on the long-positions form, where the panel never stopped
+ * restarting, a button under an open menu never settled long enough to be pressed. An
+ * entrance is a thing a screen does once when you arrive at it, not something a panel redoes
+ * because the row above it changed.
+ *
+ * So it belongs to containers whose children are a fixed set decided at render — the tile
+ * grids — and is asked for by name. Everywhere else a pane is simply a pane.
+ *
+ * `backwards` fill so a delayed panel holds its start frame instead of flashing at full
+ * opacity first. The stagger stops at the sixth: on a screen that stacks ten, a per-panel
+ * delay has the last one arriving half a second after the page was otherwise ready, and a
+ * page still assembling itself reads as slow even when it is not.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .tri-stagger > * {
+    animation: tri-rise 380ms cubic-bezier(0.22, 0.75, 0.3, 1) backwards;
+  }
+  .tri-stagger > :nth-child(2) {
+    animation-delay: 45ms;
+  }
+  .tri-stagger > :nth-child(3) {
+    animation-delay: 90ms;
+  }
+  .tri-stagger > :nth-child(4) {
+    animation-delay: 135ms;
+  }
+  .tri-stagger > :nth-child(5) {
+    animation-delay: 180ms;
+  }
+  .tri-stagger > :nth-child(n + 6) {
+    animation-delay: 210ms;
+  }
+}
+
+@keyframes tri-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/*
+ * The spring lift, on the small tiles only.
+ *
+ * The overshoot in the curve is what makes it feel physical rather than linear. It is not
+ * put on `Card`: a card here can be a 400px chart panel, and a chart that jumps when the
+ * pointer crosses it is movement that means nothing. A KPI tile is small, discrete and
+ * reads as an object, so it behaves like one.
+ *
+ * Behind `hover: hover` so a touch device — where `:hover` sticks after a tap — never
+ * leaves a tile raised with no way to put it back.
+ */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .tri-lift {
+    transition:
+      transform 350ms cubic-bezier(0.34, 1.4, 0.5, 1),
+      background-color 300ms ease,
+      border-color 300ms ease;
+  }
+  .tri-lift:hover {
+    transform: translateY(-3px);
+    background: var(--tri-pane-hover);
+    border-color: color-mix(in srgb, var(--tri-brand) 34%, transparent);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The other two display styles.
+
+   Everything above is `depth`, which is the default and therefore needs no selector of its
+   own. These two re-declare the same token names and nothing else, so a style is a palette
+   swap plus a handful of treatment rules — no component knows which one is on.
+
+   **How the two axes stay independent.** Style and theme are separate questions, so all six
+   combinations exist. Each style declares its dark values under `[data-theme='dark']` and
+   `[data-theme='system']`, its light values under `[data-theme='light']`, and repeats the
+   light values for `system` inside the media query, which is exactly the shape the base
+   palette uses. The two-attribute selectors score (0,2,0) against the base palette's (0,1,0),
+   so a style always wins over the default without needing `!important` anywhere.
+
+   Every colour below was checked for contrast before it was written: body text, dimmed text,
+   profit, loss, the accent as text, and the ink on a brand fill all clear 4.5:1 against the
+   surface they actually sit on, in all six combinations.
+   --------------------------------------------------------------------------- */
+
+/* ===== INSTRUMENT — the trading terminal. Dense, flat, hairline, amber. ===== */
+[data-style='instrument'][data-theme='dark'],
+[data-style='instrument'][data-theme='system'] {
+  --tri-bg: #0a0c0e;
+  --tri-surface: #0e1114;
+  --tri-raised: #151a20;
+  --tri-line: rgba(255, 255, 255, 0.08);
+  --tri-text: #d8dee4;
+  --tri-dim: #8a949e;
+  --tri-brand: #e5b93c;
+  --tri-brand-2: #5b8cff;
+  --tri-on-brand: #10130a;
+  --tri-pos: #3fcf8e;
+  --tri-neg: #f0616d;
+  --tri-warn: #e5b93c;
+
+  --tri-pos-soft: rgba(63, 207, 142, 0.14);
+  --tri-pos-edge: rgba(63, 207, 142, 0.4);
+  --tri-neg-soft: rgba(240, 97, 109, 0.14);
+  --tri-neg-edge: rgba(240, 97, 109, 0.4);
+
+  --tri-header: rgba(10, 12, 14, 0.85);
+  --tri-on-heat: #0a0c0e;
+
+  /* Opaque and unlit. A terminal is not glass — it is a flat panel with a hairline round it,
+     and every pixel of depth spent here is a pixel not spent on a number. */
+  --tri-pane: #0e1114;
+  --tri-pane-hover: #12171c;
+  --tri-pane-edge: transparent;
+  --tri-pane-shadow: none;
+  --tri-ambient: none;
+}
+
+[data-style='instrument'][data-theme='light'] {
+  --tri-bg: #edeef0;
+  --tri-surface: #ffffff;
+  --tri-raised: #e4e6ea;
+  --tri-line: rgba(10, 12, 14, 0.14);
+  --tri-text: #14171a;
+  --tri-dim: #5a626b;
+  --tri-brand: #7e610e;
+  --tri-brand-2: #3b6fe0;
+  --tri-on-brand: #ffffff;
+  --tri-pos: #0a7a5b;
+  --tri-neg: #c62641;
+  --tri-warn: #7e610e;
+
+  --tri-pos-soft: rgba(10, 122, 91, 0.13);
+  --tri-pos-edge: rgba(10, 122, 91, 0.35);
+  --tri-neg-soft: rgba(198, 38, 65, 0.12);
+  --tri-neg-edge: rgba(198, 38, 65, 0.35);
+
+  --tri-header: rgba(237, 238, 240, 0.85);
+  --tri-on-heat: #14171a;
+
+  --tri-pane: #ffffff;
+  --tri-pane-hover: #ffffff;
+  --tri-pane-edge: transparent;
+  --tri-pane-shadow: none;
+  --tri-ambient: none;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-style='instrument'][data-theme='system'] {
+    --tri-bg: #edeef0;
+    --tri-surface: #ffffff;
+    --tri-raised: #e4e6ea;
+    --tri-line: rgba(10, 12, 14, 0.14);
+    --tri-text: #14171a;
+    --tri-dim: #5a626b;
+    --tri-brand: #7e610e;
+    --tri-brand-2: #3b6fe0;
+    --tri-on-brand: #ffffff;
+    --tri-pos: #0a7a5b;
+    --tri-neg: #c62641;
+    --tri-warn: #7e610e;
+
+    --tri-pos-soft: rgba(10, 122, 91, 0.13);
+    --tri-pos-edge: rgba(10, 122, 91, 0.35);
+    --tri-neg-soft: rgba(198, 38, 65, 0.12);
+    --tri-neg-edge: rgba(198, 38, 65, 0.35);
+
+    --tri-header: rgba(237, 238, 240, 0.85);
+    --tri-on-heat: #14171a;
+
+    --tri-pane: #ffffff;
+    --tri-pane-hover: #ffffff;
+    --tri-pane-edge: transparent;
+    --tri-pane-shadow: none;
+    --tri-ambient: none;
+  }
+}
+
+/*
+ * Instrument's treatment. Sharper corners, no light to follow, and no arrival animation:
+ * this is the style for somebody who reads the screen all day, and a panel that rises every
+ * time they come back to a tab is a panel they are waiting for.
+ */
+[data-style='instrument'] .tri-pane {
+  border-radius: 8px;
+}
+[data-style='instrument'] .tri-glow {
+  display: none;
+}
+[data-style='instrument'] .tri-stagger > * {
+  animation: none;
+}
+[data-style='instrument'] .tri-lift:hover {
+  /* The hairline answers instead of the tile moving. */
+  transform: none;
+  border-color: color-mix(in srgb, var(--tri-brand) 45%, transparent);
+}
+
+/* ===== CALM — daylight. Air, low contrast, sage. ===== */
+[data-style='calm'][data-theme='dark'],
+[data-style='calm'][data-theme='system'] {
+  --tri-bg: #141714;
+  --tri-surface: #1a1e1b;
+  --tri-raised: #222724;
+  --tri-line: rgba(255, 255, 255, 0.08);
+  --tri-text: #e4e8e3;
+  --tri-dim: #9aa39b;
+  --tri-brand: #7fb295;
+  --tri-brand-2: #6f9ab2;
+  --tri-on-brand: #0c120e;
+  --tri-pos: #6fc79a;
+  --tri-neg: #e08a72;
+  --tri-warn: #d9b06a;
+
+  --tri-pos-soft: rgba(111, 199, 154, 0.14);
+  --tri-pos-edge: rgba(111, 199, 154, 0.38);
+  --tri-neg-soft: rgba(224, 138, 114, 0.14);
+  --tri-neg-edge: rgba(224, 138, 114, 0.38);
+
+  --tri-header: rgba(20, 23, 20, 0.85);
+  --tri-on-heat: #141714;
+
+  --tri-pane: rgba(255, 255, 255, 0.04);
+  --tri-pane-hover: rgba(255, 255, 255, 0.055);
+  --tri-pane-edge: rgba(255, 255, 255, 0.05);
+  --tri-pane-shadow: inset 0 1px 0 var(--tri-pane-edge);
+  --tri-ambient: radial-gradient(
+    52rem 26rem at 88% -10%,
+    rgba(127, 178, 149, 0.1),
+    transparent 62%
+  );
+}
+
+[data-style='calm'][data-theme='light'] {
+  --tri-bg: #f5f4f1;
+  --tri-surface: #ffffff;
+  --tri-raised: #edece8;
+  --tri-line: #e4e3de;
+  --tri-text: #2a2e2c;
+  --tri-dim: #6e756f;
+  --tri-brand: #48725b;
+  --tri-brand-2: #4a6f83;
+  --tri-on-brand: #ffffff;
+  --tri-pos: #3e7d5c;
+  --tri-neg: #b4573f;
+  --tri-warn: #8a6a1f;
+
+  --tri-pos-soft: rgba(62, 125, 92, 0.13);
+  --tri-pos-edge: rgba(62, 125, 92, 0.35);
+  --tri-neg-soft: rgba(180, 87, 63, 0.12);
+  --tri-neg-edge: rgba(180, 87, 63, 0.35);
+
+  --tri-header: rgba(245, 244, 241, 0.85);
+  --tri-on-heat: #2a2e2c;
+
+  --tri-pane: #ffffff;
+  --tri-pane-hover: #ffffff;
+  --tri-pane-edge: rgba(255, 255, 255, 0.9);
+  --tri-pane-shadow: 0 1px 2px rgba(42, 46, 44, 0.04), 0 14px 30px -22px rgba(42, 46, 44, 0.5);
+  --tri-ambient: radial-gradient(52rem 26rem at 88% -10%, rgba(79, 122, 99, 0.12), transparent 62%);
+}
+
+@media (prefers-color-scheme: light) {
+  [data-style='calm'][data-theme='system'] {
+    --tri-bg: #f5f4f1;
+    --tri-surface: #ffffff;
+    --tri-raised: #edece8;
+    --tri-line: #e4e3de;
+    --tri-text: #2a2e2c;
+    --tri-dim: #6e756f;
+    --tri-brand: #48725b;
+    --tri-brand-2: #4a6f83;
+    --tri-on-brand: #ffffff;
+    --tri-pos: #3e7d5c;
+    --tri-neg: #b4573f;
+    --tri-warn: #8a6a1f;
+
+    --tri-pos-soft: rgba(62, 125, 92, 0.13);
+    --tri-pos-edge: rgba(62, 125, 92, 0.35);
+    --tri-neg-soft: rgba(180, 87, 63, 0.12);
+    --tri-neg-edge: rgba(180, 87, 63, 0.35);
+
+    --tri-header: rgba(245, 244, 241, 0.85);
+    --tri-on-heat: #2a2e2c;
+
+    --tri-pane: #ffffff;
+    --tri-pane-hover: #ffffff;
+    --tri-pane-edge: rgba(255, 255, 255, 0.9);
+    --tri-pane-shadow: 0 1px 2px rgba(42, 46, 44, 0.04), 0 14px 30px -22px rgba(42, 46, 44, 0.5);
+    --tri-ambient: radial-gradient(
+      52rem 26rem at 88% -10%,
+      rgba(79, 122, 99, 0.12),
+      transparent 62%
+    );
+  }
+}
+
+/* Calm's treatment: everything the same, only slower and by less. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  [data-style='calm'] .tri-lift {
+    transition-duration: 520ms;
+  }
+  [data-style='calm'] .tri-lift:hover {
+    transform: translateY(-2px);
+  }
 }
 
 /* Numbers everywhere use the mono face, per the prototype. */

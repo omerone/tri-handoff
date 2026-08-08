@@ -45,7 +45,7 @@ export function SubmitButton({
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className={`bg-brand inline-flex min-h-11 items-center justify-center rounded-[10px] px-4 py-2.5 text-sm font-bold text-white transition-opacity disabled:opacity-60 sm:min-h-9 ${className}`}
+      className={`bg-brand inline-flex min-h-11 items-center justify-center rounded-[10px] px-4 py-2.5 text-sm font-bold text-on-brand transition-opacity disabled:opacity-60 sm:min-h-9 ${className}`}
     >
       {children}
     </button>

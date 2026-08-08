@@ -6,10 +6,12 @@ import { CURRENCY_SYMBOL, SUPPORTED_CURRENCIES, type Currency } from '@/lib/mone
 import {
   setAutoSyncAction,
   setDisplayCurrencyAction,
+  setDisplayStyleAction,
   setLocaleAction,
   setThemeAction,
 } from '@/app/actions/preferences';
 import { THEMES, type Theme } from '@/lib/theme';
+import { DISPLAY_STYLES, type DisplayStyle } from '@/lib/display-style';
 
 /** The prototype's segmented toggle. */
 function Toggle<T extends string>({
@@ -35,7 +37,7 @@ function Toggle<T extends string>({
             aria-pressed={active}
             onClick={() => onChange(key)}
             className={`rounded-lg px-3 py-1.5 text-[13px] disabled:opacity-60 ${
-              active ? 'bg-brand font-bold text-white' : 'text-dim font-medium'
+              active ? 'bg-brand font-bold text-on-brand' : 'text-dim font-medium'
             }`}
           >
             {label}
@@ -88,6 +90,35 @@ export function ThemeChoice({
       value={current}
       disabled={pending}
       onChange={(next) => startTransition(() => setThemeAction(next))}
+    />
+  );
+}
+
+/**
+ * Which of the three visual languages the interface is drawn in.
+ *
+ * Its own control beside the theme rather than folded into it: these answer two different
+ * questions — light-or-dark, and which look — and every style is drawn in both themes. One
+ * row of six buttons would be asking both at once, and choosing a style would silently
+ * decide whether the screen is dark.
+ *
+ * Resolved in CSS from `<html data-style>` for the same reason the theme is: deciding it in
+ * JavaScript would paint one style on the server and correct it on the client.
+ */
+export function DisplayStyleChoice({
+  current,
+  labels,
+}: {
+  current: DisplayStyle;
+  labels: Record<DisplayStyle, string>;
+}) {
+  const [pending, startTransition] = useTransition();
+  return (
+    <Toggle
+      options={DISPLAY_STYLES.map((value) => [value, labels[value]] as const)}
+      value={current}
+      disabled={pending}
+      onChange={(next) => startTransition(() => setDisplayStyleAction(next))}
     />
   );
 }

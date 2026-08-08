@@ -58,7 +58,7 @@ export function BookTabs({
             href={tab === 'long' ? '/long' : `/long?book=${tab}`}
             aria-current={active ? 'page' : undefined}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-[9px] px-3 py-1.5 text-center text-xs font-bold transition-colors sm:flex-none ${
-              active ? 'bg-brand text-white' : 'text-dim hover:text-text hover:bg-raised'
+              active ? 'bg-brand text-on-brand' : 'text-dim hover:text-text hover:bg-raised'
             }`}
           >
             {/* `min-w-0` so the longest label shrinks inside its tab rather than pushing the

@@ -6,6 +6,7 @@ import { getMessages } from 'next-intl/server';
 import { LOCALE_DIR } from '@/i18n/config';
 import { resolveLocale } from '@/i18n/request';
 import { resolveTheme, THEME_COOKIE } from '@/lib/theme';
+import { DISPLAY_STYLE_COOKIE, resolveDisplayStyle } from '@/lib/display-style';
 import { getSession } from '@/lib/auth/session';
 import { InfoLayer } from '@/components/ui/info-layer';
 import { TooltipLayer } from '@/components/ui/tooltip';
@@ -51,10 +52,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // here costs nothing beyond the lookup the page was going to make anyway — and it is the
   // only way Settings and the painted page cannot disagree.
   const session = await getSession();
-  const theme = resolveTheme(session?.user.theme, (await cookies()).get(THEME_COOKIE)?.value);
+  const jar = await cookies();
+  const theme = resolveTheme(session?.user.theme, jar.get(THEME_COOKIE)?.value);
+  // The second half of the same question, on its own axis: theme is light-or-dark, style is
+  // which of the three looks. Both are painted here so neither can flash on first render.
+  const style = resolveDisplayStyle(
+    session?.user.displayStyle,
+    jar.get(DISPLAY_STYLE_COOKIE)?.value,
+  );
 
   return (
-    <html lang={locale} dir={LOCALE_DIR[locale]} data-theme={theme}>
+    <html lang={locale} dir={LOCALE_DIR[locale]} data-theme={theme} data-style={style}>
       <body className={`${heebo.variable} ${plexMono.variable} min-h-screen bg-bg text-text`}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}

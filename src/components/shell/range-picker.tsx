@@ -169,7 +169,7 @@ export function RangePicker({
   const group = 'border-line bg-raised flex gap-1 rounded-[10px] border p-[3px]';
   const segment = (active: boolean) =>
     `tri-tap rounded-lg px-3 py-1.5 text-[13px] ${
-      active ? 'bg-brand font-bold text-white' : 'text-dim font-medium'
+      active ? 'bg-brand font-bold text-on-brand' : 'text-dim font-medium'
     }`;
   const field =
     'border-line bg-raised text-text min-h-9 w-full rounded-[10px] border px-2.5 py-1.5 text-xs';
@@ -240,7 +240,7 @@ export function RangePicker({
              * already says it opens something.
              */
             className={`tri-tap border-line flex min-h-9 w-full items-center justify-between gap-1.5 rounded-[10px] border px-3 py-1.5 text-[13px] lg:inline-flex lg:w-auto lg:justify-start ${
-              custom ? 'bg-brand font-bold text-white' : 'bg-raised text-dim font-medium'
+              custom ? 'bg-brand font-bold text-on-brand' : 'bg-raised text-dim font-medium'
             }`}
           >
             <span className="flex min-w-0 items-center gap-1.5">
@@ -288,7 +288,7 @@ export function RangePicker({
                     aria-pressed={current.kind === preset}
                     className={`tri-tap flex min-h-9 items-center justify-between rounded-[10px] px-3 py-1.5 text-[13px] ${
                       current.kind === preset
-                        ? 'bg-brand font-bold text-white'
+                        ? 'bg-brand font-bold text-on-brand'
                         : 'text-text hover:bg-raised font-medium'
                     }`}
                   >
@@ -381,7 +381,7 @@ export function RangePicker({
 
                 <button
                   type="submit"
-                  className="tri-tap bg-brand min-h-9 w-full rounded-[10px] px-4 py-1.5 text-xs font-bold text-white"
+                  className="tri-tap bg-brand min-h-9 w-full rounded-[10px] px-4 py-1.5 text-xs font-bold text-on-brand"
                 >
                   {labels.apply}
                 </button>

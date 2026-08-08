@@ -37,7 +37,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <div className={`border-line bg-surface rounded-[18px] border ${className}`}>
+    <div className={`border-line tri-pane rounded-[18px] border ${className}`}>
       {(title || action) && (
         <div className="flex items-center justify-between gap-2 px-4 pt-2.5 pb-1">
           <div className="text-dim flex min-w-0 items-center gap-1 text-xs font-semibold tracking-[0.3px]">

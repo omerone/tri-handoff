@@ -31,6 +31,8 @@ export type TenantUser = {
   readonly locale: Locale;
   readonly displayCurrency: string;
   readonly theme: 'dark' | 'light' | 'system';
+  /** Which of the three visual languages to draw in — see `lib/display-style.ts`. */
+  readonly displayStyle: 'depth' | 'instrument' | 'calm';
   /**
    * Whether a login should pull from the broker on its own. Off by default — the refresh
    * button is the only thing that spends money unless this is deliberately turned on.

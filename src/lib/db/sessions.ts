@@ -16,6 +16,8 @@ export type SessionRecord = {
   locale: Locale;
   displayCurrency: string;
   theme: 'dark' | 'light' | 'system';
+  /** Which visual language to draw in — see `lib/display-style.ts`. */
+  displayStyle: 'depth' | 'instrument' | 'calm';
   /** Whether signing in should pull from the broker. See the column comment in the schema. */
   autoSyncOnLogin: boolean;
   lastLoginAt: Date | null;
@@ -82,6 +84,7 @@ export async function findSession(
           locale: true,
           displayCurrency: true,
           theme: true,
+          displayStyle: true,
           autoSyncOnLogin: true,
           lastLoginAt: true,
           tenant: { select: { name: true, domain: true, status: true } },
@@ -99,6 +102,7 @@ export async function findSession(
     locale: row.user.locale,
     displayCurrency: row.user.displayCurrency,
     theme: row.user.theme,
+    displayStyle: row.user.displayStyle,
     autoSyncOnLogin: row.user.autoSyncOnLogin,
     lastLoginAt: row.user.lastLoginAt,
     tenantName: row.user.tenant.name,

@@ -82,7 +82,7 @@ export function KPI({
       job is one number, repeated eleven times down a handset.
     */
     <div
-      className="border-line bg-surface flex h-[5rem] flex-col rounded-[14px] border px-2.5 py-2 sm:h-auto sm:rounded-[18px] sm:px-4 sm:py-3"
+      className="border-line tri-pane tri-lift flex h-[5rem] flex-col rounded-[14px] border px-2.5 py-2 sm:h-auto sm:rounded-[18px] sm:px-4 sm:py-3"
       data-tip={title}
     >
       {/*

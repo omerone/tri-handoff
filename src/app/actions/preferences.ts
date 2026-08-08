@@ -3,8 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { isLocale, type Locale } from '@/i18n/config';
 import { isTheme, type Theme } from '@/lib/theme';
+import { isDisplayStyle, type DisplayStyle } from '@/lib/display-style';
 import { getSession } from '@/lib/auth/session';
-import { setLocaleCookie, setRangeCookie, setThemeCookie } from '@/lib/preferences/cookies';
+import {
+  setDisplayStyleCookie,
+  setLocaleCookie,
+  setRangeCookie,
+  setThemeCookie,
+} from '@/lib/preferences/cookies';
 import { parseRange } from '@/lib/time/range';
 import { isSupportedCurrency } from '@/lib/money/currency';
 import { updateUserPreferences } from '@/lib/db';
@@ -41,6 +47,25 @@ export async function setThemeAction(next: string): Promise<void> {
   if (session) await updateUserPreferences(session.ctx, { theme: next as Theme });
 
   await setThemeCookie(next);
+
+  revalidatePath('/', 'layout');
+}
+
+/**
+ * Switches which of the three visual languages the interface is drawn in.
+ *
+ * Written in the same order and for the same reasons as the theme: the row first, so a
+ * failure leaves both copies on the old value rather than a cookie claiming a change the
+ * authoritative copy never took. It changes nothing but how the page is painted — the style
+ * is a `data-style` attribute and every rule that reads it lives in globals.css.
+ */
+export async function setDisplayStyleAction(next: string): Promise<void> {
+  if (!isDisplayStyle(next)) return;
+
+  const session = await getSession();
+  if (session) await updateUserPreferences(session.ctx, { displayStyle: next as DisplayStyle });
+
+  await setDisplayStyleCookie(next);
 
   revalidatePath('/', 'layout');
 }

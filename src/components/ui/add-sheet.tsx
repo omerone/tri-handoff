@@ -58,7 +58,7 @@ export function AddSheet({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={sheetId}
-        className="tri-tap bg-brand flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] px-4 py-2 text-sm font-bold text-white md:hidden"
+        className="tri-tap bg-brand flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] px-4 py-2 text-sm font-bold text-on-brand md:hidden"
       >
         <Plus size={16} aria-hidden />
         {label}

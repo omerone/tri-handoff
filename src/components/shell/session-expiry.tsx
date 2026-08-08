@@ -124,7 +124,7 @@ export function SessionExpiry({
             setRemaining(null);
             router.refresh();
           }}
-          className="tri-tap bg-brand shrink-0 rounded-[10px] px-3 py-2 text-xs font-bold text-white"
+          className="tri-tap bg-brand shrink-0 rounded-[10px] px-3 py-2 text-xs font-bold text-on-brand"
         >
           {t('sessionStay')}
         </button>

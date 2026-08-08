@@ -484,6 +484,11 @@
       }
     },
     "themeSystem": "לפי המערכת",
+    "displayStyle": "סגנון תצוגה",
+    "displayStyleNote": "משנה את המראה בלבד — הצבעים, החומר והתנועה. הנתונים והפעולות זהים בכל סגנון.",
+    "styleDepth": "עומק",
+    "styleInstrument": "מכשיר",
+    "styleCalm": "שקט",
     "account": {
       "deleteFailedUserNotFound": "החשבון כבר לא קיים. התחבר מחדש ונסה שוב.",
       "deleteFailedInvalidPassword": "הסיסמה שגויה. המחיקה לא בוצעה.",

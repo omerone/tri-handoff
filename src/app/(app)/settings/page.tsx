@@ -1,9 +1,16 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { SettingRow } from '@/components/ui/setting-row';
-import { AutoSyncChoice, CurrencyChoice, LanguageChoice, ThemeChoice } from './choices';
+import {
+  AutoSyncChoice,
+  CurrencyChoice,
+  DisplayStyleChoice,
+  LanguageChoice,
+  ThemeChoice,
+} from './choices';
 import { SignOutButton } from '@/components/shell/sign-out-button';
 import { asTheme } from '@/lib/theme';
+import { asDisplayStyle } from '@/lib/display-style';
 import { Mt5Card, type ConnectedAccount } from './mt5-card';
 import { TwoFactorCard } from './two-factor-card';
 import { requireSession } from '@/lib/auth/session';
@@ -96,8 +103,8 @@ export default async function SettingsPage() {
               server: t('server'),
               connect: t('connect'),
               disconnect: t('disconnect'),
-            swingAccount: t('swingAccount'),
-            dayAccount: t('dayAccount'),
+              swingAccount: t('swingAccount'),
+              dayAccount: t('dayAccount'),
               slotEmpty: t('slotEmpty'),
               disconnectTitle: t('disconnectTitle'),
               disconnectQuestion: t('disconnectQuestion'),
@@ -218,6 +225,17 @@ export default async function SettingsPage() {
               <ThemeChoice
                 current={asTheme(session.user.theme)}
                 labels={{ dark: t('themeDark'), light: t('themeLight'), system: t('themeSystem') }}
+              />
+            </SettingRow>
+
+            <SettingRow label={t('displayStyle')} description={t('displayStyleNote')}>
+              <DisplayStyleChoice
+                current={asDisplayStyle(session.user.displayStyle)}
+                labels={{
+                  depth: t('styleDepth'),
+                  instrument: t('styleInstrument'),
+                  calm: t('styleCalm'),
+                }}
               />
             </SettingRow>
 

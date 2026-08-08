@@ -484,6 +484,11 @@
       }
     },
     "themeSystem": "System",
+    "displayStyle": "Display style",
+    "displayStyleNote": "Changes the look only — colour, material and motion. The data and the controls are the same in every style.",
+    "styleDepth": "Depth",
+    "styleInstrument": "Instrument",
+    "styleCalm": "Calm",
     "account": {
       "deleteFailedUserNotFound": "That account no longer exists. Sign in again and retry.",
       "deleteFailedInvalidPassword": "That password is not correct. Deletion was not carried out.",

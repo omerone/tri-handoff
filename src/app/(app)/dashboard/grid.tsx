@@ -231,7 +231,7 @@ export function DashboardGrid({
           aria-pressed={editing}
           className={`rounded-lg border px-2.5 py-1 text-xs ${
             editing
-              ? 'bg-brand border-brand font-bold text-white'
+              ? 'bg-brand border-brand font-bold text-on-brand'
               : 'border-line text-dim hover:text-text'
           }`}
         >
@@ -239,7 +239,10 @@ export function DashboardGrid({
         </button>
       </div>
 
-      <div className="grid grid-cols-12 gap-3">
+      {/* `tri-stagger` is presentation only: the tiles arrive in reading order on first
+          paint. It is asked for here, on a container whose children are a fixed set, rather
+          than living on the pane itself — see the note in globals.css. */}
+      <div className="tri-stagger grid grid-cols-12 gap-3">
         {layout.map((item, index) => {
           const narrow = NARROW_SPAN[WIDGETS[item.id].kind];
           return (

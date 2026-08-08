@@ -108,7 +108,7 @@ export function TwoFactorCard({
         <button
           type="button"
           onClick={() => setDismissed(true)}
-          className="bg-brand self-start rounded-[10px] px-4 py-2.5 text-sm font-bold text-white"
+          className="bg-brand self-start rounded-[10px] px-4 py-2.5 text-sm font-bold text-on-brand"
         >
           {labels.codesSaved}
         </button>

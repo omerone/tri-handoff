@@ -53,6 +53,7 @@ export async function getUser(ctx: TenantContext): Promise<TenantUser | null> {
       locale: true,
       displayCurrency: true,
       theme: true,
+      displayStyle: true,
       autoSyncOnLogin: true,
       lastLoginAt: true,
     },
@@ -64,6 +65,7 @@ export async function getUser(ctx: TenantContext): Promise<TenantUser | null> {
         locale: row.locale,
         displayCurrency: row.displayCurrency,
         theme: row.theme,
+        displayStyle: row.displayStyle,
         autoSyncOnLogin: row.autoSyncOnLogin,
         lastLoginAt: row.lastLoginAt,
       }
@@ -76,6 +78,7 @@ export async function updateUserPreferences(
     locale?: Locale;
     displayCurrency?: string;
     theme?: 'dark' | 'light' | 'system';
+    displayStyle?: 'depth' | 'instrument' | 'calm';
     autoSyncOnLogin?: boolean;
   },
 ): Promise<void> {

@@ -162,7 +162,7 @@ export function MultiFilter({
                 <span
                   aria-hidden
                   className={`flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border ${
-                    picked ? 'border-brand bg-brand text-white' : 'border-line'
+                    picked ? 'border-brand bg-brand text-on-brand' : 'border-line'
                   }`}
                 >
                   {picked ? <Check size={10} strokeWidth={3} /> : null}

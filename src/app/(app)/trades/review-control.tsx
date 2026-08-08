@@ -192,7 +192,7 @@ function ReviewSheet({
         aria-pressed={on}
         onClick={() => onAnswer(field, on ? '' : value)}
         className={`min-h-11 flex-1 rounded-[10px] border px-2 text-xs font-semibold transition-colors ${
-          on ? 'bg-brand border-brand text-white' : 'border-line bg-raised text-text'
+          on ? 'bg-brand border-brand text-on-brand' : 'border-line bg-raised text-text'
         }`}
       >
         {children}
@@ -283,7 +283,7 @@ function ReviewSheet({
             <button
               type="button"
               onClick={close}
-              className="bg-brand inline-flex min-h-11 items-center justify-center rounded-[10px] px-4 text-sm font-bold text-white"
+              className="bg-brand inline-flex min-h-11 items-center justify-center rounded-[10px] px-4 text-sm font-bold text-on-brand"
             >
               {labels.done}
             </button>

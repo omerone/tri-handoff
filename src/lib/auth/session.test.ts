@@ -87,6 +87,7 @@ function record(overrides: Partial<SessionRecord> = {}): SessionRecord {
     displayCurrency: 'ILS',
     autoSyncOnLogin: false,
     theme: 'dark',
+    displayStyle: 'depth',
     lastLoginAt: null,
     tenantName: TENANT.name,
     tenantDomain: TENANT.domain,
@@ -126,6 +127,9 @@ describe('getSession', () => {
       locale: 'he',
       displayCurrency: 'ILS',
       theme: 'dark',
+      // Painted onto <html> by the root layout beside the theme, so the style is decided
+      // before first paint rather than corrected after hydration.
+      displayStyle: 'depth',
       // Carried on the session so the shell can decide, without a second query, whether a
       // login-triggered sync is owed — see components/shell/sync-status.tsx. Both of these
       // feed that one decision, which is the only thing on the app's critical path that

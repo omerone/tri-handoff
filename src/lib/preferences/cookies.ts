@@ -2,6 +2,7 @@ import 'server-only';
 import { cookies } from 'next/headers';
 import { LOCALE_COOKIE, type Locale } from '@/i18n/config';
 import { THEME_COOKIE, type Theme } from '@/lib/theme';
+import { DISPLAY_STYLE_COOKIE, type DisplayStyle } from '@/lib/display-style';
 import { formatRange, type TimeRange } from '@/lib/time/range';
 
 const ONE_YEAR = 365 * 24 * 60 * 60;
@@ -25,6 +26,11 @@ const OPTIONS = {
  */
 export async function setThemeCookie(theme: Theme): Promise<void> {
   (await cookies()).set(THEME_COOKIE, theme, OPTIONS);
+}
+
+/** The third thing the root layout paints from: `<html data-style>`. */
+export async function setDisplayStyleCookie(style: DisplayStyle): Promise<void> {
+  (await cookies()).set(DISPLAY_STYLE_COOKIE, style, OPTIONS);
 }
 
 export async function setLocaleCookie(locale: Locale): Promise<void> {

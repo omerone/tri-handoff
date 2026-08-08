@@ -60,6 +60,15 @@ enum Theme {
   system
 }
 
+/// Which of the three visual languages the interface is drawn in. A separate axis from
+/// `Theme` on purpose: theme is light-or-dark and changes with the room, style is settled
+/// once. Every style is drawn in both themes — see `src/lib/display-style.ts`.
+enum DisplayStyle {
+  depth
+  instrument
+  calm
+}
+
 model User {
   id       String @id @default(cuid())
   /// Unique: one trader per tenant domain.
@@ -72,6 +81,7 @@ model User {
   /// currency and finance data in ILS; both are converted for display.
   displayCurrency String @default("ILS") @map("display_currency")
   theme           Theme  @default(dark)
+  displayStyle    DisplayStyle @default(depth) @map("display_style")
   /// The dashboard arrangement the user built (SPEC §1.1). An ordered `[{id, span}]` list;
   /// null means "never touched it, use the default". Read through `normalizeLayout`, which
   /// tolerates any shape — this column outlives the code that wrote it.

@@ -11,6 +11,7 @@ import { Settings as SettingsIcon } from 'lucide-react';
 import { TriMark } from '@/components/brand/logo';
 import { ThemeToggle } from './theme-toggle';
 import { MainNav, type NavItem } from './main-nav';
+import { PointerGlow } from './pointer-glow';
 import { RangePicker } from './range-picker';
 import { SyncStatus } from './sync-status';
 
@@ -44,50 +45,60 @@ export async function AppShell({
 
   return (
     <div className="min-h-screen">
-      <header className="border-line bg-header sticky top-0 z-20 border-b backdrop-blur-[8px]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <TriMark size={36} />
-            <div>
-              <div className="text-base leading-none font-extrabold">{t('app.name')}</div>
-              {/* Decoration, and at 320px it wraps to two lines and grows the sticky header
+      {/*
+        The ambient ground, and the light that follows the pointer over it. Both are fixed,
+        both are inert — `pointer-events: none` and `aria-hidden` — and both sit at `z-0`
+        under the `z-10` wrapper below, which is what keeps them behind the page rather than
+        tinting the text on top of it.
+      */}
+      <div className="tri-ambient" aria-hidden />
+      <PointerGlow />
+
+      <div className="relative z-10">
+        <header className="border-line bg-header sticky top-0 z-20 border-b backdrop-blur-[8px]">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <TriMark size={36} />
+              <div>
+                <div className="text-base leading-none font-extrabold">{t('app.name')}</div>
+                {/* Decoration, and at 320px it wraps to two lines and grows the sticky header
                   that every screen then scrolls under. */}
-              <div className="text-dim hidden text-[11px] min-[360px]:block">
-                {t('app.tagline')}
+                <div className="text-dim hidden text-[11px] min-[360px]:block">
+                  {t('app.tagline')}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/*
+            {/*
             Settings sits here rather than in the strip below, and signing out and the
             language switch have moved off the header entirely and into the Settings page.
             The header is for what is true right now — is the data synced, is it light or
             dark. Everything you go somewhere to change is behind one door.
           */}
-          <div className="flex items-center gap-2">
-            <SyncStatus session={session} lastLoginAt={session.user.lastLoginAt} />
-            <ThemeToggle current={theme} />
-            <Link
-              href={navRoute('settings').href}
-              data-tip={t('nav.settings')}
-              aria-label={t('nav.settings')}
-              className="tri-tap border-line bg-raised text-dim hover:text-text flex items-center rounded-full border px-3 py-1.5 text-xs"
-            >
-              <SettingsIcon size={13} aria-hidden />
-            </Link>
+            <div className="flex items-center gap-2">
+              <SyncStatus session={session} lastLoginAt={session.user.lastLoginAt} />
+              <ThemeToggle current={theme} />
+              <Link
+                href={navRoute('settings').href}
+                data-tip={t('nav.settings')}
+                aria-label={t('nav.settings')}
+                className="tri-tap border-line bg-raised text-dim hover:text-text flex items-center rounded-full border px-3 py-1.5 text-xs"
+              >
+                <SettingsIcon size={13} aria-hidden />
+              </Link>
+            </div>
           </div>
-        </div>
 
-        {/* Tabs alone on this row. The range picker shared it until it went down to the top
+          {/* Tabs alone on this row. The range picker shared it until it went down to the top
             of the page — at 375px the six tabs and four range buttons did not fit on one line,
             and the header spent a second row on a control that belongs to the screen below
             it rather than to the frame around it. */}
-        <div className="mx-auto max-w-6xl px-2 pb-1">
-          <MainNav items={items} />
-        </div>
-      </header>
+          <div className="mx-auto max-w-6xl px-2 pb-1">
+            <MainNav items={items} />
+          </div>
+        </header>
 
-      {/*
+        {/*
         The range sits at the top of the page rather than in the header.
         
         It was in the sticky bar so it would stay visible, but a filter pinned above six tabs
@@ -105,35 +116,36 @@ export async function AppShell({
         both under one element "the July card is on the page" cannot be asked of the DOM
         without also matching the picker that says July is selected.
       */}
-      <div className="mx-auto mb-3 flex max-w-6xl justify-end px-4 pt-5">
-        <RangePicker
-          fallback={range}
-          now={now}
-          locale={locale}
-          years={selectableYears(now)}
-          labels={{
-            title: t('range.title'),
-            presets: {
-              max: t('range.max'),
-              thisMonth: t('range.thisMonth'),
-              lastMonth: t('range.lastMonth'),
-            },
-            custom: t('range.custom'),
-            byMonths: t('range.byMonths'),
-            byDates: t('range.byDates'),
-            from: t('range.from'),
-            to: t('range.to'),
-            apply: t('range.apply'),
-            monthNames: monthNames(locale),
-          }}
-        />
+        <div className="mx-auto mb-3 flex max-w-6xl justify-end px-4 pt-5">
+          <RangePicker
+            fallback={range}
+            now={now}
+            locale={locale}
+            years={selectableYears(now)}
+            labels={{
+              title: t('range.title'),
+              presets: {
+                max: t('range.max'),
+                thisMonth: t('range.thisMonth'),
+                lastMonth: t('range.lastMonth'),
+              },
+              custom: t('range.custom'),
+              byMonths: t('range.byMonths'),
+              byDates: t('range.byDates'),
+              from: t('range.from'),
+              to: t('range.to'),
+              apply: t('range.apply'),
+              monthNames: monthNames(locale),
+            }}
+          />
+        </div>
+
+        <main className="mx-auto max-w-6xl px-4 pb-5">{children}</main>
+
+        <footer className="text-dim mx-auto max-w-6xl px-4 pb-6 text-[11px]">
+          {session.tenant.name} · {session.user.email}
+        </footer>
       </div>
-
-      <main className="mx-auto max-w-6xl px-4 pb-5">{children}</main>
-
-      <footer className="text-dim mx-auto max-w-6xl px-4 pb-6 text-[11px]">
-        {session.tenant.name} · {session.user.email}
-      </footer>
     </div>
   );
 }

@@ -84,7 +84,7 @@ export function FilterSheet({
         <SlidersHorizontal size={15} aria-hidden />
         {labels.open}
         {active > 0 ? (
-          <span className="bg-brand inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-white tabular-nums">
+          <span className="bg-brand inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-on-brand tabular-nums">
             {active}
           </span>
         ) : null}
@@ -132,7 +132,7 @@ export function FilterSheet({
         <button
           type="button"
           onClick={close}
-          className="bg-brand mt-1 inline-flex min-h-11 items-center justify-center rounded-[10px] px-4 text-sm font-bold text-white md:hidden"
+          className="bg-brand mt-1 inline-flex min-h-11 items-center justify-center rounded-[10px] px-4 text-sm font-bold text-on-brand md:hidden"
         >
           {labels.done}
         </button>

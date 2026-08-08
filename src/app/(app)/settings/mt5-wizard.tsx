@@ -277,7 +277,7 @@ function WelcomeStep({
       <p className="text-dim text-xs">{labels.wizard.welcome.hint}</p>
       <button
         onClick={onNext}
-        className="bg-brand rounded-[10px] px-4 py-2.5 font-bold text-white transition-opacity hover:opacity-90"
+        className="bg-brand rounded-[10px] px-4 py-2.5 font-bold text-on-brand transition-opacity hover:opacity-90"
       >
         {labels.wizard.welcome.action}
       </button>
@@ -418,7 +418,7 @@ function StepNav({
         type="button"
         onClick={onNext}
         disabled={disabled}
-        className="bg-brand flex-1 rounded-[10px] px-3 py-2 text-sm font-bold text-white transition-opacity disabled:opacity-40"
+        className="bg-brand flex-1 rounded-[10px] px-3 py-2 text-sm font-bold text-on-brand transition-opacity disabled:opacity-40"
       >
         {next}
       </button>
@@ -655,7 +655,7 @@ function SuccessStep({
           a four-step wizard is a screen with nothing to press. */}
       <Link
         href="/dashboard"
-        className="bg-brand rounded-[10px] px-3 py-2 text-center text-sm font-bold text-white transition-opacity hover:opacity-90"
+        className="bg-brand rounded-[10px] px-3 py-2 text-center text-sm font-bold text-on-brand transition-opacity hover:opacity-90"
       >
         {labels.wizard.success.action}
       </Link>
