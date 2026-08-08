@@ -73,15 +73,48 @@ export const getFxRate = cache(async (base: string, quote: string): Promise<FxRa
   return { base: from, quote: to, rate: Number.NaN, asOf: today, stale: true };
 });
 
+/**
+ * Fetch a pair now and store it, whatever is cached.
+ *
+ * `getFxRate` deliberately does not do this: it answers from anything published in the last
+ * few days, which is what keeps a page render from making an HTTP call every weekend. The
+ * consequence is that a rate can sit four days old before anything goes to look — over one
+ * such stretch USD/ILS moved from 3.0265 to 3.0029, which is 0.8% on every converted figure.
+ *
+ * So the refresh is triggered by an event instead of by a render: signing in. That is the
+ * moment a person is about to read their numbers, it happens once rather than per page, and
+ * it is off the critical path — see `refreshRatesOnLogin`.
+ *
+ * Returns null rather than throwing. Every caller of this is doing it *for* someone rather
+ * than *because* someone asked, and none of them may fail on its account.
+ */
+export async function refreshFxRate(base: string, quote: string): Promise<FxRate | null> {
+  const from = base.toUpperCase();
+  const to = quote.toUpperCase();
+  if (from === to) return IDENTITY(from);
+
+  const fetched = await fetchRate(from, to, { force: true });
+  if (!fetched) return null;
+
+  await writeCachedRate(from, to, fetched.rate, fetched.asOf);
+  return { base: from, quote: to, rate: fetched.rate, asOf: fetched.asOf, stale: false };
+}
+
 type FrankfurterResponse = { date: string; rates: Record<string, number> };
 
-async function fetchRate(base: string, quote: string): Promise<{ rate: number; asOf: Date } | null> {
+async function fetchRate(
+  base: string,
+  quote: string,
+  options: { force?: boolean } = {},
+): Promise<{ rate: number; asOf: Date } | null> {
   try {
     const url = `${env().FX_API_URL}/latest?from=${encodeURIComponent(base)}&to=${encodeURIComponent(quote)}`;
     const response = await fetch(url, {
       signal: AbortSignal.timeout(5_000),
       // Rates change once a day; Next's own cache saves the round trip within that window.
-      next: { revalidate: 60 * 60 },
+      // A forced refresh means "go and look", so it must not be answered from that cache
+      // either — otherwise signing in twice in an hour would re-read the same stale figure.
+      ...(options.force ? { cache: 'no-store' as const } : { next: { revalidate: 60 * 60 } }),
     });
     if (!response.ok) return null;
 

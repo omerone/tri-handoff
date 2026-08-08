@@ -9,6 +9,8 @@ import type { TenantSession } from '@/lib/tenant/context';
 import Link from 'next/link';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { TriMark } from '@/components/brand/logo';
+import { asCurrency } from '@/lib/money/currency';
+import { CurrencyToggle } from './currency-toggle';
 import { ThemeToggle } from './theme-toggle';
 import { MainNav, type NavItem } from './main-nav';
 import { PointerGlow } from './pointer-glow';
@@ -77,6 +79,12 @@ export async function AppShell({
           */}
             <div className="flex items-center gap-2">
               <SyncStatus session={session} lastLoginAt={session.user.lastLoginAt} />
+              {/* Beside the theme, because both are "how I want to read this right now"
+                  rather than settings — see the note on the component. */}
+              <CurrencyToggle
+                current={asCurrency(session.user.displayCurrency)}
+                label={t('settings.currency')}
+              />
               <ThemeToggle current={theme} />
               <Link
                 href={navRoute('settings').href}

@@ -2,10 +2,8 @@
 
 import { useTransition } from 'react';
 import type { Locale } from '@/i18n/config';
-import { CURRENCY_SYMBOL, SUPPORTED_CURRENCIES, type Currency } from '@/lib/money/currency';
 import {
   setAutoSyncAction,
-  setDisplayCurrencyAction,
   setDisplayStyleAction,
   setLocaleAction,
   setThemeAction,
@@ -65,10 +63,6 @@ export function LanguageChoice({ current }: { current: Locale }) {
   );
 }
 
-const CURRENCIES = SUPPORTED_CURRENCIES.map(
-  (code) => [code, `${CURRENCY_SYMBOL[code]} ${code}`] as const,
-);
-
 /**
  * Dark, light or follow the system (SPEC §1.1).
  *
@@ -119,18 +113,6 @@ export function DisplayStyleChoice({
       value={current}
       disabled={pending}
       onChange={(next) => startTransition(() => setDisplayStyleAction(next))}
-    />
-  );
-}
-
-export function CurrencyChoice({ current }: { current: Currency }) {
-  const [pending, startTransition] = useTransition();
-  return (
-    <Toggle
-      options={CURRENCIES}
-      value={current}
-      disabled={pending}
-      onChange={(next) => startTransition(() => setDisplayCurrencyAction(next))}
     />
   );
 }

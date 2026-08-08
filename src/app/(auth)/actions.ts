@@ -1,11 +1,13 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { after } from 'next/server';
 import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { burnPasswordVerification } from '@/lib/auth/anti-timing';
 import { clientIp, limitKey, LIMITS } from '@/lib/auth/limits';
 import { startSession } from '@/lib/auth/session';
+import { refreshRatesOnLogin } from '@/lib/money/refresh';
 import {
   hashPassword,
   MAX_PASSWORD_LENGTH,
@@ -205,7 +207,28 @@ async function completeSignIn(user: {
     eventType: 'login_success',
     description: 'Signed in',
   });
-  await touchLastLogin(makeTenantContext(user.tenantId, user.id));
+  const ctx = makeTenantContext(user.tenantId, user.id);
+  await touchLastLogin(ctx);
+
+  /*
+   * Freshen the exchange rates for the account being signed in to.
+   *
+   * `after` rather than `await`: this is two or three HTTP calls to a rate feed, and nobody
+   * should watch a login spinner for them. It runs once the response has gone out, so the
+   * redirect below is not delayed by a slow — or unreachable — third party. The dashboard the
+   * user lands on reads whatever is cached at that instant, which is the previous rate on the
+   * first page and the new one from there on; the alternative is holding the sign-in open for
+   * a figure that is accurate to a fraction of a percent either way.
+   *
+   * Wrapped, because a rate feed being down is not a failed sign-in.
+   */
+  after(async () => {
+    try {
+      await refreshRatesOnLogin(ctx);
+    } catch (error) {
+      console.warn('[fx] login refresh failed:', error instanceof Error ? error.message : error);
+    }
+  });
 
   // Bring the cookie copies back in line with the account being signed in to. Without this a
   // fresh browser paints the default theme and language until something happens to write them.

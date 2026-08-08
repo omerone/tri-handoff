@@ -1,13 +1,7 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { SettingRow } from '@/components/ui/setting-row';
-import {
-  AutoSyncChoice,
-  CurrencyChoice,
-  DisplayStyleChoice,
-  LanguageChoice,
-  ThemeChoice,
-} from './choices';
+import { AutoSyncChoice, DisplayStyleChoice, LanguageChoice, ThemeChoice } from './choices';
 import { SignOutButton } from '@/components/shell/sign-out-button';
 import { asTheme } from '@/lib/theme';
 import { asDisplayStyle } from '@/lib/display-style';
@@ -239,9 +233,10 @@ export default async function SettingsPage() {
               />
             </SettingRow>
 
-            <SettingRow label={t('currency')} description={t('fxNote')}>
-              <CurrencyChoice current={asCurrency(session.user.displayCurrency)} />
-            </SettingRow>
+            {/* The reading currency is not here any more — it is the symbol in the header,
+                beside the theme. It is the one preference on this card that gets changed
+                while looking at a figure rather than once when setting the account up, and
+                the trip to this page and back was most of the work of using it. */}
 
             <SettingRow
               label={t('autoSync')}
