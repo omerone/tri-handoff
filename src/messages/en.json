@@ -126,6 +126,7 @@
     "dayNetR": "Net R",
     "dayRrCoverage": "R from {counted} of {total} trades (the rest had no stop loss)",
     "equity": "Equity curve",
+    "fromStart": "from start",
     "balanceHistory": "Account balance over time",
     "balanceHistoryNote": "The balance the broker reports, deposits and withdrawals included — unlike the equity curve, which is built from trades and leaves them out on purpose. The difference between the two is exactly the money that was added rather than earned. One point per day the account was synced.",
     "recent": "Recent trades",

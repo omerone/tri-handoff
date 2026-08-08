@@ -107,6 +107,31 @@ export function equityCurve(
 }
 
 /**
+ * How far the account is up or down on where it opened, as a percentage of what it opened
+ * with — the figure the equity curve's tooltip carries beside each balance.
+ *
+ * Measured against the *starting* balance rather than the running peak, which is what makes
+ * it a different statement from the drawdown below: drawdown asks "how far off your best",
+ * this asks "how far from where you began". A curve that has recovered a dip reads as a small
+ * drawdown and a healthy return, and both are true.
+ *
+ * **Null rather than zero when there is nothing to measure against.** A percentage of a
+ * starting balance of zero is a division by zero, and of a negative one it is a number whose
+ * sign is the opposite of what a reader would take it to mean — an account opening at -500
+ * and moving to -250 has *improved*, while `(−250 − −500) / −500` reports −50%. Both cases
+ * are rare and both produce a confidently wrong figure, so the caller is told there is no
+ * answer and omits the line instead of printing one.
+ *
+ * The result is a ratio, so it is independent of the display currency: converting both legs
+ * by the same rate cancels. Only the money figure beside it needs converting.
+ */
+export function returnFromStart(balance: number, startBalance: number): number | null {
+  if (!Number.isFinite(balance) || !Number.isFinite(startBalance)) return null;
+  if (startBalance <= 0) return null;
+  return ((balance - startBalance) / startBalance) * 100;
+}
+
+/**
  * Maximum peak-to-trough decline.
  *
  * Measured against the running peak *including the starting balance*, so an account that

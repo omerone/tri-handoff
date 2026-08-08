@@ -297,6 +297,7 @@ export default async function DashboardPage({
           startBalance={book.openingBalance}
           rtl={rtl}
           display={display}
+          fromStartLabel={t('dash.fromStart')}
         />
       </Card>
     ),
@@ -317,6 +318,7 @@ export default async function DashboardPage({
             startBalance={snapshots[0]!.balance}
             rtl={rtl}
             display={display}
+            fromStartLabel={t('dash.fromStart')}
           />
           <p className="text-dim mt-3 text-[11px] leading-relaxed">
             {t('dash.balanceHistoryNote')}
