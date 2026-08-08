@@ -379,6 +379,46 @@ describe('the two-account limit', () => {
     await expect(connect(judy, '98989898')).resolves.toBeUndefined();
     expect(await listMt5Accounts(judy.ctx)).toHaveLength(1);
   });
+
+  /**
+   * A disconnected account does not hold a slot.
+   *
+   * This is the bug a client hit with one account connected: they had disconnected an old one
+   * a day earlier, and the row stayed — it has to, or the trades it imported lose their
+   * attribution. The limit counted rows rather than connections, so the settings page drew one
+   * account, the wizard filled in the second slot, and connecting was refused for having two
+   * already. Nothing on any screen draws a disconnected account, so there was no way to see
+   * what was refusing them and no way to free it.
+   *
+   * The two figures in this test are the whole bug: what the UI shows, and what the limit
+   * counts. They have to be the same number.
+   */
+  it('does not let a disconnected account go on holding a slot', async () => {
+    const nina = await createTenantFixture();
+    await connect(nina, '81818181');
+    await disconnectMt5Account(nina.ctx);
+
+    // The row is still there — deliberately — but it is not a connection any more.
+    expect(await listMt5Accounts(nina.ctx)).toHaveLength(0);
+    expect(await testDb.mt5Account.count({ where: { userId: nina.ctx.userId } })).toBe(1);
+
+    // So both remaining slots are free.
+    await expect(connect(nina, '82828282')).resolves.toBeUndefined();
+    await expect(connect(nina, '83838383')).resolves.toBeUndefined();
+    expect(await listMt5Accounts(nina.ctx)).toHaveLength(2);
+  });
+
+  it('lets a disconnected account be reconnected without adding a row', async () => {
+    // The other half of the same rule: reviving one is an update to the row that is already
+    // there, so it cannot smuggle a third account past the limit.
+    const oscar = await createTenantFixture();
+    await connect(oscar, '84848484');
+    await disconnectMt5Account(oscar.ctx);
+
+    await expect(connect(oscar, '84848484')).resolves.toBeUndefined();
+    expect(await listMt5Accounts(oscar.ctx)).toHaveLength(1);
+    expect(await testDb.mt5Account.count({ where: { userId: oscar.ctx.userId } })).toBe(1);
+  });
 });
 
 describe('what an account is for', () => {

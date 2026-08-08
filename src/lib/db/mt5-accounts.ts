@@ -24,6 +24,26 @@ import { prisma } from './prisma';
 /** The limit itself lives in the port's shared vocabulary; see the note there. */
 export { MAX_MT5_ACCOUNTS } from '@/lib/mt5/types';
 
+/**
+ * What this module means by "a connection", in one place.
+ *
+ * Disconnecting does not delete the row — it has to survive to hold the attribution of the
+ * trades it imported — it blanks the ciphertext and marks the row `disconnected`. So "does
+ * this row have credentials" is the question that separates a live connection from a
+ * headstone, and every query that means *connections* has to ask it.
+ *
+ * It is a constant because it was once written out by hand in each place and one of them was
+ * missed. The list the settings page draws filtered on it; the check that enforces the
+ * two-account limit did not, and counted headstones as connections. A trader who had ever
+ * disconnected an account could see one connection on screen and be told they already had
+ * two — with no way to reach the row that was refusing them, because nothing draws it.
+ *
+ * Deliberately *not* used by the two callers that want every row: the currency map in
+ * `db/trades.ts`, which prices trades belonging to accounts that are long gone, and the GDPR
+ * export, which must account for every row that exists.
+ */
+const IS_CONNECTION = { investorPwEncrypted: { not: '' } };
+
 export type Mt5AccountView = {
   id: string;
   login: string;
@@ -102,7 +122,7 @@ export const listMt5Accounts = cache(async (ctx: TenantContext): Promise<Mt5Acco
     where: {
       userId: ctx.userId,
       user: { tenantId: ctx.tenantId },
-      investorPwEncrypted: { not: '' },
+      ...IS_CONNECTION,
     },
     orderBy: { createdAt: 'asc' },
     select: VIEW_FIELDS,
@@ -156,8 +176,14 @@ export async function connectMt5Account(
    */
   // Counted before the write, and only a *new* account is refused: reconnecting one of the
   // two — a changed password, a re-run of the wizard — must keep working at the limit.
+  //
+  // Connections, not rows. Without `IS_CONNECTION` this counted disconnected accounts too, so
+  // every account a trader had ever disconnected went on occupying a slot they could not see
+  // and could not free. Note this still lets a *disconnected* account be reconnected past the
+  // count: it is absent from `existing`, so it reads as new, and the upsert below finds its
+  // row by login and server and revives it rather than adding one.
   const existing = await prisma.mt5Account.findMany({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, ...IS_CONNECTION },
     select: { login: true, server: true },
   });
   const isNew = !existing.some(
@@ -216,7 +242,7 @@ export async function readCredentialCiphertexts(ctx: TenantContext): Promise<
     where: {
       userId: ctx.userId,
       user: { tenantId: ctx.tenantId },
-      investorPwEncrypted: { not: '' },
+      ...IS_CONNECTION,
     },
     orderBy: { createdAt: 'asc' },
     select: {
