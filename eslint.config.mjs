@@ -1,11 +1,16 @@
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { FlatCompat } from '@eslint/eslintrc';
+import coreWebVitals from 'eslint-config-next/core-web-vitals';
+import typescript from 'eslint-config-next/typescript';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({ baseDirectory: __dirname });
+/*
+ * Spread straight in, no `FlatCompat`.
+ *
+ * These two used to be `.eslintrc` shapes and had to be converted. As of
+ * eslint-config-next 16 they are already flat arrays, and putting a flat config
+ * through the compatibility layer does not merely waste a step — it throws
+ * `Converting circular structure to JSON` and takes the whole lint run with it,
+ * including the tenant-isolation guards below, which are the reason this file is
+ * interesting.
+ */
 
 const config = [
   {
@@ -13,12 +18,17 @@ const config = [
       '.next/**',
       'node_modules/**',
       'src/generated/**',
+      // A design prototype, kept for reference and never built or shipped. It is one
+      // 800-line JSX sketch and it accounts for twenty-one of the errors the Next 16
+      // rules find; holding a sketch to the app's standards teaches nobody anything.
+      'docs/**',
       'next-env.d.ts',
       'playwright-report/**',
       'test-results/**',
     ],
   },
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  ...coreWebVitals,
+  ...typescript,
   {
     rules: {
       '@typescript-eslint/no-unused-vars': [
@@ -127,6 +137,43 @@ const config = [
     files: ['scripts/**/*.ts', 'prisma/**/*.ts', '**/*.test.ts', 'e2e/**/*.ts'],
     rules: {
       'no-console': 'off',
+    },
+  },
+  {
+    /*
+     * React Compiler rules, which arrived with eslint-config-next 16 and which this codebase
+     * has never been held to.
+     *
+     * They are kept on and kept visible, at `warn`, rather than deleted. Every one of them
+     * names something true — a component declared inside a render function is rebuilt on
+     * every render, a ref written during render is a render with a side effect — and all of
+     * it is pre-existing, in components covered by the end-to-end suite. Fixing them is a
+     * refactor with its own regression risk, and it does not belong inside a version bump
+     * taken to close a security advisory. Four sites: `trades/filters.tsx` (a local `Filter`
+     * component), `trades/multi-filter.tsx` (a ref assigned during render), and the debounced
+     * effects in `long/symbol-field.tsx`, `shell/range-picker.tsx` and
+     * `admin/audit-log-viewer.tsx`.
+     */
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/static-components': 'warn',
+      'react-hooks/refs': 'warn',
+    },
+  },
+  {
+    /*
+     * ...except `immutability`, which is switched off for pages rather than softened.
+     *
+     * Every page in this app is an async server component — `(app)/layout.tsx` forces it —
+     * and the rule fires on `allConverted = false` inside a `Promise.all`, telling us to
+     * "consider using state instead". There is no state and no re-render: the function runs
+     * once per request, on the server, and the variable is a local. The rule is reasoning
+     * about a client render that never happens.
+     */
+    files: ['src/app/**/page.tsx'],
+    rules: {
+      'react-hooks/immutability': 'off',
     },
   },
 ];

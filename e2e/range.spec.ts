@@ -225,9 +225,22 @@ test.describe('the custom panel', () => {
    * deliberately: the trigger there *is* the range, so the panel would say nothing new while
    * covering whatever the page put beneath it. What these tests are about is what the panel
    * shows once it is up, not which of the two brought it there.
+   *
+   * The click is retried until the panel answers, because a first press can land before React
+   * has hydrated the button and is simply lost. `page.goto` resolves on `load`, which is the
+   * document and not the listeners, and the gap between the two grew under Next 16 — enough
+   * that this went from passing every run to failing whenever the test before it had left the
+   * picker in a state that made the auto-open a no-op. The app is fine; the test was racing
+   * it. Retrying the press is the honest version of "wait until it is interactive": there is
+   * no event for that, and polling for one would be guessing at the same thing less directly.
    */
   async function ensureOpen(page: Page) {
-    if ((await page.locator('#tri-range-custom').count()) === 0) await open(page);
+    const panel = page.locator('#tri-range-custom');
+    if ((await panel.count()) > 0) return;
+    await expect(async () => {
+      await open(page);
+      await expect(panel).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
   }
 
   test('applies a month range', async ({ page }) => {
@@ -329,11 +342,22 @@ test.describe('the custom panel', () => {
     // standing under a picker that says the range is everything.
     await page.goto('/dashboard?range=2026-05..2026-07');
     await ensureOpen(page);
-    await expect(page.locator('select[name="fromMonthMonth"]')).toBeVisible();
+
+    /*
+     * The panel itself, not the month fields inside it.
+     *
+     * It opens in whichever mode the range it is showing implies, and the range in force here
+     * is whatever the test before this one left in the cookie — so asserting on
+     * `fromMonthMonth` was asserting that the previous test happened to end on months. It
+     * usually did. What this test is about is that choosing a preset closes the panel, and
+     * that is true of both modes.
+     */
+    const panel = page.locator('#tri-range-custom');
+    await expect(panel).toBeVisible();
 
     await choose(page, 'Maximum');
     await expect(page).toHaveURL(/range=max/);
-    await expect(page.locator('select[name="fromMonthMonth"]')).toHaveCount(0);
+    await expect(panel).toHaveCount(0);
     await expect(picker(page)).toHaveAttribute('aria-expanded', 'false');
   });
 });

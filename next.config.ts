@@ -53,6 +53,19 @@ const nextConfig: NextConfig = {
    * `instrumentation.ts` still followed `env.ts` into the secrets manager and failed on
    * `Can't resolve 'os'`. Swapping in the stub is safe because no Edge code path reaches it —
    * `middleware.ts` is the only thing that runs there and it imports one pure helper.
+   *
+   * **This branch no longer runs on a normal build.** Next 16 builds with Turbopack by
+   * default, which ignores a `webpack` key entirely; it applies only to an explicit
+   * `next build --webpack`. It is kept rather than deleted because the substitution is still
+   * correct for that build, and a config that silently means nothing is worse than one that
+   * says when it applies — the note above `headers()` is about exactly this hazard.
+   *
+   * There is deliberately no Turbopack equivalent. `turbopack.resolveAlias` has no
+   * `nextRuntime` to key on, so aliasing these to the stub would swap them out of the *Node*
+   * bundle too, where the real implementations are what load the secrets and send the mail.
+   * It is not needed either: under Turbopack the Edge graph does not reach them. Checked, not
+   * assumed — `.next/server/edge` contains no reference to the secrets manager, nodemailer or
+   * the AWS SDK.
    */
   webpack: (config, { nextRuntime, webpack }) => {
     if (nextRuntime === 'edge') {
@@ -70,10 +83,6 @@ const nextConfig: NextConfig = {
       );
     }
     return config;
-  },
-  eslint: {
-    // Linting is a separate step in `npm run check`; don't run it twice during build.
-    ignoreDuringBuilds: true,
   },
   /*
    * Caching only. The security headers used to be declared here as well as in
