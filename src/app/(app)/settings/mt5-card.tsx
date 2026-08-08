@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Landmark, Shield } from 'lucide-react';
 import { Num } from '@/components/ui/kpi';
+import { ACCOUNT_SLOTS, accountsBySlot } from '@/lib/mt5/slots';
 import { Mt5ConnectWizard, type WizardLabels } from './mt5-wizard';
 import { disconnectMt5Action } from './mt5-actions';
 
@@ -87,14 +88,13 @@ export function Mt5Card({
    * product is stamped `day`, and the Swing tab is permanently empty. Matching on the stored
    * purpose means the heading, the wizard's submission and the database always agree.
    */
-  const PURPOSES = ['swing', 'day'] as const;
   // An account connected before purposes existed has none. It takes the first slot no
   // account claims, so it is visible and disconnectable rather than hidden by its own age.
-  const unassigned = accounts.filter((account) => account.purpose === null);
-  const slots = PURPOSES.map(
-    (purpose) =>
-      accounts.find((account) => account.purpose === purpose) ?? unassigned.shift() ?? null,
-  );
+  //
+  // Shared with the connect action rather than written out here — see `lib/mt5/slots.ts` for
+  // what happened the last time these two answered the question separately.
+  const PURPOSES = ACCOUNT_SLOTS;
+  const slots = accountsBySlot(accounts);
 
   return (
     /*

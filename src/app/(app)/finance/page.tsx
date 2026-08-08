@@ -8,7 +8,7 @@ import { isAtOrBefore, stepMonth } from '@/lib/finance/bounds';
 import { applyRangeAction } from '@/app/actions/range';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { describeRange } from '@/lib/time/range';
-import { getMt5Account, listFinanceEntries, listLongPositions } from '@/lib/db';
+import { listFinanceEntries, listLongPositions, listMt5Accounts } from '@/lib/db';
 import { computeMetrics } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { portfolioTotals } from '@/lib/positions/valuation';
@@ -57,9 +57,10 @@ export default async function FinancePage({
   const rtl = LOCALE_DIR[locale] === 'rtl';
   const params = await searchParams;
 
-  const [entries, account, positions] = await Promise.all([
+  const [entries, accounts, positions] = await Promise.all([
     listFinanceEntries(session.ctx),
-    getMt5Account(session.ctx),
+    // Every connected account, not the first one — see the trading leg below.
+    listMt5Accounts(session.ctx),
     listLongPositions(session.ctx),
   ]);
 
@@ -105,11 +106,27 @@ export default async function FinancePage({
   // labelling an unconverted shekel figure with a dollar sign — both produce a number that
   // looks entirely reasonable, which is why the two are resolved separately and neither
   // falls back to a bare 1.
-  const accountCurrency = account?.accountCurrency ?? 'USD';
-  const [cashMoney, tradingMoney] = await Promise.all([
+  /*
+   * One rate per currency the accounts are actually denominated in.
+   *
+   * There used to be exactly one, taken from the first account, because there used to be
+   * exactly one account. Two accounts can sit at two brokers in two currencies, and adding
+   * their equities together without converting each first adds dollars to euros — a number
+   * that is wrong by roughly the exchange rate and looks entirely plausible.
+   */
+  const accountCurrencies = [...new Set(accounts.map((one) => one.accountCurrency ?? 'USD'))];
+  const [cashMoney, ...tradingMoneys] = await Promise.all([
     displayMoney({ source: 'ILS', display: session.user.displayCurrency, locale }),
-    displayMoney({ source: accountCurrency, display: session.user.displayCurrency, locale }),
+    ...accountCurrencies.map((currency) =>
+      displayMoney({ source: currency, display: session.user.displayCurrency, locale }),
+    ),
   ]);
+  const tradingByCurrency = new Map(
+    accountCurrencies.map((currency, index) => [currency, tradingMoneys[index]!] as const),
+  );
+  // Every leg has to convert, or the total is withheld — same rule the long positions follow.
+  const tradingConverted = tradingMoneys.every((one) => one.converted);
+  const tradingStale = tradingMoneys.some((one) => one.stale);
 
   /*
    * Three kinds of number pass through this screen and only one of them needs converting at
@@ -130,8 +147,11 @@ export default async function FinancePage({
     formatMoney(amount, cashMoney.currency, locale, options);
 
   const fromIls = (amount: number) => (cashMoney.converted ? amount * cashMoney.fx.rate : amount);
-  const fromTrading = (amount: number) =>
-    tradingMoney.converted ? amount * tradingMoney.fx.rate : amount;
+  /** A figure in one account's own currency, carried into the display currency. */
+  const fromAccount = (amount: number, currency: string) => {
+    const rate = tradingByCurrency.get(currency);
+    return rate?.converted ? amount * rate.fx.rate : amount;
+  };
 
   /*
    * What the trading account is worth, and why it is not simply `?? 0`.
@@ -146,9 +166,32 @@ export default async function FinancePage({
    * So the fallback is the book the dashboard already draws its own balance from — deposits
    * plus everything realised — which is the same quantity arrived at from the other side. Zero
    * is kept for the case it is actually true: no account at all.
+   *
+   * And it is the sum of *every* connected account. This read the first one only, so a trader
+   * with two connected accounts had one of them silently missing from their net worth — two
+   * accounts holding $300 each showed a trading leg of $300, with nothing on screen to say the
+   * other one existed. Each account is converted out of its own currency before they are added.
+   *
+   * The fallback stays whole-book, because `bookBalance` is a whole-book quantity — deposits
+   * plus everything realised, across every account. It is used when *any* account has yet to
+   * report, since summing the ones that have would understate the total just as quietly.
    */
-  const reported = account?.equity ?? account?.balance ?? null;
-  const tradingValue = account === null ? 0 : (reported ?? (await bookBalance(session.ctx)));
+  const reportedPerAccount = accounts.map((one) => one.equity ?? one.balance ?? null);
+  const everyAccountReported = reportedPerAccount.every((value) => value !== null);
+
+  const tradingValue = // already in the display currency
+    accounts.length === 0
+      ? 0
+      : everyAccountReported
+        ? accounts.reduce(
+            (sum, one, index) =>
+              sum + fromAccount(reportedPerAccount[index]!, one.accountCurrency ?? 'USD'),
+            0,
+          )
+        : fromAccount(
+            await bookBalance(session.ctx),
+            accounts[0]?.accountCurrency ?? 'USD',
+          );
 
   // Long positions can be held in several currencies, so each is converted before the
   // portfolio is totalled. If any one of them has no rate, the total is not computed at all
@@ -181,10 +224,10 @@ export default async function FinancePage({
 
   // Net worth needs all three legs in one currency. Missing any rate makes the sum
   // meaningless, so it is withheld rather than approximated.
-  const wealthAvailable = cashMoney.converted && tradingMoney.converted && longValue !== null;
+  const wealthAvailable = cashMoney.converted && tradingConverted && longValue !== null;
   const wealth = wealthAvailable
     ? totalWealth({
-        trading: fromTrading(tradingValue),
+        trading: tradingValue,
         longPositions: longValue,
         cash: fromIls(cash),
       })
@@ -238,7 +281,7 @@ export default async function FinancePage({
             wealth === null
               ? t('fxUnavailable')
               : [
-                  `${t('trading')} ${tradingMoney.money(tradingValue)}`,
+                  `${t('trading')} ${inDisplay(tradingValue)}`,
                   longValue && longValue > 0
                     ? `${t('longPositions')} ${inDisplay(longValue)}`
                     : null,
@@ -251,7 +294,7 @@ export default async function FinancePage({
         />
       </div>
 
-      {cashMoney.stale || tradingMoney.stale ? (
+      {cashMoney.stale || tradingStale ? (
         <p className="text-warn text-xs">{t('fxStale')}</p>
       ) : null}
 

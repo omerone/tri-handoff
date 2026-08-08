@@ -17,6 +17,7 @@ import {
   listMt5Accounts,
 } from '@/lib/db';
 import { mt5Provider } from '@/lib/mt5';
+import { occupantOfSlot } from '@/lib/mt5/slots';
 import { syncMt5 } from '@/lib/mt5/sync';
 
 export type Mt5FormState = {
@@ -140,11 +141,18 @@ export async function connectMt5Action(
    */
   const purpose = parsed.data.purpose ?? null;
   const connected = await listMt5Accounts(session.ctx);
-  const inThisSlot =
-    (purpose === null
-      ? connected[0]
-      : (connected.find((account) => account.purpose === purpose) ??
-        connected.find((account) => account.purpose === null))) ?? null;
+  /*
+   * Asked through the same function the card draws with, and that is the whole point.
+   *
+   * This used to resolve the slot itself: match the purpose, and failing that fall back to any
+   * account with no purpose. The card resolves it differently — an unassigned account takes the
+   * first *unclaimed* slot, which is the swing one — so for a trader whose account predates the
+   * purpose column the two disagreed about where that account was. Filling the empty day slot
+   * found the unassigned account through the fallback and read the submission as replacing it:
+   * "this will delete the trade book", on the screen that exists to add a second account
+   * without touching the first, and confirming did it.
+   */
+  const inThisSlot = (purpose === null ? connected[0] : occupantOfSlot(connected, purpose)) ?? null;
 
   const isDifferentAccount =
     inThisSlot !== null &&
@@ -176,6 +184,33 @@ export async function connectMt5Action(
         }),
       },
     };
+  }
+
+  /*
+   * The slot's previous occupant stops being a connection *before* its replacement becomes
+   * one, and both halves of that sentence were wrong until this line existed.
+   *
+   * Nothing retired the old account. It kept its credentials, so it stayed a connection: the
+   * card draws the first account whose purpose matches the slot, and `listMt5Accounts` orders
+   * by creation, so the slot went on drawing the account the trader had just replaced while
+   * the new one — connected, syncing, counted against the limit — was drawn nowhere at all.
+   * The old one also kept syncing, which re-imported the very trades the replace had deleted.
+   *
+   * And with both slots full there was no replacing anything: two connections is the limit, so
+   * `connectMt5Account` refused the new account with "you can connect up to two" — an error
+   * about a limit the trader was not trying to exceed, on the one screen offering to swap it.
+   *
+   * Retiring it first answers both. It frees the slot for the count, and it leaves exactly one
+   * connection claiming that purpose. The row itself survives, as disconnect always leaves it,
+   * so the trades deleted below keep something to have belonged to.
+   *
+   * Ordered rather than transactional: `verify` has already succeeded, so the only way the
+   * connect below fails now is the database being unavailable, and the state that leaves — a
+   * slot the trader must reconnect, with its history still intact because the delete has not
+   * run — is recoverable in a way that the reverse order is not.
+   */
+  if (isDifferentAccount && inThisSlot) {
+    await disconnectMt5Account(session.ctx, inThisSlot.id);
   }
 
   try {

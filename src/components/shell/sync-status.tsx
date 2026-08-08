@@ -1,5 +1,5 @@
 import { getTranslations } from 'next-intl/server';
-import { getMt5Account } from '@/lib/db';
+import { listMt5Accounts } from '@/lib/db';
 import type { TenantSession } from '@/lib/tenant/context';
 import { SyncPill } from './sync-pill';
 import { formatTimeAt } from '@/lib/time/format';
@@ -17,7 +17,25 @@ export async function SyncStatus({
   lastLoginAt: Date | null;
 }) {
   const t = await getTranslations('sync');
-  const account = await getMt5Account(session.ctx);
+  const accounts = await listMt5Accounts(session.ctx);
+
+  /*
+   * The *oldest* of the connected accounts' syncs, not the first account's.
+   *
+   * This pill is one sentence about the whole book, so it has to describe the account that is
+   * furthest behind: with two accounts connected, reading only the first one meant the header
+   * could say "synced 20:39" while the other account had not been reached for a day, and the
+   * screens below were mixing fresh figures with stale ones under a pill that said everything
+   * was current. An account that has never synced at all is the oldest there is, so it makes
+   * the whole thing read as never synced — which is exactly what it is.
+   */
+  const syncTimes = accounts.map((account) => account.lastSyncAt);
+  const oldestSync = syncTimes.some((at) => at === null)
+    ? null
+    : syncTimes.reduce<Date | null>(
+        (oldest, at) => (oldest === null || (at !== null && at < oldest) ? at : oldest),
+        null,
+      );
 
   /*
    * Both decisions are arithmetic and live in `lib/sync/status.ts`, where they are exercised
@@ -27,8 +45,8 @@ export async function SyncStatus({
    */
   const now = new Date();
   const status: SyncStatusInputs = {
-    lastSyncAt: account?.lastSyncAt ?? null,
-    connected: account !== null,
+    lastSyncAt: oldestSync,
+    connected: accounts.length > 0,
     lastLoginAt,
     autoSyncOnLogin: session.user.autoSyncOnLogin,
     now,
@@ -36,7 +54,7 @@ export async function SyncStatus({
 
   // A time only — the pill means "synced today at", and a date here would push the header
   // wider on a phone for information the settings page already carries in full.
-  const lastSyncedAt = account?.lastSyncAt ? formatTimeAt(account.lastSyncAt) : null;
+  const lastSyncedAt = oldestSync ? formatTimeAt(oldestSync) : null;
 
   /*
    * Formatted here rather than in the pill: `Date.now()` on the client is the *browser's*
@@ -48,7 +66,7 @@ export async function SyncStatus({
 
   return (
     <SyncPill
-      connected={account !== null}
+      connected={accounts.length > 0}
       lastSyncedAt={lastSyncedAt}
       autoSyncDue={isAutoSyncDue(status)}
       staleLabel={staleLabel}
