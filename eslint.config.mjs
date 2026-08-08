@@ -134,7 +134,9 @@ const config = [
     },
   },
   {
-    files: ['scripts/**/*.ts', 'prisma/**/*.ts', '**/*.test.ts', 'e2e/**/*.ts'],
+    // `.mjs` as well as `.ts`: a build script that says what it wrote is the one place
+    // `console.log` is the interface rather than a leftover.
+    files: ['scripts/**/*.{ts,mjs,js}', 'prisma/**/*.ts', '**/*.test.ts', 'e2e/**/*.ts'],
     rules: {
       'no-console': 'off',
     },

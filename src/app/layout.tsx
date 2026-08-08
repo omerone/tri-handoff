@@ -31,14 +31,28 @@ export const metadata: Metadata = {
   title: 'TRi — Trade · Risk · Insight',
   description: 'Trading journal and personal finance dashboard.',
   robots: { index: false, follow: false },
+  /*
+   * The name under the icon, once this is on a Home Screen.
+   *
+   * Without it iOS labels the tile with `title` — the whole strapline — and then truncates it
+   * to roughly nine characters, so what a person actually ends up with is "TRi — Tra…". The
+   * install sheet still shows the long one; this is only what survives underneath.
+   *
+   * `statusBarStyle` is deliberately left alone. On its default, iOS tints the status bar with
+   * `themeColor` below, which already answers light and dark separately — pinning it to
+   * `black` would be right for the dark theme and wrong for the other one.
+   */
+  appleWebApp: { capable: true, title: 'TRi' },
 };
 
 export const viewport: Viewport = {
-  // Matched to each theme's page colour, so the browser chrome on mobile does not stay
-  // black behind a light page.
+  // Each theme's page colour, so the browser chrome on mobile does not stay black behind a
+  // light page. Taken from `--tri-bg` in globals.css, because the two had drifted — #0A0B0F
+  // against a page that is #0B1017, and #F4F5F8 against #EEF2F6. That is a seam nobody notices
+  // in a browser tab and a visible band above the app once it runs on a Home Screen.
   themeColor: [
-    { media: '(prefers-color-scheme: dark)', color: '#0A0B0F' },
-    { media: '(prefers-color-scheme: light)', color: '#F4F5F8' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b1017' },
+    { media: '(prefers-color-scheme: light)', color: '#eef2f6' },
   ],
   width: 'device-width',
   initialScale: 1,
