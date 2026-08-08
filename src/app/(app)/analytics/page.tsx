@@ -155,7 +155,14 @@ export default async function AnalyticsPage({
     return (
       <div className="flex flex-col gap-4">
         <Card title={t('nav.analytics')}>
-          <EmptyState>{range.bounded ? t('range.empty') : t('dash.empty')}</EmptyState>
+          {/* Same three cases as the dashboard — see the note there. */}
+          <EmptyState>
+            {range.bounded
+              ? t('range.empty')
+              : book.connected
+                ? t('dash.emptyConnected')
+                : t('dash.empty')}
+          </EmptyState>
         </Card>
         <Card title={t('learning.byTopic')}>
           <DonutChart

@@ -71,10 +71,18 @@ export default async function DashboardPage({
   if (book.trades.length === 0) {
     return (
       <Card title={t('nav.dash')}>
-        {/* Two different statements, and telling them apart matters: an empty *window* is not
-            an empty account, and offering to connect a broker to someone who already has one
-            reads as the sync having failed. */}
-        <EmptyState>{range.bounded ? t('range.empty') : t('dash.empty')}</EmptyState>
+        {/* Three different statements, and telling them apart matters: an empty *window* is
+            not an empty account, and offering to connect a broker to someone who already has
+            one reads as the sync having failed. That last case was the one being got wrong —
+            a client with two funded accounts and no closed trades yet was told to go and
+            connect an account, which is the screen calling their own setup broken. */}
+        <EmptyState>
+          {range.bounded
+            ? t('range.empty')
+            : book.connected
+              ? t('dash.emptyConnected')
+              : t('dash.empty')}
+        </EmptyState>
       </Card>
     );
   }

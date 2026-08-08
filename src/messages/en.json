@@ -129,7 +129,8 @@
     "balanceHistory": "Account balance over time",
     "balanceHistoryNote": "The balance the broker reports, deposits and withdrawals included — unlike the equity curve, which is built from trades and leaves them out on purpose. The difference between the two is exactly the money that was added rather than earned. One point per day the account was synced.",
     "recent": "Recent trades",
-    "empty": "No trades yet. Connect your MT5 account to get started."
+    "empty": "No trades yet. Connect your MT5 account to get started.",
+    "emptyConnected": "The account is connected and has no closed trades yet. The first one to close will show up here."
   },
   "layout": {
     "edit": "Edit layout",
@@ -546,7 +547,15 @@
     "dayAccount": "Day-trading account"
   },
   "calendar": {
-    "weekdays": ["S", "M", "T", "W", "T", "F", "S"],
+    "weekdays": [
+      "S",
+      "M",
+      "T",
+      "W",
+      "T",
+      "F",
+      "S"
+    ],
     "noTrades": "—",
     "prevMonth": "Previous month",
     "nextMonth": "Next month",
