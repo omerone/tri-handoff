@@ -63,7 +63,7 @@ for (const { path, size } of TARGETS) {
     // Flattened onto the mark's own ground. iOS composites transparency against black, which
     // is close enough to this colour to hide the mistake on a dark tile and not close enough
     // anywhere else — better to have no transparency to composite.
-    .flatten({ background: '#12141b' })
+    .flatten({ background: '#0b0f14' })
     .png()
     .toBuffer();
   await writeFile(out, png);

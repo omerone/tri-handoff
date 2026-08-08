@@ -1,20 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <!-- The mark from src/components/brand/logo.tsx: the R-strip, four days around the zero
-       line. A file served as a favicon has no page to read CSS variables from, so the dark
-       theme's green and red are baked in. Keep the two in step by hand.
+  <!-- The mark from src/components/brand/logo.tsx: a rising line with an arrow, inside its own
+       frame. A file served as a favicon has no page to read CSS variables from, so the teal is
+       baked in. Keep the two in step by hand.
 
-       Two deliberate differences from the component, both because of where this is drawn. A
-       favicon lands at 16px on whatever colour a browser paints its tab strip, so this version
-       keeps a tile — the product's own dark surface — or the red bar disappears against a dark
-       chrome and the green one against a light one. And the bars are a touch wider with more
-       air between them, because at 16px the component's spacing closes up into a smudge. -->
-  <rect width="48" height="48" rx="12" fill="#12141b"/>
-  <rect x="0.75" y="0.75" width="46.5" height="46.5" rx="11.25" fill="none" stroke="#fff" stroke-opacity="0.1" stroke-width="1.5"/>
+       The tile stays here and is deliberately absent from the component: a favicon lands at
+       16px on whatever colour a browser paints its tab strip, and neon teal on an unknown
+       ground is a smudge. -->
+  <defs>
+    <filter id="g" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="0.55" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
 
-  <rect x="6.5" y="22.75" width="35" height="2" rx="1" fill="#e8eaf0" fill-opacity="0.3"/>
+  <rect width="48" height="48" rx="12" fill="#0b0f14"/>
 
-  <rect x="6.5" y="14" width="7" height="8.75" rx="2" fill="#2dd4a7"/>
-  <rect x="16" y="24.75" width="7" height="7" rx="2" fill="#ff5c7a"/>
-  <rect x="25.5" y="7.75" width="7" height="15" rx="2" fill="#2dd4a7"/>
-  <rect x="35" y="17.25" width="7" height="5.5" rx="2" fill="#2dd4a7"/>
+  <g filter="url(#g)">
+    <!-- The frame. -->
+    <rect x="3.4" y="3.4" width="41.2" height="41.2" rx="9.5" fill="none"
+          stroke="#3fe6d4" stroke-opacity="0.85" stroke-width="0.9"/>
+
+    <!-- The grid it is plotted on: a baseline and three verticals, well under the line so they
+         read as paper rather than as data. -->
+    <g stroke="#3fe6d4" stroke-opacity="0.28" stroke-width="0.45" stroke-linecap="round">
+      <path d="M7 37.4H41"/>
+      <path d="M12.4 8.6V37.4M24 8.6V37.4M35.6 8.6V37.4"/>
+    </g>
+
+    <!-- Four days and a breakout. Round joins, because at 16px a mitre on a 130° turn grows a
+         spike longer than the stroke is wide. -->
+    <path d="M6.7 34.6 12.2 22.8 15.6 29.3 20.9 19 28.1 30.2 37.2 13.3"
+          fill="none" stroke="#3fe6d4" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- The head, with the notch in its back that the artwork has.
+         A flat-backed triangle was tried first. At this angle — the last leg climbs at about
+         sixty degrees — a straight back reads as a pennant on a pole rather than as an arrow,
+         and the eye takes a moment to find which way it points. The notch is what makes it
+         unmistakable, and it is the one piece of detail here worth the two pixels it costs. -->
+    <path d="M39.2 9.6 39.5 16 37.4 13 33.7 12.9Z" fill="#3fe6d4"/>
+  </g>
 </svg>

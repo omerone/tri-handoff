@@ -1,27 +1,28 @@
 /**
- * The TRi mark: the R-strip.
+ * The TRi mark: a rising line with an arrow, inside its own frame.
  *
- * The strip is the product's signature element — one column per trading day, winners growing
- * up from a centre line and losers down — and it is the one picture no other trading app
- * shows. So the mark is not a picture *of* the product, it is a small piece of it: four days,
- * three green and one red, around the zero line.
+ * Four days and a breakout, plotted on a grid — the picture the product is about, drawn the
+ * way the dashboard draws it: the run is not a clean ascent, it dips twice on the way, and the
+ * arrow only leaves at the end. A mark showing an unbroken climb would be the one thing a
+ * trading journal must never claim.
  *
- * Two earlier marks were rejected on the way here, both for the same reason. Three letters in
- * a gradient square is a placeholder: at 36px the middle letter is four pixels wide and the
- * mark only repeats the wordmark beside it. Three ascending bars is better drawn, but it is
- * the most common image in finance and says nothing this product does that others do not.
+ * The geometry here and in `src/app/icon.svg` is the same drawing, and the two are kept in
+ * step by hand: a favicon has no page to read a CSS variable from, so that file bakes the teal
+ * in and carries a dark tile the browser's tab strip cannot supply. `scripts/render-icons.mjs`
+ * turns that file into the PNGs iOS and Android need, so a change made here has to be made
+ * there and re-rendered — three copies, and this comment is the only thing holding them
+ * together.
  *
- * No tile. A rounded square behind the bars puts an indigo ground under green and red, which
- * muddies both, and the tile was only ever there to give the letters something to sit on.
- * Without it the mark is the data, and it takes the page's own background.
+ * Colour comes from the theme's own token rather than frozen hex, so the mark follows light
+ * and dark. The glow is a `drop-shadow` on the element instead of an SVG filter: a filter
+ * needs an `id`, this renders in two places on the same page — the app header and the sign-in
+ * screen — and two elements sharing an id is markup that happens to work rather than markup
+ * that is right.
  *
- * Colour comes from the theme's own tokens — the same green and red every profit and loss in
- * the product is drawn in — so the mark follows light and dark rather than carrying frozen
- * hex. `src/app/icon.svg` is the same drawing with the dark values baked in, because a file
- * served as a favicon has no page to read a variable from; the two are kept in step by hand.
- *
- * At 16px it is four marks around a rule. That is the trade this direction makes: less legible
- * in a browser tab than a solid tile, and unmistakable everywhere else.
+ * At 16px it is a teal smudge with a hint of a climb in it. That is the trade this artwork
+ * makes and it is a real one: the mark it replaced was drawn to survive a browser tab and this
+ * one is not. Everywhere it is actually looked at — a home screen, a header, a sign-in card —
+ * it is unmistakable, and a favicon is the one place nobody is looking.
  */
 export function TriMark({ size = 36, className = '' }: { size?: number; className?: string }) {
   return (
@@ -32,30 +33,50 @@ export function TriMark({ size = 36, className = '' }: { size?: number; classNam
       className={className}
       role="img"
       aria-label="TRi"
+      style={{
+        filter: 'drop-shadow(0 0 2px color-mix(in oklab, var(--tri-brand) 55%, transparent))',
+      }}
     >
-      {/* The zero line, in the interface's own text colour at a low opacity — the same way the
-          strip draws it on the dashboard, where it separates a green day from a red one. */}
-      <rect x="2" y="22.75" width="44" height="2" rx="1" fill="currentColor" fillOpacity="0.3" />
+      {/* The frame. Inset far enough that the glow has somewhere to go. */}
+      <rect
+        x="3.4"
+        y="3.4"
+        width="41.2"
+        height="41.2"
+        rx="9.5"
+        fill="none"
+        stroke="var(--tri-brand)"
+        strokeOpacity="0.85"
+        strokeWidth="0.9"
+      />
+
+      {/* The paper: a baseline and three verticals, kept well under the line so they read as a
+          grid rather than as more data. */}
+      <g stroke="var(--tri-brand)" strokeOpacity="0.28" strokeWidth="0.45" strokeLinecap="round">
+        <path d="M7 37.4H41" />
+        <path d="M12.4 8.6V37.4M24 8.6V37.4M35.6 8.6V37.4" />
+      </g>
+
+      {/* Round joins, because at this size a mitre on a 130° turn grows a spike longer than the
+          stroke is wide. */}
+      <path
+        d="M6.7 34.6 12.2 22.8 15.6 29.3 20.9 19 28.1 30.2 37.2 13.3"
+        fill="none"
+        stroke="var(--tri-brand)"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
 
       {/*
-       * Four days, sitting on the line rather than crossing it: a winner's base is the line's
-       * top edge, a loser's is its bottom.
+       * The head, with a notch in its back.
        *
-       * `rx` is 2 on a 9-wide bar — the same soft corner the strip itself uses on the
-       * dashboard. Rounding to half the width was tried first and turned the mark into four
-       * lozenges: the short bars became dots, the red one a pill, and the row of columns read
-       * as scattered confetti rather than as days on an axis.
-       *
-       * They fill the box, too. The first cut used two thirds of the width and height, which
-       * left half the square empty and made the mark a smudge beside a bold wordmark.
-       *
-       * The shape is a month worth having — two good days, one small, one bad — because a mark
-       * showing four winners would be the one thing a trading journal must never claim.
+       * A flat-backed triangle was tried first. At this angle — the last leg climbs at about
+       * sixty degrees — a straight back reads as a pennant on a pole rather than as an arrow,
+       * and the eye takes a moment to work out which way it points. The notch is what makes it
+       * unmistakable, and it is the one piece of detail here worth what it costs when small.
        */}
-      <rect x="2.25" y="13" width="9" height="9.75" rx="2" fill="var(--tri-pos)" />
-      <rect x="13.75" y="24.75" width="9" height="8" rx="2" fill="var(--tri-neg)" />
-      <rect x="25.25" y="6" width="9" height="16.75" rx="2" fill="var(--tri-pos)" />
-      <rect x="36.75" y="16.75" width="9" height="6" rx="2" fill="var(--tri-pos)" />
+      <path d="M39.2 9.6 39.5 16 37.4 13 33.7 12.9Z" fill="var(--tri-brand)" />
     </svg>
   );
 }

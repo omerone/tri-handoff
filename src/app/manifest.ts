@@ -31,7 +31,7 @@ export default function manifest(): MetadataRoute.Manifest {
      * it is on screen the icon sits in the middle of it, and a page-coloured splash puts a
      * near-black tile on a slightly different near-black.
      */
-    background_color: '#12141b',
+    background_color: '#0b0f14',
     // …whereas this one is the page, because it tints the chrome *around* the running app.
     theme_color: '#0b1017',
     orientation: 'portrait',
