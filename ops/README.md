@@ -52,7 +52,7 @@ Install:
 
 ## The domain and TLS
 
-Done on 2026-08-11. The app is served at **https://ester.troinvest.uk** behind
+Done on 2026-08-11. The app is served at **https://troinvest.uk** behind
 Cloudflare, and the session cookie carries `Secure` — the password no longer
 crosses the network in the clear, which was the largest open item in the audit.
 
@@ -103,6 +103,14 @@ there too.
   edge and injects a decode script. The footer prints the signed-in user's
   address, so every page came back with markup the server had not rendered and
   React failed hydration on it. Turning it on again brings that back.
+
+### The operator console is not on a client's domain
+
+`APP_BASE_DOMAIN=admin.troinvest.uk`, and the client is on the apex. That split is
+not cosmetic: `provisionTenant` *refuses* to hand a tenant the base domain, and
+says why — the client's app and `/admin` would share one origin and one cookie
+jar, and the host check that hides the panel would stop meaning anything.
+`https://troinvest.uk/admin` returns 404; the panel answers only on its own host.
 
 ### Adding a client
 

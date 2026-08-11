@@ -18,7 +18,11 @@ set -euo pipefail
 REPO_DIR=${REPO_DIR:-/opt/tri-handoff}
 BRANCH=${BRANCH:-master}
 HEALTH_URL=${HEALTH_URL:-http://localhost:3000/login}
-HEALTH_HOST=${HEALTH_HOST:-167.233.250.233}
+# The Host header the check sends. It must be a *provisioned tenant domain*: the request goes
+# straight to the container, and the app answers 404 for a host it does not know — so a stale
+# value here does not report a broken site, it reports every healthy deploy as broken and
+# rolls it back. It was the bare IP until the domain existed.
+HEALTH_HOST=${HEALTH_HOST:-troinvest.uk}
 HEALTH_ATTEMPTS=${HEALTH_ATTEMPTS:-30}
 HEALTH_INTERVAL=${HEALTH_INTERVAL:-2}
 LOG=/var/log/tri-deploy.log
