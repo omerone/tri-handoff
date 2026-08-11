@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { requireSession } from '@/lib/auth/session';
 import { createLearningEntry, deleteLearningEntry } from '@/lib/db';
 import { isPlausibleDate } from '@/lib/finance/bounds';
+import { normalizeLearner } from '@/lib/learning/types';
 
 export type LearningFormState = { error?: string; ok?: boolean };
 
@@ -18,6 +19,19 @@ const MAX_HOURS = 24;
 
 const entrySchema = z.object({
   topic: z.enum(['psychology', 'technical']),
+  /**
+   * Who studied. Optional, because a session recorded without a name is still a session and
+   * refusing it would cost the entry to save the attribution.
+   *
+   * Normalised on the way in — trimmed, inner runs of space collapsed — so "Ester " and
+   * "Ester" are one person in the ledger. Comparison is case-insensitive at the grouping
+   * step; the stored spelling stays as typed, because it is somebody's name.
+   */
+  learner: z
+    .string()
+    .max(60)
+    .optional()
+    .transform((value) => normalizeLearner(value)),
   title: z.string().trim().min(1).max(120),
   note: z.string().trim().max(2_000),
   // The field is text so a comma decimal typed on a Hebrew keyboard still parses.
@@ -41,6 +55,7 @@ export async function createLearningEntryAction(
 
   const parsed = entrySchema.safeParse({
     topic: formData.get('topic'),
+    learner: formData.get('learner') ?? '',
     title: formData.get('title') ?? '',
     note: formData.get('note') ?? '',
     hours: String(formData.get('hours') ?? ''),
@@ -54,6 +69,7 @@ export async function createLearningEntryAction(
     note: parsed.data.note || null,
     hours: parsed.data.hours,
     learnedOn: parsed.data.learnedOn,
+    learner: parsed.data.learner,
   });
 
   revalidatePath('/learning');

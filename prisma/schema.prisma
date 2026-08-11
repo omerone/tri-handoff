@@ -606,6 +606,18 @@ model LearningEntry {
   title String
   note  String?
 
+  /// Who did the studying.
+  ///
+  /// One login, two people: the account belongs to a pair who study the same craft, and
+  /// "we did eleven hours" answers nothing about whether one of them did ten of them. Kept as
+  /// a name rather than a second user row, because these two share one book by design and
+  /// splitting the login would split the trades with it.
+  ///
+  /// Null for a session recorded before anyone was named, which is not the same as a session
+  /// nobody did — it groups under its own heading rather than being assigned to whoever is
+  /// alphabetically first.
+  learner String?
+
   /// Session length. Two decimals so a 45-minute session is 0.75 rather than a rounded hour;
   /// the analytics pie is weighted by this, since ten minutes and an afternoon are not the
   /// same amount of study.

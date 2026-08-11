@@ -7,6 +7,10 @@ import { FormMessage, SubmitButton } from '@/components/ui/form';
 import { createLearningEntryAction, type LearningFormState } from './actions';
 
 export type LearningFormLabels = {
+  /** "Who studied" — the field label. */
+  learner: string;
+  /** Shown in the empty field, and the reason this ledger is worth splitting at all. */
+  learnerPlaceholder: string;
   what: string;
   whatPlaceholder: string;
   hours: string;
@@ -25,10 +29,21 @@ export type LearningFormLabels = {
 export function LearningEntryForm({
   labels,
   defaultDate,
+  learners,
 }: {
   labels: LearningFormLabels;
   /** Formatted on the server, so the field does not depend on the client's clock. */
   defaultDate: string;
+  /**
+   * Names already used, offered as suggestions.
+   *
+   * The account is shared by two people, so this list is two entries long and the point of it
+   * is that the second session is attributed by picking rather than retyping — retyping is
+   * where "Ester" and "ester" come from, and a ledger split across two spellings of one name
+   * answers nothing. `learnerKey` folds them back together when grouping, but not creating
+   * the drift is better than cleaning up after it.
+   */
+  learners: readonly string[];
 }) {
   const [state, action] = useActionState<LearningFormState, FormData>(
     createLearningEntryAction,
@@ -74,6 +89,29 @@ export function LearningEntryForm({
           row, which on a phone it needs — a half cell gave it 169px and the placeholder is
           three examples long, clipped before the first one ended.
         */}
+        <label className="flex flex-col gap-1 sm:min-w-[9rem]">
+          <span className="text-dim text-[11px] font-semibold">{labels.learner}</span>
+          {/*
+            A text field with suggestions rather than a dropdown: the first session has nobody
+            to choose from, and a dropdown with one option called "add a name…" is a worse
+            version of typing it. `list` gives the second session a one-click answer without
+            making the first one impossible.
+          */}
+          <input
+            name="learner"
+            maxLength={60}
+            list="tri-learners"
+            autoComplete="off"
+            placeholder={labels.learnerPlaceholder}
+            className={field}
+          />
+          <datalist id="tri-learners">
+            {learners.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        </label>
+
         <label className="col-span-2 flex flex-col gap-1 sm:col-auto sm:min-w-[12rem] sm:flex-1">
           <span className="text-dim text-[11px] font-semibold">{labels.what}</span>
           <input

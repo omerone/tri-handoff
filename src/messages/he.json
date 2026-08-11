@@ -654,7 +654,11 @@
     "topics": {
       "psychology": "פסיכולוגיה",
       "technical": "טכני"
-    }
+    },
+    "learner": "מי למד",
+    "learnerPlaceholder": "שם",
+    "byLearner": "שעות לפי אדם",
+    "unattributed": "לא נרשם שם"
   },
   "review": {
     "tpTiming": "עיתוי היציאה",

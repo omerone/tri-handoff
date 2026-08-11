@@ -654,7 +654,11 @@
     "topics": {
       "psychology": "Psychology",
       "technical": "Technical"
-    }
+    },
+    "learner": "Who studied",
+    "learnerPlaceholder": "Name",
+    "byLearner": "Hours per person",
+    "unattributed": "No name recorded"
   },
   "review": {
     "tpTiming": "Exit timing",

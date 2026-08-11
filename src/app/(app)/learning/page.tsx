@@ -7,7 +7,12 @@ import { Chip, EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { listLearningEntries } from '@/lib/db';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
-import { hoursDecimals, learningTotals, type LearningTopic } from '@/lib/learning/types';
+import {
+  hoursDecimals,
+  learnerNames,
+  learningTotals,
+  type LearningTopic,
+} from '@/lib/learning/types';
 import { formatNumber } from '@/lib/money/currency';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { TOPIC_COLOR } from '@/lib/review/colors';
@@ -90,12 +95,55 @@ export default async function LearningPage({
         />
       </Card>
 
+      {/*
+        Who put the hours in.
+
+        The account is one login shared by two people, so a single total is the one number that
+        cannot answer the question the ledger exists for: eleven hours between them is a good
+        month, or it is one person carrying it, and those are different situations. Drawn only
+        once somebody has been named — before that it would be a panel with one row reading
+        "unattributed", which is a worse way of saying nothing.
+      */}
+      {totals.byLearner.some((row) => row.learner !== null) ? (
+        <Card title={t('byLearner')}>
+          <ul className="divide-line divide-y">
+            {totals.byLearner.map((row) => (
+              <li
+                key={row.learner ?? 'unattributed'}
+                className="flex items-baseline justify-between gap-3 py-2.5"
+              >
+                <div className="min-w-0">
+                  <div className="text-text text-sm font-semibold">
+                    {row.learner ?? t('unattributed')}
+                  </div>
+                  <div className="text-dim mt-0.5 text-[11px]">
+                    {row.byTopic
+                      .filter((slot) => slot.hours > 0)
+                      .map((slot) => `${t(`topics.${slot.topic}`)} ${hours(slot.hours)}`)
+                      .join(' · ')}
+                  </div>
+                </div>
+                <div className="shrink-0 text-end">
+                  <div className="tri-num text-text text-sm font-bold">{hours(row.hours)}</div>
+                  <div className="text-dim text-[11px]">
+                    {t('sessions', { count: row.sessions })}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       <Card title={`${t('title')} · ${t('subtitle')}`}>
         <div className="border-line border-b pb-3">
           <AddSheet label={tBulk('addEntry')}>
             <LearningEntryForm
               defaultDate={defaultDate}
+              learners={learnerNames(entries)}
               labels={{
+                learner: t('learner'),
+                learnerPlaceholder: t('learnerPlaceholder'),
                 what: t('what'),
                 whatPlaceholder: t('whatPlaceholder'),
                 hours: t('hours'),
@@ -132,6 +180,13 @@ export default async function LearningPage({
                     <div className="flex flex-wrap items-baseline gap-2">
                       <span className="text-text text-sm font-semibold">{entry.title}</span>
                       <Chip>{t(`topics.${entry.topic as LearningTopic}`)}</Chip>
+                      {/*
+                        The name on the row, not only in the summary. A ledger that totals per
+                        person but does not say who did any given session cannot be corrected:
+                        the one wrongly attributed hour is invisible until the totals look odd,
+                        and by then nobody remembers which session it was.
+                      */}
+                      {entry.learner ? <Chip tone="brand">{entry.learner}</Chip> : null}
                     </div>
                     {entry.note ? (
                       <p className="text-dim mt-1 text-xs leading-relaxed">{entry.note}</p>

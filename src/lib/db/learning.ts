@@ -19,6 +19,7 @@ type Row = {
   note: string | null;
   hours: unknown;
   learnedOn: Date;
+  learner: string | null;
 };
 
 const toEntry = (row: Row): LearningEntry => ({
@@ -28,6 +29,7 @@ const toEntry = (row: Row): LearningEntry => ({
   note: row.note,
   hours: Number(row.hours),
   learnedOn: row.learnedOn,
+  learner: row.learner,
 });
 
 export type LearningWindow = { from?: Date; to?: Date };
@@ -68,6 +70,8 @@ export type LearningEntryInput = {
   note: string | null;
   hours: number;
   learnedOn: Date;
+  /** Who studied. Null when the session was recorded without a name. */
+  learner: string | null;
 };
 
 export async function createLearningEntry(
