@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
+import { isBrother } from '@/lib/household';
 import { requireSession } from '@/lib/auth/session';
 import { createFinanceEntry, deleteFinanceEntry, endRecurringSeries } from '@/lib/db';
 import { isPlausibleDate, isPlausibleMonth, MIN_YEAR } from '@/lib/finance/bounds';
@@ -48,11 +49,20 @@ const entrySchema = z.object({
     message: `The date must be between ${MIN_YEAR} and a few years from now.`,
   }),
   isRecurring: z.coerce.boolean().default(false),
+  /**
+   * Whose money. One of the two brothers, or empty for a shared row — validated against the
+   * household list so a stray value cannot invent a third person in the dropdowns.
+   */
+  owner: z
+    .string()
+    .optional()
+    .transform((value) => (isBrother(value) ? value : null)),
 });
 
 function parse(formData: FormData) {
   return entrySchema.safeParse({
     type: formData.get('type'),
+    owner: formData.get('owner') ?? '',
     label: formData.get('label'),
     amountIls: formData.get('amountIls'),
     category: formData.get('category') || DEFAULT_CATEGORY,

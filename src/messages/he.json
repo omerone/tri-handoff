@@ -364,7 +364,9 @@
     "fxUnavailable": "שער חליפין אינו זמין — לא ניתן לחשב שווי כולל כרגע.",
     "fxStale": "שער החליפין אינו מהיום.",
     "deleteSeriesConfirm": "למחוק את הסדרה כולה? היא תיעלם מכל החודשים, כולל אלה שכבר עברו. כדי לעצור אותה מכאן ואילך בלי לשנות את העבר, השתמש ב״סיום הסדרה״.",
-    "yearToDateAsOfToday": "מתחילת השנה (עד היום)"
+    "yearToDateAsOfToday": "מתחילת השנה (עד היום)",
+    "ownerLabel": "של מי",
+    "ownerShared": "משותף"
   },
   "long": {
     "title": "השקעות ארוכות טווח",
@@ -656,7 +658,7 @@
       "technical": "טכני"
     },
     "learner": "מי למד",
-    "learnerPlaceholder": "שם",
+    "learnerPlaceholder": "ללא שם",
     "byLearner": "שעות לפי אדם",
     "unattributed": "לא נרשם שם",
     "everyone": "שניהם",
@@ -753,5 +755,10 @@
     "addEntry": "הוספת רשומה",
     "addTrade": "הוספת עסקה",
     "addPosition": "הוספת פוזיציה"
+  },
+  "household": {
+    "title": "של מי הנתונים",
+    "both": "שניהם",
+    "shared": "המסחר משותף — המתג חל על פיננסי ולמידה"
   }
 }

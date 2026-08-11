@@ -107,6 +107,7 @@ describe('cumulativeCash is no longer a loop', () => {
     type: 'income',
     category: 'salary',
     label: 'Salary',
+  owner: null,
     amountIls: 1_000,
     entryDate: day(2026, 1, 1),
     isRecurring: false,

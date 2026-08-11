@@ -30,6 +30,7 @@ describe('round trip', () => {
   it('stores and reads back an entry', async () => {
     const created = await createFinanceEntry(alice.ctx, {
       type: 'income',
+      owner: null,
       category: 'salary',
       label: 'July salary',
       amountIls: 18_500,
@@ -42,6 +43,7 @@ describe('round trip', () => {
 
     expect(found).toMatchObject({
       type: 'income',
+      owner: null,
       category: 'salary',
       label: 'July salary',
       amountIls: 18_500,
@@ -57,6 +59,7 @@ describe('round trip', () => {
     // as the last day of the previous one.
     const created = await createFinanceEntry(alice.ctx, {
       type: 'expense',
+      owner: null,
       category: 'rent',
       label: 'Rent',
       amountIls: 6_200,
@@ -73,6 +76,7 @@ describe('round trip', () => {
   it('stores fractional amounts exactly', async () => {
     const created = await createFinanceEntry(alice.ctx, {
       type: 'expense',
+      owner: null,
       category: 'food',
       label: 'Coffee',
       amountIls: 17.35,
@@ -88,6 +92,7 @@ describe('recurring series', () => {
   it('ends at the given month instead of disappearing from history', async () => {
     const salary = await createFinanceEntry(bob.ctx, {
       type: 'income',
+      owner: null,
       category: 'salary',
       label: 'Salary',
       amountIls: 12_000,
@@ -108,6 +113,7 @@ describe('recurring series', () => {
   it("will not end another tenant's series", async () => {
     const salary = await createFinanceEntry(alice.ctx, {
       type: 'income',
+      owner: null,
       category: 'salary',
       label: 'Salary',
       amountIls: 9_000,
@@ -142,6 +148,7 @@ describe('tenant isolation', () => {
 
     const updated = await updateFinanceEntry(crossTenantContext(bob, alice), target.id, {
       type: 'expense',
+      owner: null,
       category: 'other',
       label: 'hijacked',
       amountIls: 1,
@@ -165,5 +172,71 @@ describe('tenant isolation', () => {
     const target = (await listFinanceEntries(alice.ctx))[0]!;
     expect(await deleteFinanceEntry(alice.ctx, target.id)).toBe(true);
     expect((await listFinanceEntries(alice.ctx)).some((e) => e.id === target.id)).toBe(false);
+  });
+});
+
+describe("whose money", () => {
+  /**
+   * One login, two brothers, one budget table. Trading is joint and stays unfiltered; money
+   * is not, and the owner column is what keeps one brother's rent out of the other's month.
+   */
+  it("narrows to one brother, and 'both' holds everything", async () => {
+    const fixture = await createTenantFixture();
+    await createFinanceEntry(fixture.ctx, {
+      type: 'income',
+      owner: 'יוני',
+      category: 'salary',
+      label: 'משכורת יוני',
+      amountIls: 10_000,
+      entryDate: new Date('2026-08-01'),
+      isRecurring: false,
+    });
+    await createFinanceEntry(fixture.ctx, {
+      type: 'expense',
+      owner: 'אביתר',
+      category: 'rent',
+      label: 'שכירות אביתר',
+      amountIls: 4_000,
+      entryDate: new Date('2026-08-02'),
+      isRecurring: false,
+    });
+    await createFinanceEntry(fixture.ctx, {
+      type: 'expense',
+      owner: null,
+      category: 'other',
+      label: 'הוצאה משותפת',
+      amountIls: 300,
+      entryDate: new Date('2026-08-03'),
+      isRecurring: false,
+    });
+
+    const mine = await listFinanceEntries(fixture.ctx, 'יוני');
+    expect(mine.map((entry) => entry.label)).toEqual(['משכורת יוני']);
+
+    const his = await listFinanceEntries(fixture.ctx, 'אביתר');
+    expect(his.map((entry) => entry.label)).toEqual(['שכירות אביתר']);
+
+    // "Both" is the absence of a filter: his, mine, and the row that belongs to the household.
+    const everyone = await listFinanceEntries(fixture.ctx, null);
+    expect(everyone).toHaveLength(3);
+  });
+
+  it('an unowned row appears only in the household view', async () => {
+    // Null is "shared", not "unclaimed": handing it to whichever brother happens to be
+    // selected would make the same shekel count in two private budgets.
+    const fixture = await createTenantFixture();
+    await createFinanceEntry(fixture.ctx, {
+      type: 'expense',
+      owner: null,
+      category: 'other',
+      label: 'ארנונה',
+      amountIls: 900,
+      entryDate: new Date('2026-08-05'),
+      isRecurring: false,
+    });
+
+    expect(await listFinanceEntries(fixture.ctx, 'יוני')).toHaveLength(0);
+    expect(await listFinanceEntries(fixture.ctx, 'אביתר')).toHaveLength(0);
+    expect(await listFinanceEntries(fixture.ctx, null)).toHaveLength(1);
   });
 });

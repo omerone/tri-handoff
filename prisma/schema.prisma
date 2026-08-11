@@ -499,6 +499,14 @@ model FinanceEntry {
   category String      @default("other")
   label    String
 
+  /// Which brother this money belongs to.
+  ///
+  /// The login is shared by two brothers whose trading is genuinely joint — but money is not:
+  /// each has his own income and expenses, and a budget that merges them answers a question
+  /// neither asked. One of the names in `src/lib/household.ts`. Null means the row predates
+  /// the split or was deliberately entered as shared; it shows only under "both".
+  owner String?
+
   /// Personal finance is ILS-native (SPEC §3.1); display conversion happens at render time.
   amountIls Decimal @map("amount_ils") @db.Decimal(14, 2)
 

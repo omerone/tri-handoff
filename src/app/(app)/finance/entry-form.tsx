@@ -33,12 +33,29 @@ export function EntryForm({
   labels,
   categories,
   defaultDate,
+  defaultOwner,
+  owners,
+  ownerLabel,
+  ownerShared,
   window,
 }: {
   labels: EntryFormLabels;
   categories: { income: CategoryOption[]; expense: CategoryOption[] };
   /** Today, formatted on the server so the field does not depend on the client's clock. */
   defaultDate: string;
+  /**
+   * The header switch's position, which is the answer this form assumes.
+   *
+   * When the screen is narrowed to one brother, a row added on it is his without another
+   * click — entering money on "יוני" and having it land under "both" because a second control
+   * defaulted differently is the contradiction this closes. On "both" the select defaults to
+   * shared and the person picks.
+   */
+  defaultOwner: string | null;
+  /** The two names, plus the shared option's label. */
+  owners: readonly string[];
+  ownerLabel: string;
+  ownerShared: string;
   /**
    * What the screen is currently showing, as `yyyy-mm-dd` bounds. Posted with the entry so
    * the action can tell whether the thing just added would land somewhere the user cannot
@@ -81,6 +98,19 @@ export function EntryForm({
         <label className="flex min-w-[9rem] flex-1 flex-col gap-1">
           <span className="text-dim text-[11px] font-semibold">{labels.label}</span>
           <input name="label" required maxLength={120} className={field} />
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-dim text-[11px] font-semibold">{ownerLabel}</span>
+          {/* keyed so moving the header switch re-defaults a form nobody has touched yet */}
+          <select name="owner" key={defaultOwner ?? 'both'} defaultValue={defaultOwner ?? ''} className={field}>
+            {owners.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+            <option value="">{ownerShared}</option>
+          </select>
         </label>
 
         <label className="flex flex-col gap-1">

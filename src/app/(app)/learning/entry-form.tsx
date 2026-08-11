@@ -30,20 +30,24 @@ export function LearningEntryForm({
   labels,
   defaultDate,
   learners,
+  defaultLearner,
 }: {
   labels: LearningFormLabels;
   /** Formatted on the server, so the field does not depend on the client's clock. */
   defaultDate: string;
   /**
-   * Names already used, offered as suggestions.
+   * The two brothers, from `src/lib/household.ts` — a select now, not suggestions.
    *
-   * The account is shared by two people, so this list is two entries long and the point of it
-   * is that the second session is attributed by picking rather than retyping — retyping is
-   * where "Ester" and "ester" come from, and a ledger split across two spellings of one name
-   * answers nothing. `learnerKey` folds them back together when grouping, but not creating
-   * the drift is better than cleaning up after it.
+   * The field began as free text with a datalist, which invited "Ester" beside "ester" and
+   * left `learnerKey` to fold the drift back together. With the household fixed at two named
+   * people there is nothing free text can add except typos, so the input became a choice.
    */
   learners: readonly string[];
+  /**
+   * The header switch's position: studying while the screen is narrowed to one brother
+   * records his session without a second control being touched.
+   */
+  defaultLearner: string | null;
 }) {
   const [state, action] = useActionState<LearningFormState, FormData>(
     createLearningEntryAction,
@@ -91,25 +95,20 @@ export function LearningEntryForm({
         */}
         <label className="flex flex-col gap-1 sm:min-w-[9rem]">
           <span className="text-dim text-[11px] font-semibold">{labels.learner}</span>
-          {/*
-            A text field with suggestions rather than a dropdown: the first session has nobody
-            to choose from, and a dropdown with one option called "add a name…" is a worse
-            version of typing it. `list` gives the second session a one-click answer without
-            making the first one impossible.
-          */}
-          <input
+          {/* keyed so moving the header switch re-defaults a form nobody has touched yet */}
+          <select
             name="learner"
-            maxLength={60}
-            list="tri-learners"
-            autoComplete="off"
-            placeholder={labels.learnerPlaceholder}
+            key={defaultLearner ?? 'both'}
+            defaultValue={defaultLearner ?? ''}
             className={field}
-          />
-          <datalist id="tri-learners">
+          >
             {learners.map((name) => (
-              <option key={name} value={name} />
+              <option key={name} value={name}>
+                {name}
+              </option>
             ))}
-          </datalist>
+            <option value="">{labels.learnerPlaceholder}</option>
+          </select>
         </label>
 
         <label className="col-span-2 flex flex-col gap-1 sm:col-auto sm:min-w-[12rem] sm:flex-1">

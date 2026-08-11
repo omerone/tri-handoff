@@ -9,6 +9,8 @@ export type FinanceEntry = RecurringSource & {
   type: 'income' | 'expense';
   category: string;
   label: string;
+  /** Which brother's money this is; null is a shared row. See `src/lib/household.ts`. */
+  owner: string | null;
   amountIls: number;
 };
 

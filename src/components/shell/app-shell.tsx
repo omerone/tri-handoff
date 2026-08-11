@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import type { Locale } from '@/i18n/config';
 import { resolveTheme, THEME_COOKIE } from '@/lib/theme';
 import { navRoute, stripNav } from '@/lib/nav';
+import { currentBrother } from '@/lib/preferences/brother';
 import { currentRange } from '@/lib/preferences/range';
 import { monthNames, selectableYears } from '@/lib/time/range-options';
 import type { TenantSession } from '@/lib/tenant/context';
@@ -10,6 +11,7 @@ import Link from 'next/link';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { TriMark } from '@/components/brand/logo';
 import { asCurrency } from '@/lib/money/currency';
+import { BrotherSwitch } from './brother-switch';
 import { CurrencyToggle } from './currency-toggle';
 import { ThemeToggle } from './theme-toggle';
 import { MainNav, type NavItem } from './main-nav';
@@ -44,6 +46,7 @@ export async function AppShell({
   // resolved against two different clocks is two different months, and a hydration mismatch.
   const now = new Date();
   const range = await currentRange();
+  const brother = await currentBrother();
 
   return (
     <div className="min-h-screen">
@@ -78,6 +81,16 @@ export async function AppShell({
             dark. Everything you go somewhere to change is behind one door.
           */}
             <div className="flex items-center gap-2">
+              {/* Whose money and whose hours the owned screens show. First in the row: it is
+                  an answer about identity, and the rest of the row is about state. */}
+              <BrotherSwitch
+                current={brother}
+                labels={{
+                  title: t('household.title'),
+                  both: t('household.both'),
+                  shared: t('household.shared'),
+                }}
+              />
               <SyncStatus session={session} lastLoginAt={session.user.lastLoginAt} />
               {/* Beside the theme, because both are "how I want to read this right now"
                   rather than settings — see the note on the component. */}

@@ -18,6 +18,12 @@ export type EntryRowData = {
   type: 'income' | 'expense';
   label: string;
   category: string;
+  /**
+   * Whose money, shown only in the household view — narrowed to one brother every row is his
+   * and a chip on each would be a column of the same word. Null (a shared row) shows nothing:
+   * unattributed is the default state, not a fact worth a badge.
+   */
+  owner: string | null;
   /** Preformatted on the server, so the row does not need the locale or the rate. */
   amount: string;
   date: string;
@@ -50,6 +56,11 @@ export function EntryRow({
             <Num>{entry.date}</Num>
             <span>·</span>
             <span className="truncate">{entry.category}</span>
+            {entry.owner ? (
+              <span className="border-line bg-raised text-text rounded-full border px-1.5 py-px text-[10px] font-semibold">
+                {entry.owner}
+              </span>
+            ) : null}
             {entry.isRecurring ? (
               <span className="text-brand inline-flex items-center gap-1">
                 <Repeat size={10} aria-hidden />

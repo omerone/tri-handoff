@@ -19,6 +19,7 @@ type FinanceRow = {
   type: 'income' | 'expense';
   category: string;
   label: string;
+  owner: string | null;
   amountIls: { toString(): string };
   entryDate: Date;
   isRecurring: boolean;
@@ -31,6 +32,7 @@ function toEntry(row: FinanceRow): FinanceEntry {
     type: row.type,
     category: row.category,
     label: row.label,
+    owner: row.owner,
     amountIls: Number(row.amountIls),
     entryDate: row.entryDate,
     isRecurring: row.isRecurring,
@@ -38,10 +40,25 @@ function toEntry(row: FinanceRow): FinanceEntry {
   };
 }
 
-export async function listFinanceEntries(ctx: TenantContext): Promise<FinanceEntry[]> {
+export async function listFinanceEntries(
+  ctx: TenantContext,
+  /**
+   * One brother's money, or everyone's.
+   *
+   * Undefined and null both mean "both" — null is the switch resting on the household
+   * position, and the distinction the schema keeps (a row *owned by* nobody) matters on
+   * write, not on read: an unowned row belongs in every view of the shared budget, but a
+   * brother's view holds strictly his own.
+   */
+  owner?: string | null,
+): Promise<FinanceEntry[]> {
   assertContext(ctx);
   const rows = await prisma.financeEntry.findMany({
-    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    where: {
+      userId: ctx.userId,
+      user: { tenantId: ctx.tenantId },
+      ...(owner ? { owner } : {}),
+    },
     orderBy: { entryDate: 'asc' },
   });
   return rows.map(toEntry);
@@ -51,6 +68,8 @@ export type FinanceEntryInput = {
   type: 'income' | 'expense';
   category: string;
   label: string;
+  /** Which brother the money belongs to; null is a deliberately shared row. */
+  owner: string | null;
   amountIls: number;
   entryDate: Date;
   isRecurring: boolean;
@@ -68,6 +87,7 @@ export async function createFinanceEntry(
       type: input.type,
       category: input.category,
       label: input.label,
+      owner: input.owner,
       amountIls: input.amountIls,
       entryDate: input.entryDate,
       isRecurring: input.isRecurring,
@@ -91,6 +111,7 @@ export async function updateFinanceEntry(
       type: input.type,
       category: input.category,
       label: input.label,
+      owner: input.owner,
       amountIls: input.amountIls,
       entryDate: input.entryDate,
       isRecurring: input.isRecurring,

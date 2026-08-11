@@ -364,7 +364,9 @@
     "fxUnavailable": "No exchange rate available — total wealth can't be computed right now.",
     "fxStale": "The exchange rate is not from today.",
     "deleteSeriesConfirm": "Delete the whole series? It disappears from every month, including past ones. To stop it from here on without changing history, use \"End series\".",
-    "yearToDateAsOfToday": "Year to date (as of today)"
+    "yearToDateAsOfToday": "Year to date (as of today)",
+    "ownerLabel": "Whose",
+    "ownerShared": "Shared"
   },
   "long": {
     "title": "Long-term positions",
@@ -656,7 +658,7 @@
       "technical": "Technical"
     },
     "learner": "Who studied",
-    "learnerPlaceholder": "Name",
+    "learnerPlaceholder": "No name",
     "byLearner": "Hours per person",
     "unattributed": "No name recorded",
     "everyone": "Everyone",
@@ -753,5 +755,10 @@
     "addEntry": "Add an entry",
     "addTrade": "Add a trade",
     "addPosition": "Add a position"
+  },
+  "household": {
+    "title": "Whose data",
+    "both": "Both",
+    "shared": "Trading is shared — this switch applies to Finance and Learning"
   }
 }

@@ -6,6 +6,8 @@ import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { isAtOrBefore, stepMonth } from '@/lib/finance/bounds';
 import { applyRangeAction } from '@/app/actions/range';
+import { HOUSEHOLD } from '@/lib/household';
+import { currentBrother } from '@/lib/preferences/brother';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { describeRange } from '@/lib/time/range';
 import { listFinanceEntries, listLongPositions, listMt5Accounts } from '@/lib/db';
@@ -57,8 +59,15 @@ export default async function FinancePage({
   const rtl = LOCALE_DIR[locale] === 'rtl';
   const params = await searchParams;
 
+  /*
+   * The header switch decides whose budget this screen is. The trading legs below are NOT
+   * filtered by it — the broker accounts and the long-term book are joint, which is what the
+   * dimmed switch on those screens is saying — so the filter stops here, at the money.
+   */
+  const brother = await currentBrother();
+
   const [entries, accounts, positions] = await Promise.all([
-    listFinanceEntries(session.ctx),
+    listFinanceEntries(session.ctx, brother),
     // Every connected account, not the first one — see the trading leg below.
     listMt5Accounts(session.ctx),
     listLongPositions(session.ctx),
@@ -338,6 +347,10 @@ export default async function FinancePage({
         <div className="border-line border-b pb-3">
           <AddSheet label={tBulk('addEntry')}>
             <EntryForm
+              defaultOwner={brother}
+              owners={HOUSEHOLD}
+              ownerLabel={t('ownerLabel')}
+              ownerShared={t('ownerShared')}
               labels={{
                 label: t('label'),
                 amount: t('amount'),
@@ -398,6 +411,8 @@ export default async function FinancePage({
                       type: occurrence.type,
                       label: occurrence.label,
                       category: categoryLabel(occurrence.category),
+                      // Named only in the household view; see the note on EntryRowData.
+                      owner: brother === null ? occurrence.owner : null,
                       amount: ils(occurrence.amountIls),
                       // Stored as UTC midnight: a calendar date, not an instant.
                       date: formatDayMonthAt(occurrence.occurrenceDate, 'UTC'),

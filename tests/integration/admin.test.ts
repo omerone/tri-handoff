@@ -43,6 +43,7 @@ beforeAll(async () => {
 
   await createFinanceEntry(healthy.ctx, {
     type: 'income',
+    owner: null,
     category: 'salary',
     label: 'Salary',
     amountIls: 18_500,
@@ -214,6 +215,7 @@ describe('deleting a tenant', () => {
     const doomed = await createTenantFixture();
     await createFinanceEntry(doomed.ctx, {
       type: 'expense',
+      owner: null,
       category: 'rent',
       label: 'Rent',
       amountIls: 6_200,

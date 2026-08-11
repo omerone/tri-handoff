@@ -27,6 +27,7 @@ function entry(overrides: Partial<FinanceEntry> = {}): FinanceEntry {
     type: 'expense',
     category: 'other',
     label: `entry ${counter}`,
+    owner: null,
     amountIls: 100,
     entryDate: day(2026, 1, 15),
     isRecurring: false,
