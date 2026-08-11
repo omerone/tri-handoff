@@ -138,9 +138,43 @@ test.describe('the picker', () => {
   });
 });
 
+test.describe('where a screen opens', () => {
+  /**
+   * The current month, on every screen, with no cookie and no parameter.
+   *
+   * It was "maximum" — the whole book — which is defensible for an empty account and stops
+   * being so the moment one fills up: a journal opened on everything answers "how am I doing?"
+   * with a lifetime average, the one figure that barely moves. Owned here, in one place, so
+   * the rest of the suite can ask for the span it needs instead of assuming this one.
+   */
+  test('is the current month, until something says otherwise', async ({ page }) => {
+    // The range cookie only — clearing them all takes the session with it and the next
+    // navigation lands on the login screen, where there is no picker to read.
+    await page.context().clearCookies({ name: 'tri_range' });
+
+    for (const path of ['/trades', '/dashboard', '/finance', '/learning']) {
+      await page.goto(path);
+      await expect(picker(page), `${path} did not open on the month`).toHaveText(
+        /this month|החודש/i,
+      );
+    }
+  });
+
+  test('still yields to a link that names a range', async ({ page }) => {
+    // The range cookie only — clearing them all takes the session with it and the next
+    // navigation lands on the login screen, where there is no picker to read.
+    await page.context().clearCookies({ name: 'tri_range' });
+    await page.goto('/trades?range=max');
+    await expect(picker(page)).toHaveText(/maximum|מקסימום/i);
+  });
+});
+
 test.describe('what the range does to a screen', () => {
   test('narrows the trades table and its summary', async ({ page }) => {
-    await page.goto('/trades');
+    // From everything, because the claim is that a preset *narrows*: the screens default to
+    // the current month, and the seeded book ends before it, so a bare `/trades` would start
+    // this comparison at zero and "less than" would be vacuously true.
+    await page.goto('/trades?range=max');
     const all = Number((await page.locator('main').innerText()).match(/(\d+) trades/)![1]);
 
     await choose(page, 'Last month');

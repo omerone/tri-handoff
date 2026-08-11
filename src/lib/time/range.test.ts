@@ -96,15 +96,30 @@ describe('reading a stored or hand-edited range', () => {
 });
 
 describe('resolving against a moment', () => {
-  it('leaves `max` unbounded — the default filters nothing', () => {
-    const resolved = resolveRange(DEFAULT_RANGE, NOW);
-    expect(DEFAULT_RANGE).toEqual({ kind: 'max' });
+  it('leaves `max` unbounded — the one range that filters nothing', () => {
+    const resolved = resolveRange({ kind: 'max' }, NOW);
     expect(resolved.bounded).toBe(false);
     expect(resolved.from).toBeNull();
     expect(resolved.to).toBeNull();
     expect(resolved.months).toBeNull();
     expect(resolved.days).toBeNull();
     expect(toTradeFilter(resolved)).toEqual({});
+  });
+
+  /*
+   * The default is the current month, not everything.
+   *
+   * A journal opened on "everything" answers "how am I doing?" with a lifetime average — the
+   * one figure that barely moves, and so the one that says least. Pinned as a fact rather
+   * than left to whatever `DEFAULT_RANGE` happens to hold, because every screen reads its
+   * window from that constant and a change to it moves all of them at once.
+   */
+  it('defaults to the month in progress, bounded to it', () => {
+    expect(DEFAULT_RANGE).toEqual({ kind: 'thisMonth' });
+    const resolved = resolveRange(DEFAULT_RANGE, NOW);
+    expect(resolved.bounded).toBe(true);
+    expect(resolved.from).not.toBeNull();
+    expect(resolved.to).not.toBeNull();
   });
 
   it('reads `thisMonth` off the analytics clock, not the host clock', () => {

@@ -46,7 +46,15 @@ function monthBefore(label: string): string {
 
 test.describe('dashboard', () => {
   test('shows the KPI row, the R-strip and the equity curve', async ({ page }) => {
-    await page.goto('/dashboard');
+    /*
+     * The whole book, not the default window.
+     *
+     * The screens open on the current month now, and the seeded book ends before it — so a bare
+     * `/trades` is an honest empty month rather than the fixture these assertions describe. This
+     * is a test about the book, so it asks for the book; the default itself is owned by
+     * range.spec, where it can be asserted once instead of assumed everywhere.
+     */
+    await page.goto('/dashboard?range=max');
 
     // Scoped to each tile rather than searched page-wide: the strip's hover cards reuse
     // these same labels, so a bare `getByText('Net P&L')` now matches nineteen elements.
@@ -215,7 +223,10 @@ test.describe('dashboard', () => {
     // flat string — reordered its own parts inside the Hebrew layout.
     test.skip((page.viewportSize()?.width ?? 0) < 768, 'the strip is a list on a phone');
 
-    await page.goto('/dashboard');
+    // Thirty columns is the strip's own window, which a chosen range replaces with itself —
+    // the default month would make this 31 in August and 28 in February. `max` is the one
+    // position that leaves the strip its own span, so the count is a fact rather than a date.
+    await page.goto('/dashboard?range=max');
     const strip = page.locator('[data-widget="rStrip"]');
     const columns = strip.locator('[role="tooltip"]');
     await expect(columns).toHaveCount(30);
@@ -285,11 +296,13 @@ test.describe('dashboard', () => {
 
 test.describe('cross-screen consistency', () => {
   test('the trade count agrees between the dashboard and the trades table', async ({ page }) => {
-    await page.goto('/dashboard');
+    // Both on the same window — the point is that two screens agree, and they can only be
+    // compared over a span that holds the seeded book.
+    await page.goto('/dashboard?range=max');
     const dashboardText = (await page.locator('main').innerText()).match(/(\d+) trades/);
     expect(dashboardText).not.toBeNull();
 
-    await page.goto('/trades');
+    await page.goto('/trades?range=max');
     const tableText = (await page.locator('main').innerText()).match(/(\d+) trades/);
     expect(tableText).not.toBeNull();
     expect(tableText![1]).toBe(dashboardText![1]);
@@ -315,7 +328,7 @@ async function column(page: Page, heading: string): Promise<string[]> {
 
 test.describe('trades table', () => {
   test('filters through the URL and keeps the selection', async ({ page }) => {
-    await page.goto('/trades?class=crypto&dir=short');
+    await page.goto('/trades?range=max&class=crypto&dir=short');
 
     // Every visible row matches the filter.
     const sides = await column(page, 'Side');
@@ -327,10 +340,10 @@ test.describe('trades table', () => {
   });
 
   test('narrowing the filter narrows the summary', async ({ page }) => {
-    await page.goto('/trades');
+    await page.goto('/trades?range=max');
     const all = (await page.locator('main').innerText()).match(/(\d+) trades/)![1];
 
-    await page.goto('/trades?class=crypto');
+    await page.goto('/trades?range=max&class=crypto');
     const crypto = (await page.locator('main').innerText()).match(/(\d+) trades/)![1];
 
     expect(Number(crypto)).toBeGreaterThan(0);

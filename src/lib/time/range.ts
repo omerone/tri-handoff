@@ -38,13 +38,20 @@ export type TimeRange =
   | { kind: 'dates'; from: DateParts; to: DateParts };
 
 /**
- * Everything, and the default.
+ * The current month, and the default.
  *
- * A new user has no reason to be looking at a window, and every screen behaved this way before
- * the picker existed — so an absent cookie and an absent parameter land exactly where the
- * product already was.
+ * It was `max` — everything — on the reasoning that a new user has no reason to be looking at
+ * a window and that this was where the product already sat before the picker existed. That is
+ * an argument about an empty account, and it stops holding the moment the account fills up:
+ * a trading journal opened on "everything" answers "how am I doing?" with a lifetime average,
+ * which is the one figure that barely moves and so the one that says least. The month is the
+ * unit the trader actually works in — a P&L, a set of costs, a study ledger, all bounded by
+ * the period they are being judged over.
+ *
+ * Every screen still reads it from one place, so `max` remains one press away and a link
+ * carrying `?range=max` still overrides this exactly as it always did.
  */
-export const DEFAULT_RANGE: TimeRange = { kind: 'max' };
+export const DEFAULT_RANGE: TimeRange = { kind: 'thisMonth' };
 
 /** The query-string parameter and the cookie both use this spelling. */
 export const RANGE_PARAM = 'range';

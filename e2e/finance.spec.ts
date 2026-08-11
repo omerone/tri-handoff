@@ -69,10 +69,12 @@ async function addEntry(
 
 test.describe('the finance screen', () => {
   test('shows the month, the four tiles and the entry form', async ({ page }) => {
-    await page.goto('/finance');
+    // "All-time net" is what the third tile is called when the window is unbounded — it is
+    // labelled by whatever period it is reporting, and the screens open on the current month
+    // now. Asked for explicitly so this stays a test about the four tiles rather than about
+    // which of them happens to be on screen this month.
+    await page.goto('/finance?range=max');
 
-    // "All-time net", not "Monthly net": the default view is unbounded and spans every entry
-    // ever recorded, so the third tile is only labelled by a period when a range is set.
     for (const label of ['Income', 'Expenses', 'All-time net', 'Total wealth']) {
       await expect(tile(page, label)).toBeVisible();
     }
