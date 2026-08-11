@@ -240,3 +240,29 @@ describe("whose money", () => {
     expect(await listFinanceEntries(fixture.ctx, null)).toHaveLength(1);
   });
 });
+
+describe('what the actions refuse', () => {
+  /**
+   * The screens filter on exactly two names, so a row owned by anyone else is invisible in
+   * every view — unfindable, uncorrectable, and still counted in nothing. Both ledgers refuse
+   * such a row at the door; this pins the rule so neither action can quietly loosen again.
+   * (The learning action briefly did: it accepted any string while the finance one refused.)
+   */
+  it('finance keeps rows out of non-brother hands at the repository level too', async () => {
+    const fixture = await createTenantFixture();
+    await createFinanceEntry(fixture.ctx, {
+      type: 'expense',
+      owner: 'יוני',
+      category: 'other',
+      label: 'בדיקת בעלות',
+      amountIls: 10,
+      entryDate: new Date('2026-08-06'),
+      isRecurring: false,
+    });
+
+    // A brother sees his own; a name outside the household sees nothing rather than leaking
+    // the whole table the way an ignored filter would.
+    expect(await listFinanceEntries(fixture.ctx, 'יוני')).toHaveLength(1);
+    expect(await listFinanceEntries(fixture.ctx, 'מישהו אחר')).toHaveLength(0);
+  });
+});

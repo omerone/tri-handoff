@@ -365,8 +365,7 @@
     "fxStale": "The exchange rate is not from today.",
     "deleteSeriesConfirm": "Delete the whole series? It disappears from every month, including past ones. To stop it from here on without changing history, use \"End series\".",
     "yearToDateAsOfToday": "Year to date (as of today)",
-    "ownerLabel": "Whose",
-    "ownerShared": "Shared"
+    "ownerLabel": "Whose"
   },
   "long": {
     "title": "Long-term positions",
@@ -657,12 +656,7 @@
       "psychology": "Psychology",
       "technical": "Technical"
     },
-    "learner": "Who studied",
-    "learnerPlaceholder": "No name",
-    "byLearner": "Hours per person",
-    "unattributed": "No name recorded",
-    "everyone": "Everyone",
-    "whoseHours": "Whose hours"
+    "learner": "Who studied"
   },
   "review": {
     "tpTiming": "Exit timing",
@@ -758,7 +752,6 @@
   },
   "household": {
     "title": "Whose data",
-    "both": "Both",
     "shared": "Trading is shared — this switch applies to Finance and Learning"
   }
 }

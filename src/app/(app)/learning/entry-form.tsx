@@ -9,8 +9,6 @@ import { createLearningEntryAction, type LearningFormState } from './actions';
 export type LearningFormLabels = {
   /** "Who studied" — the field label. */
   learner: string;
-  /** Shown in the empty field, and the reason this ledger is worth splitting at all. */
-  learnerPlaceholder: string;
   what: string;
   whatPlaceholder: string;
   hours: string;

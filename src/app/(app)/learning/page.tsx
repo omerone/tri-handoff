@@ -65,10 +65,9 @@ export default async function LearningPage({
    * shows the other — so the tabs went, and the one switch in the header is the answer
    * everywhere it applies.
    *
-   * Filtered here rather than in SQL: the window is already loaded for the comparison card,
-   * so a second query would fetch a subset of rows this request is holding anyway. Matching
-   * runs through `learnerKey`, which folds case and spacing — entries written before the
-   * switch existed still land on the right brother.
+   * Filtered in memory rather than in SQL: the whole window is one query either way, and the
+   * matching runs through `learnerKey`, which folds case and spacing — entries written before
+   * the switch existed still land on the right brother.
    */
   const who = await currentBrother();
   const entries =
@@ -77,9 +76,7 @@ export default async function LearningPage({
       : everyone.filter((entry) => learnerKey(entry.learner) === learnerKey(who));
 
   const totals = learningTotals(entries);
-  // The comparison is over the whole window whichever person is selected — it is the thing the
-  // selection is made *from*, and recomputing it from the filtered set would leave one row.
-  const comparison = learningTotals(everyone);
+
 
   const hours = (value: number) => `${formatNumber(value, locale, hoursDecimals(value))}h`;
   const percent = (value: number) => `${formatNumber(value * 100, locale, 0)}%`;
@@ -128,36 +125,6 @@ export default async function LearningPage({
         once somebody has been named — before that it would be a panel with one row reading
         "unattributed", which is a worse way of saying nothing.
       */}
-      {who === null && comparison.byLearner.some((row) => row.learner !== null) ? (
-        <Card title={t('byLearner')}>
-          <ul className="divide-line divide-y">
-            {comparison.byLearner.map((row) => (
-              <li
-                key={row.learner ?? 'unattributed'}
-                className="flex items-baseline justify-between gap-3 py-2.5"
-              >
-                <div className="min-w-0">
-                  <div className="text-text text-sm font-semibold">
-                    {row.learner ?? t('unattributed')}
-                  </div>
-                  <div className="text-dim mt-0.5 text-[11px]">
-                    {row.byTopic
-                      .filter((slot) => slot.hours > 0)
-                      .map((slot) => `${t(`topics.${slot.topic}`)} ${hours(slot.hours)}`)
-                      .join(' · ')}
-                  </div>
-                </div>
-                <div className="shrink-0 text-end">
-                  <div className="tri-num text-text text-sm font-bold">{hours(row.hours)}</div>
-                  <div className="text-dim text-[11px]">
-                    {t('sessions', { count: row.sessions })}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
 
       <Card title={`${t('title')} · ${t('subtitle')}`}>
         <div className="border-line border-b pb-3">
@@ -167,7 +134,6 @@ export default async function LearningPage({
               learner={who}
               labels={{
                 learner: t('learner'),
-                learnerPlaceholder: t('learnerPlaceholder'),
                 what: t('what'),
                 whatPlaceholder: t('whatPlaceholder'),
                 hours: t('hours'),

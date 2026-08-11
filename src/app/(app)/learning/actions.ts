@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { requireSession } from '@/lib/auth/session';
 import { createLearningEntry, deleteLearningEntry } from '@/lib/db';
 import { isPlausibleDate } from '@/lib/finance/bounds';
-import { normalizeLearner } from '@/lib/learning/types';
+import { isBrother } from '@/lib/household';
 
 export type LearningFormState = { error?: string; ok?: boolean };
 
@@ -20,18 +20,13 @@ const MAX_HOURS = 24;
 const entrySchema = z.object({
   topic: z.enum(['psychology', 'technical']),
   /**
-   * Who studied. Optional, because a session recorded without a name is still a session and
-   * refusing it would cost the entry to save the attribution.
-   *
-   * Normalised on the way in — trimmed, inner runs of space collapsed — so "Ester " and
-   * "Ester" are one person in the ledger. Comparison is case-insensitive at the grouping
-   * step; the stored spelling stays as typed, because it is somebody's name.
+   * Who studied. Always one of the two brothers, refused otherwise — the same rule the
+   * finance action applies, and it was briefly looser here: this field accepted any string
+   * while the screens filter on exactly two names, so a crafted POST — or a stale form cached
+   * from the build that still had a free-text field — wrote a session that no view would ever
+   * show again. A row that cannot be seen cannot be corrected, which is worse than an error.
    */
-  learner: z
-    .string()
-    .max(60)
-    .optional()
-    .transform((value) => normalizeLearner(value)),
+  learner: z.string().refine(isBrother),
   title: z.string().trim().min(1).max(120),
   note: z.string().trim().max(2_000),
   // The field is text so a comma decimal typed on a Hebrew keyboard still parses.
