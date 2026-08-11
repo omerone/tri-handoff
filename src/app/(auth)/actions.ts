@@ -36,7 +36,8 @@ import {
 import type { Locale } from '@/i18n/config';
 import type { Theme } from '@/lib/theme';
 import { sendPasswordResetEmail } from '@/lib/mail/password-reset';
-import { setLocaleCookie, setThemeCookie } from '@/lib/preferences/cookies';
+import { setDisplayStyleCookie, setLocaleCookie, setThemeCookie } from '@/lib/preferences/cookies';
+import type { DisplayStyle } from '@/lib/display-style';
 import { SecurityLogger } from '@/lib/security/logger';
 import { resolveTenant } from '@/lib/tenant/resolve';
 
@@ -200,6 +201,7 @@ async function completeSignIn(user: {
   tenantId: string;
   locale: Locale;
   theme: Theme;
+  displayStyle: DisplayStyle;
 }): Promise<never> {
   await startSession(user.id);
   await SecurityLogger.logAuthEvent({
@@ -231,9 +233,12 @@ async function completeSignIn(user: {
   });
 
   // Bring the cookie copies back in line with the account being signed in to. Without this a
-  // fresh browser paints the default theme and language until something happens to write them.
+  // fresh browser paints the default theme, language and look until something writes them —
+  // and for the style that "something" was only the settings screen, so the login page could
+  // disagree with the product indefinitely.
   await setThemeCookie(user.theme);
   await setLocaleCookie(user.locale);
+  await setDisplayStyleCookie(user.displayStyle);
 
   // Outside the guarded section: redirect() signals by throwing.
   redirect('/dashboard');

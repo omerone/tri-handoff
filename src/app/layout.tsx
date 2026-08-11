@@ -8,6 +8,8 @@ import { resolveLocale } from '@/i18n/request';
 import { resolveTheme, THEME_COOKIE } from '@/lib/theme';
 import { DISPLAY_STYLE_COOKIE, resolveDisplayStyle } from '@/lib/display-style';
 import { getSession } from '@/lib/auth/session';
+import { resolveTenant } from '@/lib/tenant/resolve';
+import { tenantAppearance } from '@/lib/db/users';
 import { InfoLayer } from '@/components/ui/info-layer';
 import { TooltipLayer } from '@/components/ui/tooltip';
 import './globals.css';
@@ -67,13 +69,39 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // only way Settings and the painted page cannot disagree.
   const session = await getSession();
   const jar = await cookies();
-  const theme = resolveTheme(session?.user.theme, jar.get(THEME_COOKIE)?.value);
+
+  /*
+   * Who the screen is being painted for, when nobody is signed in.
+   *
+   * A domain has exactly one trader, so the login page's look has a well-defined answer even
+   * before authentication — and without this, it did not match the product behind it: an
+   * account set to the amber "instrument" look signed in through a blue "depth" screen on
+   * every fresh device, because only sign-in itself writes the cookies.
+   *
+   * The row is the *fallback*, not the override: a cookie that is present is either the last
+   * sign-in's preference or a choice the visitor just made with the toggle on this very
+   * screen, and a login page that refuses its own theme switch is broken in a more visible
+   * way than one that opens on the wrong blue. smoke.spec pins that contract.
+   */
+  const appearance =
+    session === null
+      ? await (async () => {
+          const lookup = await resolveTenant();
+          return lookup.state === 'unknown' ? null : await tenantAppearance(lookup.tenant.id);
+        })()
+      : null;
+
+  // Signed in: the account wins, cookie fills gaps. Signed out: the cookie wins — both
+  // resolver arguments pass the same validation, so the swap below is the precedence and
+  // nothing else — and the tenant's one trader fills the gap a fresh browser leaves.
+  const theme = session
+    ? resolveTheme(session.user.theme, jar.get(THEME_COOKIE)?.value)
+    : resolveTheme(jar.get(THEME_COOKIE)?.value, appearance?.theme);
   // The second half of the same question, on its own axis: theme is light-or-dark, style is
   // which of the three looks. Both are painted here so neither can flash on first render.
-  const style = resolveDisplayStyle(
-    session?.user.displayStyle,
-    jar.get(DISPLAY_STYLE_COOKIE)?.value,
-  );
+  const style = session
+    ? resolveDisplayStyle(session.user.displayStyle, jar.get(DISPLAY_STYLE_COOKIE)?.value)
+    : resolveDisplayStyle(jar.get(DISPLAY_STYLE_COOKIE)?.value, appearance?.displayStyle);
 
   return (
     <html lang={locale} dir={LOCALE_DIR[locale]} data-theme={theme} data-style={style}>

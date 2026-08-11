@@ -1,4 +1,5 @@
 import 'server-only';
+import type { DisplayStyle, Theme } from '@prisma/client';
 import { cache } from 'react';
 import { Prisma } from '@prisma/client';
 import type { Locale } from '@/i18n/config';
@@ -13,10 +14,21 @@ import { prisma } from './prisma';
 export async function findUserForLogin(tenantId: string, email: string) {
   return prisma.user.findUnique({
     where: { tenantId_email: { tenantId, email: email.trim().toLowerCase() } },
-    // `locale` and `theme` ride along so sign-in can refresh their cookie copies: a browser
-    // that has never seen this account carries no cookies, and the first paint after login
-    // would otherwise be the default theme rather than the user's.
-    select: { id: true, tenantId: true, email: true, passwordHash: true, locale: true, theme: true },
+    // `locale`, `theme` and `displayStyle` ride along so sign-in can refresh their cookie
+    // copies: a browser that has never seen this account carries no cookies, and the first
+    // paint after login would otherwise be the defaults rather than the user's. The style was
+    // missing from this list, and the miss was visible: an account set to the amber
+    // "instrument" look signed in through a blue "depth" login screen on every device,
+    // forever, because nothing ever taught the browser otherwise.
+    select: {
+      id: true,
+      tenantId: true,
+      email: true,
+      passwordHash: true,
+      locale: true,
+      theme: true,
+      displayStyle: true,
+    },
   });
 }
 
@@ -32,7 +44,7 @@ export async function findUserForLogin(tenantId: string, email: string) {
 export async function findUserById(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, tenantId: true, email: true, locale: true, theme: true },
+    select: { id: true, tenantId: true, email: true, locale: true, theme: true, displayStyle: true },
   });
 }
 
@@ -169,4 +181,23 @@ export async function touchLastLogin(ctx: TenantContext): Promise<void> {
     where: { id: ctx.userId, tenantId: ctx.tenantId },
     data: { lastLoginAt: new Date() },
   });
+}
+
+/**
+ * How the domain's one trader likes the product to look, for painting screens that render
+ * before anyone is signed in.
+ *
+ * Legitimate precisely because of the product's shape: a tenant has exactly one user, so
+ * "the login page's style" has a well-defined answer here in a way it would not in any
+ * multi-user product. Appearance only — no id, no email — because the caller is unauthenticated
+ * by definition, and this function's select is the whole of what it can learn.
+ */
+export async function tenantAppearance(
+  tenantId: string,
+): Promise<{ theme: Theme; displayStyle: DisplayStyle } | null> {
+  const row = await prisma.user.findUnique({
+    where: { tenantId },
+    select: { theme: true, displayStyle: true },
+  });
+  return row;
 }
