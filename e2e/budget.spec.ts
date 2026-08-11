@@ -56,7 +56,7 @@ function tile(page: Page, category: string) {
  * hydration, so a click that lands too early is swallowed silently. Clicking until the field
  * is actually visible is the only evidence the handler was attached.
  */
-async function setCeiling(page: Page, category: string, amount: number) {
+async function setCeiling(page: Page, category: string, amount: number, currency = 'ILS') {
   const form = page.locator('form:has(input[list="budget-categories"])');
   const field = form.locator('input[name="category"]');
   const opener = page.getByRole('button', { name: 'Set a budget' }).first();
@@ -70,6 +70,8 @@ async function setCeiling(page: Page, category: string, amount: number) {
 
   await field.fill(category);
   await form.locator('input[name="amount"]').fill(String(amount));
+  // Stated rather than left to the default, which follows whatever the header is reading in.
+  await form.locator('select[name="currency"]').selectOption(currency);
   await form.getByRole('button', { name: 'Set', exact: true }).click();
 }
 
@@ -140,6 +142,31 @@ test.describe('a budget ceiling', () => {
     await expect(tile(page, CATEGORY)).toContainText('left of ₪800');
     await expect(tile(page, CATEGORY)).toContainText('₪300');
     await expect(tile(page, CATEGORY)).toContainText('₪500 used');
+  });
+
+  test('is kept in the currency it was written in, whatever the screen is reading', async ({
+    page,
+  }) => {
+    /*
+     * The bug this closes: 2,000 entered as shekels on a screen set to dollars came back as
+     * $667. The figure was right and the unit was never asked for, so the ceiling a person
+     * typed and the ceiling they were shown were different numbers.
+     *
+     * Now the currency travels with the budget. Everything else on this screen stays in
+     * shekels while this one tile is in dollars, which is what proves the header is not the
+     * thing deciding it.
+     */
+    const CATEGORY = category('usd');
+    await page.goto('/finance');
+
+    await setCeiling(page, CATEGORY, 500, 'USD');
+    await expect(tile(page, CATEGORY)).toContainText('left of $500');
+
+    // Spent in shekels, as the ledger always is, and converted up to meet the ceiling.
+    await spend(page, `${PREFIX} groceries`, CATEGORY, 900);
+    await expect(tile(page, CATEGORY)).not.toContainText('₪');
+    // Around three shekels to the dollar, and the rate moves: assert the shape, not the cents.
+    await expect(tile(page, CATEGORY)).toContainText(/\$(29\d|30\d) used/);
   });
 
   test('says a monthly figure means nothing against an unbounded window', async ({ page }) => {

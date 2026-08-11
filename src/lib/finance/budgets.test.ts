@@ -3,16 +3,23 @@ import { budgetUse, monthsCovered } from './budgets';
 
 const spent = (category: string, total: number) => ({ category, total, count: 1 });
 
+/** A shekel budget: no conversion, so the arithmetic is the ledger's own numbers. */
+const shekels = (category: string, amount: number) => ({ category, amount, currency: 'ILS' });
+
+/** Rates into each currency, from one shekel. Roughly today's, rounded for readability. */
+const RATES: Record<string, number> = { ILS: 1, USD: 1 / 3, EUR: 1 / 4 };
+const rate = (currency: string) => RATES[currency] ?? null;
+
 describe('budget use', () => {
   it('reports what is left while inside the ceiling', () => {
     // The example the feature was asked for: 2,000 set, 200 spent, 1,800 left.
-    const [use] = budgetUse([{ category: 'spending', amountIls: 2000 }], [spent('spending', 200)], 1);
+    const [use] = budgetUse([shekels('spending', 2000)], [spent('spending', 200)], 1, rate);
     expect(use).toMatchObject({ budget: 2000, spent: 200, remaining: 1800, over: 0 });
     expect(use!.ratio).toBeCloseTo(0.1);
   });
 
   it('reports the overrun once the ceiling is passed', () => {
-    const [use] = budgetUse([{ category: 'spending', amountIls: 2000 }], [spent('spending', 2350)], 1);
+    const [use] = budgetUse([shekels('spending', 2000)], [spent('spending', 2350)], 1, rate);
     // Never a negative "remaining": the two facts are separate, and one of them is zero.
     expect(use).toMatchObject({ remaining: 0, over: 350 });
     expect(use!.ratio).toBeCloseTo(1.175);
@@ -21,12 +28,12 @@ describe('budget use', () => {
   it('keeps a budget nothing has been spent against', () => {
     // An untouched allowance is the good case; hiding it would make the card change shape the
     // moment the first expense of the month is entered.
-    const [use] = budgetUse([{ category: 'food', amountIls: 800 }], [], 1);
+    const [use] = budgetUse([shekels('food', 800)], [], 1, rate);
     expect(use).toMatchObject({ spent: 0, remaining: 800, over: 0 });
   });
 
   it('does not invent a gauge for spending with no budget', () => {
-    expect(budgetUse([], [spent('food', 500)], 1)).toHaveLength(0);
+    expect(budgetUse([], [spent('food', 500)], 1, rate)).toHaveLength(0);
   });
 
   /*
@@ -37,26 +44,84 @@ describe('budget use', () => {
    * quarter — so the ceiling is scaled, not the spending.
    */
   it('scales the ceiling to the months on screen', () => {
-    const [use] = budgetUse([{ category: 'food', amountIls: 800 }], [spent('food', 2000)], 3);
+    const [use] = budgetUse([shekels('food', 800)], [spent('food', 2000)], 3, rate);
     expect(use).toMatchObject({ budget: 2400, spent: 2000, remaining: 400, over: 0 });
   });
 
   it('puts whatever is closest to its limit first', () => {
     const use = budgetUse(
-      [
-        { category: 'calm', amountIls: 1000 },
-        { category: 'tight', amountIls: 1000 },
-      ],
+      [shekels('calm', 1000), shekels('tight', 1000)],
       [spent('calm', 100), spent('tight', 1200)],
       1,
+      rate,
     );
     expect(use.map((one) => one.category)).toEqual(['tight', 'calm']);
   });
 
   it('does not divide by a ceiling of zero', () => {
-    const [use] = budgetUse([{ category: 'food', amountIls: 0 }], [spent('food', 50)], 1);
+    const [use] = budgetUse([shekels('food', 0)], [spent('food', 50)], 1, rate);
     expect(use!.ratio).toBe(0);
     expect(Number.isFinite(use!.ratio)).toBe(true);
+  });
+});
+
+describe('a budget kept in another currency', () => {
+  it('brings the shekel spending up to the ceiling rather than the other way round', () => {
+    // $500 a month, ₪900 spent. At three shekels to the dollar that is $300 of it — so $200
+    // is left, and every figure on the tile is in dollars because the ceiling is.
+    const [use] = budgetUse(
+      [{ category: 'food', amount: 500, currency: 'USD' }],
+      [spent('food', 900)],
+      1,
+      rate,
+    );
+    expect(use).toMatchObject({ budget: 500, spent: 300, remaining: 200, over: 0 });
+    expect(use!.currency).toBe('USD');
+  });
+
+  it('reports the overrun in the ceiling’s currency too', () => {
+    const [use] = budgetUse(
+      [{ category: 'food', amount: 100, currency: 'USD' }],
+      [spent('food', 900)],
+      1,
+      rate,
+    );
+    expect(use).toMatchObject({ spent: 300, remaining: 0, over: 200 });
+  });
+
+  it('leaves the shekel budgets beside it untouched', () => {
+    // The rate applies to the budget that asked for it, not to the screen.
+    const use = budgetUse(
+      [
+        { category: 'food', amount: 300, currency: 'USD' },
+        shekels('fuel', 300),
+      ],
+      [spent('food', 300), spent('fuel', 300)],
+      1,
+      rate,
+    );
+    expect(use.find((one) => one.category === 'food')!.spent).toBe(100);
+    expect(use.find((one) => one.category === 'fuel')!.spent).toBe(300);
+  });
+
+  /*
+   * The one that matters most, and the reason the rate is allowed to say no.
+   *
+   * Measuring a dollar ceiling against unconverted shekels reports a threefold overrun on a
+   * month that never happened, and it looks exactly like a real one. Dropping the budget is
+   * recoverable — the screen says which ones went and why. A confident wrong dial is not.
+   */
+  it('is dropped, not measured at par, when there is no rate for it', () => {
+    const use = budgetUse(
+      [
+        { category: 'food', amount: 500, currency: 'GBP' },
+        shekels('fuel', 300),
+      ],
+      [spent('food', 900), spent('fuel', 100)],
+      1,
+      rate,
+    );
+    expect(use.map((one) => one.category)).toEqual(['fuel']);
   });
 });
 

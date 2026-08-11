@@ -25,7 +25,13 @@ import {
 } from '@/lib/finance/balance';
 import { isKnownCategory, suggestedCategories } from '@/lib/finance/categories';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
-import { formatMoney, formatNumber } from '@/lib/money/currency';
+import {
+  CURRENCY_SYMBOL,
+  SUPPORTED_CURRENCIES,
+  formatMoney,
+  formatNumber,
+  symbolFor,
+} from '@/lib/money/currency';
 import { displayMoney } from '@/lib/money/display';
 import { getFxRate, hasRate } from '@/lib/money/fx';
 import { wallClock } from '@/lib/time/zone';
@@ -279,7 +285,38 @@ export default async function FinancePage({
    * honest number to put on a dial that means "all time versus one month".
    */
   const monthsOnScreen = monthsCovered(range.months);
-  const gauges = monthsOnScreen === null ? [] : budgetUse(budgets, byCategory, monthsOnScreen);
+
+  /*
+   * Each dial is read in the currency its ceiling was written in, not in the header's.
+   *
+   * So the shekel spending has to come the other way — into the budget's currency — and that
+   * needs one rate per currency in use. A missing rate drops that budget rather than measuring
+   * it at 1:1: a dollar ceiling against unconverted shekels reports a threefold overrun on a
+   * month that never happened, and it is indistinguishable from a real one. What was dropped
+   * is named below the grid instead.
+   */
+  const budgetCurrencies = [...new Set(budgets.map((one) => one.currency))];
+  const budgetRates = new Map(
+    await Promise.all(
+      budgetCurrencies.map(
+        async (currency) =>
+          [currency, await getFxRate('ILS', currency)] as const,
+      ),
+    ),
+  );
+  const rateInto = (currency: string) => {
+    const fx = budgetRates.get(currency);
+    return fx && hasRate(fx) ? fx.rate : null;
+  };
+
+  const gauges =
+    monthsOnScreen === null ? [] : budgetUse(budgets, byCategory, monthsOnScreen, rateInto);
+  const unmeasured =
+    monthsOnScreen === null ? [] : budgets.filter((one) => rateInto(one.currency) === null);
+
+  /** A figure in whatever currency its own budget is kept in. */
+  const inBudget = (value: number, currency: string) =>
+    formatMoney(value, currency, locale, { decimals: 0 });
   const suggestions = (type: 'income' | 'expense') =>
     suggestedCategories(type).map((value) => ({ value, label: t(`categories.${value}`) }));
 
@@ -475,21 +512,26 @@ export default async function FinancePage({
                          and this is what is left; past it, and this is by how much. */
                       value={
                         gauge.over > 0
-                          ? `+${ils(gauge.over)}`
-                          : ils(gauge.remaining)
+                          ? `+${inBudget(gauge.over, gauge.currency)}`
+                          : inBudget(gauge.remaining, gauge.currency)
                       }
                       caption={
                         gauge.over > 0
                           ? t('budgetOver')
-                          : t('budgetLeftOf', { budget: ils(gauge.budget) })
+                          : t('budgetLeftOf', {
+                              budget: inBudget(gauge.budget, gauge.currency),
+                            })
                       }
                     />
                     <BudgetControls
                       id={budget.id}
                       /* The monthly figure, not the window-scaled one on the dial above it. */
-                      monthlyAmount={budget.amountIls}
+                      monthlyAmount={budget.amount}
                       labels={{
-                        spent: t('budgetSpent', { spent: ils(gauge.spent) }),
+                        spent: t('budgetSpent', {
+                          spent: inBudget(gauge.spent, gauge.currency),
+                        }),
+                        symbol: symbolFor(gauge.currency),
                         edit: t('budgetEditOf', { category: categoryLabel(gauge.category) }),
                         remove: t('budgetRemoveOf', { category: categoryLabel(gauge.category) }),
                         save: t('save'),
@@ -503,6 +545,15 @@ export default async function FinancePage({
             </div>
           )}
 
+          {/* Named rather than silently missing — see the rate note above. */}
+          {unmeasured.length > 0 ? (
+            <p className="text-dim text-xs">
+              {t('budgetNoRate', {
+                categories: unmeasured.map((one) => categoryLabel(one.category)).join(', '),
+              })}
+            </p>
+          ) : null}
+
           {/*
             Behind a button on a phone, for the same reason the entry form above it is: the
             dials are what this card is for, and a row of fields above them is a row of fields
@@ -515,7 +566,13 @@ export default async function FinancePage({
                 category: t('category'),
                 categoryPlaceholder: t('budgetCategoryPlaceholder'),
                 amount: t('budgetAmount'),
+                currency: t('budgetCurrency'),
                 add: t('budgetAdd'),
+                currencies: SUPPORTED_CURRENCIES.map((code) => ({
+                  code,
+                  label: `${CURRENCY_SYMBOL[code]} ${code}`,
+                })),
+                defaultCurrency: session.user.displayCurrency,
                 options: [...new Set(byCategory.map((one) => one.category))],
               }}
             />

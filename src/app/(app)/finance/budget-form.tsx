@@ -13,9 +13,14 @@ export type BudgetFormLabels = {
   category: string;
   categoryPlaceholder: string;
   amount: string;
+  currency: string;
   add: string;
   /** Categories already in use, offered so a budget lands on the same word the ledger uses. */
   options: string[];
+  /** The currencies a ceiling may be written in, with the symbol each one prints. */
+  currencies: { code: string; label: string }[];
+  /** Which one to offer first — whatever the reader is already looking at figures in. */
+  defaultCurrency: string;
 };
 
 /**
@@ -66,6 +71,26 @@ export function BudgetForm({ owner, labels }: { owner: string; labels: BudgetFor
         <input name="amount" required inputMode="decimal" dir="ltr" placeholder="2000" className={field} />
       </label>
 
+      {/*
+        Beside the figure rather than derived from the header.
+
+        The header's currency is how the book is being *read* right now and it can be changed
+        on a whim; what a ceiling is denominated in is part of the ceiling. Reading in dollars
+        for an afternoon must not turn ₪2,000 a month into $2,000 a month. It opens on the
+        header's currency because that is what the person is looking at, and then it stays
+        with the budget.
+      */}
+      <label className="flex w-24 flex-col gap-1">
+        <span className="text-dim text-[11px] font-semibold">{labels.currency}</span>
+        <select name="currency" defaultValue={labels.defaultCurrency} className={field}>
+          {labels.currencies.map((currency) => (
+            <option key={currency.code} value={currency.code}>
+              {currency.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <button
         type="submit"
         className="bg-brand text-on-brand min-h-11 rounded-[10px] px-4 text-sm font-bold sm:min-h-9"
@@ -81,6 +106,8 @@ export function BudgetForm({ owner, labels }: { owner: string; labels: BudgetFor
 export type BudgetControlLabels = {
   /** "₪740 used" — what the tile says when it is not being edited. */
   spent: string;
+  /** The symbol beside the field, so the figure being typed has a unit on it. */
+  symbol: string;
   edit: string;
   remove: string;
   save: string;
@@ -134,6 +161,9 @@ export function BudgetControls({
         className="flex flex-col items-center gap-1"
       >
         <div className="flex items-center gap-1">
+          <span className="text-dim text-xs" aria-hidden>
+            {labels.symbol}
+          </span>
           <input
             name="amount"
             required

@@ -8,8 +8,9 @@ export type Budget = {
   id: string;
   owner: string;
   category: string;
-  /** Shekels a month. */
-  amountIls: number;
+  /** A month's ceiling, in `currency` — see the model. */
+  amount: number;
+  currency: string;
 };
 
 /**
@@ -24,9 +25,9 @@ export async function listBudgets(ctx: TenantContext, owner: Brother): Promise<B
   const rows = await prisma.budget.findMany({
     where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, owner },
     orderBy: { category: 'asc' },
-    select: { id: true, owner: true, category: true, amountIls: true },
+    select: { id: true, owner: true, category: true, amount: true, currency: true },
   });
-  return rows.map((row) => ({ ...row, amountIls: Number(row.amountIls) }));
+  return rows.map((row) => ({ ...row, amount: Number(row.amount) }));
 }
 
 /**
@@ -38,7 +39,7 @@ export async function listBudgets(ctx: TenantContext, owner: Brother): Promise<B
  */
 export async function setBudget(
   ctx: TenantContext,
-  input: { owner: Brother; category: string; amountIls: number },
+  input: { owner: Brother; category: string; amount: number; currency: string },
 ): Promise<void> {
   assertContext(ctx);
   await prisma.budget.upsert({
@@ -53,9 +54,12 @@ export async function setBudget(
       userId: ctx.userId,
       owner: input.owner,
       category: input.category,
-      amountIls: input.amountIls,
+      amount: input.amount,
+      currency: input.currency,
     },
-    update: { amountIls: input.amountIls },
+    // The currency moves with the figure: re-setting "food" to $500 must not leave it
+    // measured in shekels, which would read as a fourfold cut nobody asked for.
+    update: { amount: input.amount, currency: input.currency },
   });
 }
 
@@ -69,12 +73,12 @@ export async function setBudget(
 export async function setBudgetAmount(
   ctx: TenantContext,
   id: string,
-  amountIls: number,
+  amount: number,
 ): Promise<void> {
   assertContext(ctx);
   await prisma.budget.updateMany({
     where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
-    data: { amountIls },
+    data: { amount },
   });
 }
 

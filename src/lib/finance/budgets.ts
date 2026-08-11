@@ -5,6 +5,11 @@ import type { CategoryTotal } from './balance';
  *
  * The ledger answers "what did I spend"; this turns it into the two questions an allowance is
  * kept for — how much is left, and if none, by how much it was passed.
+ *
+ * Every figure here is in the budget's own currency, including the spending, which the ledger
+ * holds in shekels. The alternative — comparing in shekels and converting for display — makes
+ * the ceiling itself move: "$2,000 a month" would read as $1,935 the week the rate shifted,
+ * and a limit that changes on its own is not a limit.
  */
 export type BudgetUse = {
   category: string;
@@ -20,7 +25,12 @@ export type BudgetUse = {
    * pinning at full and losing the fact. Zero-budget yields 0 rather than infinity.
    */
   ratio: number;
+  /** What all of the above are denominated in. */
+  currency: string;
 };
+
+/** A ceiling as it was written down: a number, and what that number counts. */
+export type BudgetAmount = { category: string; amount: number; currency: string };
 
 /**
  * How many months of allowance a window is worth.
@@ -49,29 +59,43 @@ export function monthsCovered(
  * deliberately not invented here: it belongs in the breakdown beside this, not as a gauge
  * against a ceiling nobody set.
  *
+ * `rate` converts a shekel into one unit of the budget's currency, and returning null for one
+ * drops that budget rather than measuring it at 1:1. That is the whole reason it can say no:
+ * a dollar ceiling compared against unconverted shekels reports a threefold overrun on a
+ * month that never happened, and it looks exactly like a real one. The caller is left to say
+ * which categories went missing and why.
+ *
  * Ordered by how close each one is to its limit, so whatever needs attention is read first.
  */
 export function budgetUse(
-  budgets: readonly { category: string; amountIls: number }[],
+  budgets: readonly BudgetAmount[],
+  /** Spending per category, in shekels, as the ledger stores it. */
   spending: readonly CategoryTotal[],
   months: number,
+  rate: (currency: string) => number | null,
 ): BudgetUse[] {
   const spentBy = new Map(spending.map((one) => [one.category, one.total]));
 
   return budgets
-    .map((budget) => {
-      const scaled = budget.amountIls * Math.max(1, months);
-      const spent = spentBy.get(budget.category) ?? 0;
+    .flatMap((budget) => {
+      const toBudget = rate(budget.currency);
+      if (toBudget === null) return [];
+
+      const scaled = budget.amount * Math.max(1, months);
+      const spent = (spentBy.get(budget.category) ?? 0) * toBudget;
       const over = Math.max(0, spent - scaled);
 
-      return {
-        category: budget.category,
-        budget: scaled,
-        spent,
-        remaining: Math.max(0, scaled - spent),
-        over,
-        ratio: scaled === 0 ? 0 : spent / scaled,
-      };
+      return [
+        {
+          category: budget.category,
+          budget: scaled,
+          spent,
+          remaining: Math.max(0, scaled - spent),
+          over,
+          ratio: scaled === 0 ? 0 : spent / scaled,
+          currency: budget.currency,
+        },
+      ];
     })
     .sort((a, b) => b.ratio - a.ratio);
 }

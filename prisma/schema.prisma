@@ -511,9 +511,16 @@ model Budget {
   /// trader actually writes down rather than on a list somebody else chose.
   category String
 
-  /// Shekels a month. ILS-native like every other figure in this module; the display
-  /// conversion happens at render.
-  amountIls Decimal @map("amount_ils") @db.Decimal(14, 2)
+  /// A month's ceiling, in `currency` — not in shekels. The one figure on this screen that
+  /// is stored as it was typed: a ceiling converted into shekels at the moment it was set
+  /// would drift every time the rate moved, so "$2,000 a month" would quietly become $1,935.
+  amount Decimal @db.Decimal(14, 2)
+
+  /// What that figure is denominated in. One of `SUPPORTED_CURRENCIES`; shekels unless the
+  /// person said otherwise. Per budget rather than per person, because the header's display
+  /// currency is a way of *reading* the book and this is a decision about the money itself —
+  /// switching the header to dollars must not change what was budgeted.
+  currency String @default("ILS")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

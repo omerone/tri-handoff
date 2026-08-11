@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { requireSession } from '@/lib/auth/session';
 import { deleteBudget, setBudget, setBudgetAmount } from '@/lib/db';
 import { isBrother } from '@/lib/household';
+import { isSupportedCurrency } from '@/lib/money/currency';
 
 export type BudgetFormState = { error?: string };
 
@@ -28,6 +29,11 @@ const budgetSchema = z.object({
   owner: z.string().refine(isBrother),
   category: z.string().trim().min(1).max(60),
   amount: amountSchema,
+  /*
+   * Checked against the list rather than stored as typed: an unrecognised code would print
+   * no symbol and convert at no rate, which is a figure with nothing saying what it counts.
+   */
+  currency: z.string().refine(isSupportedCurrency),
 });
 
 /** Sets a monthly ceiling, or moves one that is already set. */
@@ -42,13 +48,15 @@ export async function setBudgetAction(
     owner: formData.get('owner') ?? '',
     category: formData.get('category') ?? '',
     amount: String(formData.get('amount') ?? ''),
+    currency: formData.get('currency') ?? '',
   });
   if (!parsed.success) return { error: t('invalid') };
 
   await setBudget(session.ctx, {
     owner: parsed.data.owner,
     category: parsed.data.category,
-    amountIls: parsed.data.amount,
+    amount: parsed.data.amount,
+    currency: parsed.data.currency,
   });
 
   revalidatePath('/finance');

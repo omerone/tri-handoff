@@ -377,7 +377,9 @@
     "ownerLabel": "Whose",
     "budgetSet": "Set a budget",
     "budgetEditOf": "Change the ceiling on {category}",
-    "budgetRemoveOf": "Remove the budget on {category}"
+    "budgetRemoveOf": "Remove the budget on {category}",
+    "budgetCurrency": "Currency",
+    "budgetNoRate": "No exchange rate for {categories}, so their budget has no gauge."
   },
   "long": {
     "title": "Long-term positions",

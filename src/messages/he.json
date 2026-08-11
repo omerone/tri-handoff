@@ -377,7 +377,9 @@
     "ownerLabel": "של מי",
     "budgetSet": "הגדרת תקציב",
     "budgetEditOf": "שינוי התקרה של {category}",
-    "budgetRemoveOf": "מחיקת התקציב של {category}"
+    "budgetRemoveOf": "מחיקת התקציב של {category}",
+    "budgetCurrency": "מטבע",
+    "budgetNoRate": "אין שער חליפין ל{categories}, אז אין מד ניצול לתקציב שלהם."
   },
   "long": {
     "title": "השקעות ארוכות טווח",
