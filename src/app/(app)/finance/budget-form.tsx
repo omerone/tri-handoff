@@ -1,16 +1,19 @@
 'use client';
 
-import { useActionState, useEffect, useRef } from 'react';
-import { Trash2 } from 'lucide-react';
-import { useTransition } from 'react';
-import { setBudgetAction, deleteBudgetAction, type BudgetFormState } from './budget-actions';
+import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import { Check, Pencil, Trash2, X } from 'lucide-react';
+import {
+  setBudgetAction,
+  deleteBudgetAction,
+  editBudgetAction,
+  type BudgetFormState,
+} from './budget-actions';
 
 export type BudgetFormLabels = {
   category: string;
   categoryPlaceholder: string;
   amount: string;
   add: string;
-  remove: string;
   /** Categories already in use, offered so a budget lands on the same word the ledger uses. */
   options: string[];
 };
@@ -75,19 +78,114 @@ export function BudgetForm({ owner, labels }: { owner: string; labels: BudgetFor
   );
 }
 
-/** Removing one ceiling. Its own component so the row stays a server component. */
-export function BudgetRemove({ id, label }: { id: string; label: string }) {
+export type BudgetControlLabels = {
+  /** "₪740 used" — what the tile says when it is not being edited. */
+  spent: string;
+  edit: string;
+  remove: string;
+  save: string;
+  cancel: string;
+  /** The field's own name, for the reader who cannot see which tile it belongs to. */
+  amount: string;
+};
+
+/**
+ * The line under one dial: what has been spent, and the two things you can do about it.
+ *
+ * Editing happens in place rather than in the form at the bottom of the card. The form writes
+ * a budget by *category*, and using it to change one means retyping the category exactly —
+ * which is not an edit so much as an invitation to create a second ceiling next to the first,
+ * with the spending split between them and both dials wrong. Here the row's id is what moves,
+ * so the only thing a person can change is the number they came to change.
+ *
+ * The figure in the field is the monthly ceiling, not the scaled one on the dial above it: on
+ * a three-month window those are different numbers, and saving back what the dial showed would
+ * triple the allowance every time somebody opened the editor and pressed save.
+ */
+export function BudgetControls({
+  id,
+  monthlyAmount,
+  labels,
+}: {
+  id: string;
+  monthlyAmount: number;
+  labels: BudgetControlLabels;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const icon =
+    'tri-tap text-dim flex size-7 items-center justify-center rounded-lg disabled:opacity-40';
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const amount = String(new FormData(event.currentTarget).get('amount') ?? '');
+          startTransition(async () => {
+            const message = await editBudgetAction(id, amount);
+            setError(message);
+            // Left open on a refusal, so the number that was typed is still there to correct.
+            if (!message) setEditing(false);
+          });
+        }}
+        className="flex flex-col items-center gap-1"
+      >
+        <div className="flex items-center gap-1">
+          <input
+            name="amount"
+            required
+            autoFocus
+            inputMode="decimal"
+            dir="ltr"
+            aria-label={labels.amount}
+            defaultValue={monthlyAmount}
+            className="border-line bg-raised text-text w-20 rounded-[8px] border px-2 py-1 text-center text-xs"
+          />
+          <button type="submit" disabled={pending} aria-label={labels.save} className={`${icon} hover:text-pos`}>
+            <Check size={14} aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditing(false);
+              setError(null);
+            }}
+            aria-label={labels.cancel}
+            className={`${icon} hover:text-text`}
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </div>
+        {error ? <p className="text-neg text-[10px]">{error}</p> : null}
+      </form>
+    );
+  }
+
   return (
-    <button
-      type="button"
-      disabled={pending}
-      aria-label={label}
-      data-tip={label}
-      onClick={() => startTransition(() => deleteBudgetAction(id))}
-      className="text-dim hover:text-neg -m-1 p-1 disabled:opacity-40"
-    >
-      <Trash2 size={13} aria-hidden />
-    </button>
+    <div className="flex items-center gap-0.5">
+      <span className="text-dim text-[10px]">{labels.spent}</span>
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label={labels.edit}
+        data-tip={labels.edit}
+        className={`${icon} hover:text-text`}
+      >
+        <Pencil size={13} aria-hidden />
+      </button>
+      <button
+        type="button"
+        disabled={pending}
+        aria-label={labels.remove}
+        data-tip={labels.remove}
+        onClick={() => startTransition(() => deleteBudgetAction(id))}
+        className={`${icon} hover:text-neg`}
+      >
+        <Trash2 size={13} aria-hidden />
+      </button>
+    </div>
   );
 }

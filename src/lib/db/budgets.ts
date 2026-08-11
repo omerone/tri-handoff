@@ -60,6 +60,25 @@ export async function setBudget(
 }
 
 /**
+ * Moves a ceiling that already exists, by id.
+ *
+ * Separate from `setBudget` because editing one on screen is a different act from writing a
+ * new one: the category is not retyped, so it cannot be mistyped into a second budget
+ * standing beside the first with the spending split between them.
+ */
+export async function setBudgetAmount(
+  ctx: TenantContext,
+  id: string,
+  amountIls: number,
+): Promise<void> {
+  assertContext(ctx);
+  await prisma.budget.updateMany({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    data: { amountIls },
+  });
+}
+
+/**
  * Removes a ceiling. Scoped by the context as well as by id, so an id from anywhere else
  * matches nothing — the same rule every delete in this directory follows.
  */

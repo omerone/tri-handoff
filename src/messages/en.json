@@ -342,7 +342,6 @@
     "budgetCategoryPlaceholder": "Spending",
     "budgetAmount": "Monthly ceiling",
     "budgetAdd": "Set",
-    "budgetRemove": "Remove budget",
     "budgetOver": "over",
     "budgetLeftOf": "left of {budget}",
     "budgetSpent": "{spent} used",
@@ -376,7 +375,9 @@
     "deleteSeriesConfirm": "Delete the whole series? It disappears from every month, including past ones. To stop it from here on without changing history, use \"End series\".",
     "yearToDateAsOfToday": "Year to date (as of today)",
     "ownerLabel": "Whose",
-    "budgetSet": "Set a budget"
+    "budgetSet": "Set a budget",
+    "budgetEditOf": "Change the ceiling on {category}",
+    "budgetRemoveOf": "Remove the budget on {category}"
   },
   "long": {
     "title": "Long-term positions",

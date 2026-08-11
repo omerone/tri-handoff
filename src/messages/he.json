@@ -342,7 +342,6 @@
     "budgetCategoryPlaceholder": "בזבוזים",
     "budgetAmount": "תקרה לחודש",
     "budgetAdd": "הגדרה",
-    "budgetRemove": "הסרת תקציב",
     "budgetOver": "חריגה",
     "budgetLeftOf": "נותר מתוך {budget}",
     "budgetSpent": "נוצל {spent}",
@@ -376,7 +375,9 @@
     "deleteSeriesConfirm": "למחוק את הסדרה כולה? היא תיעלם מכל החודשים, כולל אלה שכבר עברו. כדי לעצור אותה מכאן ואילך בלי לשנות את העבר, השתמש ב״סיום הסדרה״.",
     "yearToDateAsOfToday": "מתחילת השנה (עד היום)",
     "ownerLabel": "של מי",
-    "budgetSet": "הגדרת תקציב"
+    "budgetSet": "הגדרת תקציב",
+    "budgetEditOf": "שינוי התקרה של {category}",
+    "budgetRemoveOf": "מחיקת התקציב של {category}"
   },
   "long": {
     "title": "השקעות ארוכות טווח",

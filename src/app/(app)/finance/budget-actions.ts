@@ -4,10 +4,19 @@ import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth/session';
-import { deleteBudget, setBudget } from '@/lib/db';
+import { deleteBudget, setBudget, setBudgetAmount } from '@/lib/db';
 import { isBrother } from '@/lib/household';
 
 export type BudgetFormState = { error?: string };
+
+/*
+ * Text, then a number. The field is text so a comma decimal typed on a Hebrew keyboard still
+ * parses, exactly as the amount field on the ledger beside it does.
+ */
+const amountSchema = z
+  .string()
+  .transform((value) => Number(value.replace(',', '.')))
+  .refine((value) => Number.isFinite(value) && value > 0 && value <= 10_000_000);
 
 const budgetSchema = z.object({
   /*
@@ -18,14 +27,7 @@ const budgetSchema = z.object({
    */
   owner: z.string().refine(isBrother),
   category: z.string().trim().min(1).max(60),
-  /*
-   * Text, then a number. The field is text so a comma decimal typed on a Hebrew keyboard
-   * still parses, exactly as the amount field on the ledger beside it does.
-   */
-  amount: z
-    .string()
-    .transform((value) => Number(value.replace(',', '.')))
-    .refine((value) => Number.isFinite(value) && value > 0 && value <= 10_000_000),
+  amount: amountSchema,
 });
 
 /** Sets a monthly ceiling, or moves one that is already set. */
@@ -51,6 +53,25 @@ export async function setBudgetAction(
 
   revalidatePath('/finance');
   return {};
+}
+
+/**
+ * Changes a ceiling already on screen.
+ *
+ * Takes the row's id rather than its category, so editing "Food" can only ever move the Food
+ * ceiling — there is no path here that creates a second one. Returns the message to show
+ * beside the field, or null; the editor stays open on a refusal so the figure is not lost.
+ */
+export async function editBudgetAction(id: string, amount: string): Promise<string | null> {
+  const session = await requireSession();
+  const t = await getTranslations('finance');
+
+  const parsed = amountSchema.safeParse(amount);
+  if (!parsed.success) return t('invalid');
+
+  await setBudgetAmount(session.ctx, id, parsed.data);
+  revalidatePath('/finance');
+  return null;
 }
 
 export async function deleteBudgetAction(id: string): Promise<void> {

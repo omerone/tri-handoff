@@ -12,7 +12,7 @@ import { describeRange } from '@/lib/time/range';
 import { listBudgets, listFinanceEntries, listLongPositions, listMt5Accounts } from '@/lib/db';
 import { budgetUse, monthsCovered } from '@/lib/finance/budgets';
 import { BudgetGauge } from '@/components/charts/budget-gauge';
-import { BudgetForm, BudgetRemove } from './budget-form';
+import { BudgetControls, BudgetForm } from './budget-form';
 import { computeMetrics } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { portfolioTotals } from '@/lib/positions/valuation';
@@ -464,6 +464,7 @@ export default async function FinancePage({
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {gauges.map((gauge) => {
                 const tone = gauge.over > 0 ? 'over' : gauge.ratio >= 0.8 ? 'close' : 'ok';
+                const budget = budgets.find((one) => one.category === gauge.category)!;
                 return (
                   <div key={gauge.category} className="flex flex-col items-center gap-1">
                     <BudgetGauge
@@ -483,12 +484,19 @@ export default async function FinancePage({
                           : t('budgetLeftOf', { budget: ils(gauge.budget) })
                       }
                     />
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-dim text-[10px]">
-                        {t('budgetSpent', { spent: ils(gauge.spent) })}
-                      </span>
-                      <BudgetRemove id={budgets.find((one) => one.category === gauge.category)!.id} label={t('budgetRemove')} />
-                    </div>
+                    <BudgetControls
+                      id={budget.id}
+                      /* The monthly figure, not the window-scaled one on the dial above it. */
+                      monthlyAmount={budget.amountIls}
+                      labels={{
+                        spent: t('budgetSpent', { spent: ils(gauge.spent) }),
+                        edit: t('budgetEditOf', { category: categoryLabel(gauge.category) }),
+                        remove: t('budgetRemoveOf', { category: categoryLabel(gauge.category) }),
+                        save: t('save'),
+                        cancel: t('cancel'),
+                        amount: t('budgetAmount'),
+                      }}
+                    />
                   </div>
                 );
               })}
@@ -508,7 +516,6 @@ export default async function FinancePage({
                 categoryPlaceholder: t('budgetCategoryPlaceholder'),
                 amount: t('budgetAmount'),
                 add: t('budgetAdd'),
-                remove: t('budgetRemove'),
                 options: [...new Set(byCategory.map((one) => one.category))],
               }}
             />

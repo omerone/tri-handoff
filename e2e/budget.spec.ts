@@ -17,8 +17,16 @@ import { closeAddForm, openAddForm } from './helpers/add-form';
  */
 
 const PREFIX = 'E2E';
-/** Unique per run, so the two viewports this file runs under do not spend each other's money. */
-const CATEGORY = `${PREFIX}-budget-${process.env.TEST_PARALLEL_INDEX ?? '0'}`;
+
+/**
+ * A category nothing else on the demo book will touch.
+ *
+ * Per test as well as per worker: the ledger is only cleaned up once the file is done, so two
+ * tests sharing a category would have the first one's spending still sitting under the
+ * second one's ceiling — and the second would read a confident, wrong number.
+ */
+const category = (test: string) =>
+  `${PREFIX}-${test}-${process.env.TEST_PARALLEL_INDEX ?? '0'}`;
 
 test.afterAll(async () => {
   const prisma = new PrismaClient();
@@ -31,18 +39,14 @@ test.afterAll(async () => {
 });
 
 /**
- * The dial for one category, and the two figures under it.
+ * One category's tile: the dial, the figures under it, and its controls.
  *
- * Pinned by holding both this category's dial and a remove control: the dial's own wrapper
- * carries the same classes as the one around it, so "innermost div containing the image" finds
- * the half of the tile without the spent figure on it.
+ * Walked up from the dial rather than filtered by what is inside it. The obvious locator —
+ * the innermost div holding both this dial and a remove button — stops resolving the moment
+ * the tile is put into edit mode, because the remove button is what the editor replaces.
  */
-function gauge(page: Page, category: string) {
-  return page
-    .locator('div')
-    .filter({ has: page.getByRole('img', { name: category }) })
-    .filter({ has: page.getByRole('button', { name: 'Remove budget' }) })
-    .last();
+function tile(page: Page, category: string) {
+  return page.getByRole('img', { name: category }).locator('xpath=ancestor::div[2]');
 }
 
 /**
@@ -82,30 +86,60 @@ async function spend(page: Page, label: string, category: string, amount: number
 
 test.describe('a budget ceiling', () => {
   test('counts down as money is spent, then reports the overrun', async ({ page }) => {
+    const CATEGORY = category('spend');
     // The current month, explicitly: a budget is a monthly figure, and against an unbounded
     // window the card says so instead of drawing a dial.
     await page.goto('/finance');
 
     await setCeiling(page, CATEGORY, 2_000);
-    await expect(gauge(page, CATEGORY)).toContainText('left of ₪2,000');
-    await expect(gauge(page, CATEGORY)).toContainText('₪0 used');
+    await expect(tile(page, CATEGORY)).toContainText('left of ₪2,000');
+    await expect(tile(page, CATEGORY)).toContainText('₪0 used');
 
     // The example this was built from: ₪2,000 set, ₪200 spent, ₪1,800 left.
     await spend(page, `${PREFIX} cigarettes`, CATEGORY, 200);
-    await expect(gauge(page, CATEGORY)).toContainText('₪1,800');
-    await expect(gauge(page, CATEGORY)).toContainText('₪200 used');
+    await expect(tile(page, CATEGORY)).toContainText('₪1,800');
+    await expect(tile(page, CATEGORY)).toContainText('₪200 used');
 
     // Past the ceiling the headline changes question: not what is left — there is none — but
     // by how much it was passed.
     await spend(page, `${PREFIX} more`, CATEGORY, 2_150);
-    await expect(gauge(page, CATEGORY)).toContainText('+₪350');
-    await expect(gauge(page, CATEGORY)).toContainText('over');
-    await expect(gauge(page, CATEGORY)).not.toContainText('left of');
+    await expect(tile(page, CATEGORY)).toContainText('+₪350');
+    await expect(tile(page, CATEGORY)).toContainText('over');
+    await expect(tile(page, CATEGORY)).not.toContainText('left of');
 
     // Removing the ceiling leaves the spending alone: the money was still spent.
-    await gauge(page, CATEGORY).getByRole('button', { name: 'Remove budget' }).click();
+    await tile(page, CATEGORY)
+      .getByRole('button', { name: `Remove the budget on ${CATEGORY}` })
+      .click();
     await expect(page.getByRole('img', { name: CATEGORY })).toHaveCount(0);
     await expect(page.getByText(`${PREFIX} cigarettes`)).toBeVisible();
+  });
+
+  test('changes a ceiling in place, leaving one budget rather than two', async ({ page }) => {
+    const CATEGORY = category('edit');
+    // Editing through the form at the bottom would mean retyping the category, and a typo
+    // there writes a *second* ceiling beside the first with the spending divided between
+    // them — two dials, both wrong, and nothing on screen saying why.
+    await page.goto('/finance');
+
+    await setCeiling(page, CATEGORY, 2_000);
+    await spend(page, `${PREFIX} coffee`, CATEGORY, 500);
+    await expect(tile(page, CATEGORY)).toContainText('₪1,500');
+
+    await tile(page, CATEGORY)
+      .getByRole('button', { name: `Change the ceiling on ${CATEGORY}` })
+      .click();
+
+    // Prefilled with what is already set, so a change is a change and not a re-entry.
+    const field = tile(page, CATEGORY).getByRole('textbox', { name: 'Monthly ceiling' });
+    await expect(field).toHaveValue('2000');
+    await field.fill('800');
+    await tile(page, CATEGORY).getByRole('button', { name: 'Save', exact: true }).click();
+
+    await expect(page.getByRole('img', { name: CATEGORY })).toHaveCount(1);
+    await expect(tile(page, CATEGORY)).toContainText('left of ₪800');
+    await expect(tile(page, CATEGORY)).toContainText('₪300');
+    await expect(tile(page, CATEGORY)).toContainText('₪500 used');
   });
 
   test('says a monthly figure means nothing against an unbounded window', async ({ page }) => {
