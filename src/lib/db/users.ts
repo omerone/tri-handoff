@@ -126,6 +126,27 @@ export async function saveDashboardLayout(
 }
 
 /**
+ * The signed-in user's own password.
+ *
+ * Deliberately separate from `setPasswordHash` below, which takes a bare user id and will
+ * overwrite anybody's password — that one belongs to `./unscoped`, is restricted to the
+ * modules that establish identity, and is what the operator console uses. A trader changing
+ * their own password from Settings is a tenant-scoped act, so it takes a context and the
+ * `where` names both the user and the tenant: there is no id a form could submit that would
+ * reach another account.
+ */
+export async function setOwnPasswordHash(
+  ctx: TenantContext,
+  passwordHash: string,
+): Promise<void> {
+  assertContext(ctx);
+  await prisma.user.updateMany({
+    where: { id: ctx.userId, tenantId: ctx.tenantId },
+    data: { passwordHash },
+  });
+}
+
+/**
  * Sets a password and ends every session the user has, in one transaction.
  *
  * The revocation is inside this function rather than left to callers on purpose. The

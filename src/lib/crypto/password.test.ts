@@ -97,6 +97,33 @@ describe('password strength validation', () => {
       validatePasswordStrength('testuser@example.com123456', ['testuser@example.com']),
     ).toThrow();
   });
+
+  /*
+   * The address without its punctuation is still the address.
+   *
+   * zxcvbn matches a user input as written, so passing `demo@tri.local` did nothing about
+   * `demotrilocal12` — different characters, no dictionary hit, and a password that is the
+   * account name with two digits on the end came back strong. It was accepted by the settings
+   * form in a browser before `expandUserInputs` existed; these are the shapes it let through.
+   */
+  it('rejects a password assembled out of the pieces of the email', () => {
+    for (const password of ['demotrilocal12', 'demo-tri-local-99', 'demotri2026local']) {
+      const result = analyzePasswordStrength(password, ['demo@tri.local']);
+      expect(result.isStrong, `${password} should not be strong`).toBe(false);
+    }
+  });
+
+  it('still accepts a genuinely unrelated password for the same account', () => {
+    // The guard has to bite on the address, not on everything the account holder might pick.
+    const result = analyzePasswordStrength('Yarok-Sulam-Nahar-71', ['demo@tri.local']);
+    expect(result.isStrong).toBe(true);
+  });
+
+  it('ignores fragments too short to mean anything', () => {
+    // `a@b.co` would otherwise contribute "co", which appears in half the words there are.
+    const result = analyzePasswordStrength('Corduroy-Mango-Trellis-8', ['a@b.co']);
+    expect(result.isStrong).toBe(true);
+  });
 });
 
 /**

@@ -104,6 +104,37 @@ export interface PasswordStrengthResult {
 }
 
 /**
+ * Whether a password is really the account's own identity with the punctuation taken out.
+ *
+ * This does not go through zxcvbn, because zxcvbn does not catch it. Measured: given
+ * `demo@tri.local` as a user input, it scores `demotrilocal12` **4 out of 4** — it segments
+ * `demotri` as bruteforce and never matches the parts, and passing `demo`, `tri` and `local`
+ * separately does not change the answer. That is a defensible general-purpose score, and it
+ * is the wrong one here: against somebody who knows the address, that password is the address.
+ *
+ * So the check is a direct one. Strip both to letters and digits, drop the trailing digits
+ * that are the standard way of dressing this up, and refuse when either contains the other.
+ * Deterministic, and it fails closed on exactly the shape it is aimed at.
+ *
+ * Four characters is the floor on both sides: shorter identities are initials and shorter
+ * password stems match half the words there are.
+ */
+function resemblesIdentity(password: string, inputs: readonly string[]): boolean {
+  // Letters only, on both sides. Digits are how this gets dressed up and they turn up in
+  // every position: `demotrilocal12` at the end, `demo2026trilocal` in the middle. Dropping
+  // only the trailing run caught the first and missed the second.
+  const letters = (value: string) => value.toLowerCase().replace(/[^a-z]/g, '');
+  const stem = letters(password);
+  if (stem.length < 4) return false;
+
+  return inputs.some((input) => {
+    const identity = letters(input);
+    if (identity.length < 4) return false;
+    return stem.includes(identity) || identity.includes(stem);
+  });
+}
+
+/**
  * Analyze password strength
  * Does not throw; caller decides what to do with result
  */
@@ -139,6 +170,19 @@ export function analyzePasswordStrength(
   }
 
   // Run zxcvbn analysis
+  // Before zxcvbn, because zxcvbn is the thing that gets this one wrong — see above.
+  if (resemblesIdentity(password, userInputs)) {
+    return {
+      score: 0,
+      feedback: {
+        warning: 'Password is too close to your email address',
+        suggestions: ['Use words that have nothing to do with your account'],
+      },
+      isStrong: false,
+      guessesLog10: 0,
+    };
+  }
+
   const result = zxcvbn(password, userInputs);
 
   return {

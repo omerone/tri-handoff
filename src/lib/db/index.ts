@@ -16,6 +16,7 @@ import 'server-only';
 export type { Mt5Status, SyncStatus, SyncTrigger, TenantStatus } from './enums';
 export {
   getUser,
+  setOwnPasswordHash,
   updateUserPreferences,
   touchLastLogin,
   getDashboardLayout,

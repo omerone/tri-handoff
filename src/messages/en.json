@@ -487,6 +487,13 @@
       }
     },
     "themeSystem": "System",
+    "password": "Password",
+    "passwordNote": "The password you were given was chosen for you. Set one only you know here. Every other device will be signed out.",
+    "currentPassword": "Current password",
+    "passwordChanged": "Password changed. Your other devices have been signed out.",
+    "passwordWrong": "That is not your current password",
+    "passwordWeak": "That password is too easy to guess — try a few unrelated words",
+    "passwordTooLong": "That password is too long",
     "displayStyle": "Display style",
     "displayStyleNote": "Changes the look only — colour, material and motion. The data and the controls are the same in every style.",
     "styleDepth": "Depth",

@@ -6,6 +6,7 @@ import { SignOutButton } from '@/components/shell/sign-out-button';
 import { asTheme } from '@/lib/theme';
 import { asDisplayStyle } from '@/lib/display-style';
 import { Mt5Card, type ConnectedAccount } from './mt5-card';
+import { PasswordCard } from './password-card';
 import { TwoFactorCard } from './two-factor-card';
 import { requireSession } from '@/lib/auth/session';
 import { countSyncedTrades, listMt5Accounts } from '@/lib/db';
@@ -22,6 +23,7 @@ export default async function SettingsPage() {
   const locale = (await getLocale()) as Locale;
   const tWizard = await getTranslations('settings.wizard');
 
+  const tAuth = await getTranslations('auth');
   const tTwoFactor = await getTranslations('settings.twoFactor');
   const [accounts, twoFactor] = await Promise.all([
     listMt5Accounts(session.ctx),
@@ -170,6 +172,20 @@ export default async function SettingsPage() {
           the broker card sets — which is what stops the column beside it being mostly empty.
         */}
         <div className="flex flex-col gap-3">
+          {/* Above the second factor, because it is the first one — and because an account
+              handed over with someone else's password is not yet the holder's account. */}
+          <Card title={t('password')}>
+            <PasswordCard
+              labels={{
+                note: t('passwordNote'),
+                current: t('currentPassword'),
+                next: tAuth('newPassword'),
+                confirm: tAuth('confirmPassword'),
+                submit: tAuth('setPassword'),
+              }}
+            />
+          </Card>
+
           <Card title={tTwoFactor('title')}>
             <TwoFactorCard
               enabledAt={twoFactor?.confirmedAt ? formatDateTimeAt(twoFactor.confirmedAt) : null}
