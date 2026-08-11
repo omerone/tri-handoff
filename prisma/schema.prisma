@@ -629,7 +629,14 @@ model LearningEntry {
   /// Session length. Two decimals so a 45-minute session is 0.75 rather than a rounded hour;
   /// the analytics pie is weighted by this, since ten minutes and an afternoon are not the
   /// same amount of study.
-  hours Decimal @db.Decimal(6, 2)
+  /// Stored in hours, but entered and read in hours *and minutes*.
+  ///
+  /// Four decimal places rather than two, and the difference is not academic: a whole number
+  /// of minutes is almost never a clean hundredth of an hour — 35 minutes is 0.58333… — so at
+  /// two places every entry is stored slightly wrong and the error accumulates across the
+  /// ledger. Measured: forty sessions of 35 minutes came back as 1,392 minutes instead of
+  /// 1,400. At four places the same forty round-trip exactly.
+  hours Decimal @db.Decimal(8, 4)
 
   learnedOn DateTime @map("learned_on") @db.Date
 

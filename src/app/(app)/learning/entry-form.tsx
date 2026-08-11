@@ -12,6 +12,7 @@ export type LearningFormLabels = {
   what: string;
   whatPlaceholder: string;
   hours: string;
+  minutes: string;
   topic: string;
   date: string;
   note: string;
@@ -64,15 +65,34 @@ export function LearningEntryForm({
           </select>
         </label>
 
+        {/*
+          Two fields, not one decimal.
+          
+          A session is remembered as "an hour and a half" or "thirty-five minutes", and only
+          one of those is a number anybody wants to convert. `1.5` is easy; 35 minutes is
+          0.58333… and the trader was either rounding it or doing arithmetic to fill in a form.
+          Both are still optional on their own — 45 minutes is minutes with the hours left
+          empty — and the action refuses only when the pair adds up to nothing.
+        */}
         <label className="flex flex-col gap-1">
           <span className="text-dim text-[11px] font-semibold">{labels.hours}</span>
           <input
             name="hours"
-            required
-            inputMode="decimal"
+            inputMode="numeric"
             dir="ltr"
-            placeholder="1.5"
-            className={`${field} sm:w-24`}
+            placeholder="1"
+            className={`${field} sm:w-20`}
+          />
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-dim text-[11px] font-semibold">{labels.minutes}</span>
+          <input
+            name="minutes"
+            inputMode="numeric"
+            dir="ltr"
+            placeholder="30"
+            className={`${field} sm:w-20`}
           />
         </label>
 

@@ -33,11 +33,11 @@ import {
   WEEKDAYS,
 } from '@/lib/analytics/dimensions';
 import { holdTimes } from '@/lib/analytics/streaks';
-import { formatDuration } from '@/lib/time/format';
+import { formatDuration, hoursToMinutes } from '@/lib/time/format';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { listLearningEntries } from '@/lib/db';
 import { currentBrother } from '@/lib/preferences/brother';
-import { hoursDecimals, learnerKey, learningTotals } from '@/lib/learning/types';
+import { learnerKey, learningTotals } from '@/lib/learning/types';
 import { originalTpBreakdown, tpTimingBreakdown } from '@/lib/review/stats';
 import { ORIGINAL_TP_COLOR, TIMING_COLOR, TOPIC_COLOR } from '@/lib/review/colors';
 import { computeCosts, costsBySymbol } from '@/lib/analytics/costs';
@@ -127,7 +127,8 @@ export default async function AnalyticsPage({
   );
 
   const sharePct = (value: number) => `${formatNumber(value * 100, locale, 0)}%`;
-  const learningHours = (value: number) => `${formatNumber(value, locale, hoursDecimals(value))}h`;
+  // Same shape as the learning screen — see the note there.
+  const learningHours = (value: number) => formatDuration(hoursToMinutes(value), locale, { maxUnit: 'hour' });
 
   const timingSlices = timing.slices.map((slice) => ({
     key: slice.key,

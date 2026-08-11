@@ -29,17 +29,50 @@ const entrySchema = z.object({
   learner: z.string().refine(isBrother),
   title: z.string().trim().min(1).max(120),
   note: z.string().trim().max(2_000),
-  // The field is text so a comma decimal typed on a Hebrew keyboard still parses.
-  hours: z
-    .string()
-    .transform((value) => Number(value.replace(',', '.')))
-    .refine((value) => Number.isFinite(value) && value > 0 && value <= MAX_HOURS),
+  /*
+   * Hours and minutes arrive as two fields and leave as one number of hours, which is what the
+   * column holds.
+   *
+   * Both are text and both may be blank: "45 minutes" is minutes with the hours empty, and an
+   * hour flat is the reverse. A comma decimal still parses, because a Hebrew keyboard types
+   * one and `1,5` meaning an hour and a half is not a mistake worth an error message.
+   *
+   * The pair is validated together rather than separately — either alone being empty is fine,
+   * and what has to be true is that they add up to a real session.
+   */
+  hours: z.string(),
+  minutes: z.string(),
   learnedOn: z
     .string()
     .refine((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
     .transform((value) => new Date(`${value}T00:00:00.000Z`))
     .refine((date) => isPlausibleDate(date)),
 });
+
+/**
+ * Two typed fields → the number of hours to store, or null when the pair is not a session.
+ *
+ * Blank counts as zero on either side, so each field works alone. The result is rounded to the
+ * column's four decimal places here rather than left to the database, so what is read back is
+ * exactly what this function decided: 35 minutes is 0.5833 hours and reads back as 35 minutes,
+ * every time, however many rows are summed.
+ */
+function totalHours(hoursField: string, minutesField: string): number | null {
+  const read = (value: string): number | null => {
+    const trimmed = value.trim();
+    if (trimmed === '') return 0;
+    const parsed = Number(trimmed.replace(',', '.'));
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  };
+
+  const hours = read(hoursField);
+  const minutes = read(minutesField);
+  if (hours === null || minutes === null) return null;
+
+  const total = hours + minutes / 60;
+  if (total <= 0 || total > MAX_HOURS) return null;
+  return Math.round(total * 10_000) / 10_000;
+}
 
 export async function createLearningEntryAction(
   _prev: LearningFormState,
@@ -54,15 +87,19 @@ export async function createLearningEntryAction(
     title: formData.get('title') ?? '',
     note: formData.get('note') ?? '',
     hours: String(formData.get('hours') ?? ''),
+    minutes: String(formData.get('minutes') ?? ''),
     learnedOn: String(formData.get('learnedOn') ?? ''),
   });
   if (!parsed.success) return { error: t('invalid') };
+
+  const total = totalHours(parsed.data.hours, parsed.data.minutes);
+  if (total === null) return { error: t('invalid') };
 
   await createLearningEntry(session.ctx, {
     topic: parsed.data.topic,
     title: parsed.data.title,
     note: parsed.data.note || null,
-    hours: parsed.data.hours,
+    hours: total,
     learnedOn: parsed.data.learnedOn,
     learner: parsed.data.learner,
   });

@@ -9,7 +9,6 @@ import { listLearningEntries } from '@/lib/db';
 import { currentBrother } from '@/lib/preferences/brother';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import {
-  hoursDecimals,
   learnerKey,
   learningTotals,
   type LearningTopic,
@@ -17,7 +16,7 @@ import {
 import { formatNumber } from '@/lib/money/currency';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { TOPIC_COLOR } from '@/lib/review/colors';
-import { formatDateAt } from '@/lib/time/format';
+import { formatDateAt, formatDuration, hoursToMinutes } from '@/lib/time/format';
 import { toTradeFilter } from '@/lib/time/range';
 import { deleteLearningEntryAction } from './actions';
 import { deleteLearningEntriesAction } from '../bulk-delete-actions';
@@ -76,7 +75,14 @@ export default async function LearningPage({
   const totals = learningTotals(entries);
 
 
-  const hours = (value: number) => `${formatNumber(value, locale, hoursDecimals(value))}h`;
+  /*
+   * Hours and minutes, not a decimal.
+   *
+   * "1.65h" is a number the reader has to convert before it says anything; "1ש 39דק'" is the
+   * answer. The stored column is hours because that is what it has always been — the
+   * conversion happens here, at the only place a person sees it.
+   */
+  const hours = (value: number) => formatDuration(hoursToMinutes(value), locale, { maxUnit: 'hour' });
   const percent = (value: number) => `${formatNumber(value * 100, locale, 0)}%`;
 
   const slices = totals.byTopic.map((bucket) => ({
@@ -135,6 +141,7 @@ export default async function LearningPage({
                 what: t('what'),
                 whatPlaceholder: t('whatPlaceholder'),
                 hours: t('hours'),
+            minutes: t('minutes'),
                 topic: t('topic'),
                 date: t('date'),
                 note: t('note'),

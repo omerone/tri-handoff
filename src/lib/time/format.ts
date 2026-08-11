@@ -184,13 +184,63 @@ export function formatDateTimeAt(instant: Date, timeZone: string = ANALYTICS_TIM
  * needed the same thing. Two copies of a formatter drift, and a hold time that reads "90m"
  * on one screen and "1h 30m" on another is two facts as far as the reader is concerned.
  */
-export function formatDuration(minutes: number, locale: Locale): string {
-  if (minutes < 60) return `${formatNumber(minutes, locale)}m`;
-  if (minutes < 60 * 24) {
-    const hours = Math.floor(minutes / 60);
-    return `${formatNumber(hours, locale)}h ${formatNumber(minutes % 60, locale)}m`;
+/**
+ * Unit suffixes, per locale.
+ *
+ * In code rather than in the message files, following `CURRENCY_SYMBOL`: this is a formatter,
+ * it is synchronous, and it is called from places that cannot await a translator. A bare `m`
+ * in a Hebrew sentence reads as an English abbreviation nobody chose — "35 דק'" is what the
+ * person actually says.
+ */
+const DURATION_UNITS: Record<Locale, { d: string; h: string; m: string }> = {
+  he: { d: 'י', h: 'ש', m: "דק'" },
+  en: { d: 'd', h: 'h', m: 'm' },
+};
+
+/**
+ * A span of minutes, written the way it is spoken.
+ *
+ * The minutes are kept beside the hours rather than folded into a decimal. "1.65h" is a number
+ * a person has to convert before it means anything; "1h 39דק'" is the answer. It is why the
+ * study ledger takes minutes as their own field, and it is the same shape a hold time wants.
+ *
+ * A whole number of hours drops the minutes — "2ש" rather than "2ש 0דק'".
+ */
+export function formatDuration(
+  minutes: number,
+  locale: Locale,
+  options: { maxUnit?: 'day' | 'hour' } = {},
+): string {
+  const unit = DURATION_UNITS[locale] ?? DURATION_UNITS.en;
+  const whole = Math.max(0, Math.round(minutes));
+
+  if (whole < 60) return `${formatNumber(whole, locale)}${unit.m}`;
+
+  /*
+   * Where the largest unit stops, and it is not the same answer for both callers.
+   *
+   * A hold time rolls up: a position held for fifty hours is "2d 2h", because days are how a
+   * swing trade is described and the minutes stopped mattering a long time before that. A
+   * study ledger does not: nobody says they studied for two days, and rolling up drops the
+   * minutes — which is the whole thing the ledger was asked to show. Fifty-two hours of study
+   * is "52h 20m".
+   */
+  if (options.maxUnit === 'hour' || whole < 60 * 24) {
+    const hours = Math.floor(whole / 60);
+    const rest = whole % 60;
+    return rest === 0
+      ? `${formatNumber(hours, locale)}${unit.h}`
+      : `${formatNumber(hours, locale)}${unit.h} ${formatNumber(rest, locale)}${unit.m}`;
   }
-  const days = Math.floor(minutes / (60 * 24));
-  const hours = Math.floor((minutes % (60 * 24)) / 60);
-  return `${formatNumber(days, locale)}d ${formatNumber(hours, locale)}h`;
+
+  const days = Math.floor(whole / (60 * 24));
+  const hours = Math.floor((whole % (60 * 24)) / 60);
+  return hours === 0
+    ? `${formatNumber(days, locale)}${unit.d}`
+    : `${formatNumber(days, locale)}${unit.d} ${formatNumber(hours, locale)}${unit.h}`;
+}
+
+/** Hours as stored → the same span in whole minutes, which is what the ledger is entered in. */
+export function hoursToMinutes(hours: number): number {
+  return Math.round(hours * 60);
 }
