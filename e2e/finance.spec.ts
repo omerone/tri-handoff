@@ -200,3 +200,56 @@ test.describe('recurring entries', () => {
     await expect(generated.getByRole('button', { name: 'Delete' })).toBeVisible();
   });
 });
+
+test.describe('the household book is read in shekels', () => {
+  /*
+   * The header's currency is for the trading side, where the account really is in dollars.
+   * The household book is not that: rent and salary are in shekels, the amount field says so,
+   * and for a while what a person typed and what the list underneath showed were different
+   * currencies — ₪50 entered, −$17 rendered. There is no way to check a screen like that.
+   *
+   * The preference is read back out of the database rather than assumed: a flip that silently
+   * failed would leave shekels on screen for the wrong reason and pass this test without
+   * testing anything.
+   */
+  test('leaves ₪ on the finance screen while the header is set to dollars', async ({ page }) => {
+    const prisma = new PrismaClient();
+    const tenant = await prisma.tenant.findUnique({
+      where: { domain: 'demo.localhost' },
+      select: { user: { select: { id: true, displayCurrency: true } } },
+    });
+    const user = tenant!.user!;
+
+    try {
+      await page.goto('/finance');
+      await page.getByRole('button', { name: 'Display currency' }).click();
+      await page.getByRole('menuitemradio', { name: /USD/ }).click();
+
+      await expect
+        .poll(async () => {
+          const row = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { displayCurrency: true },
+          });
+          return row?.displayCurrency;
+        })
+        .toBe('USD');
+
+      await page.goto('/finance?range=max');
+      for (const label of ['Income', 'Expenses', 'Total wealth']) {
+        await expect(tile(page, label)).toContainText('₪');
+        await expect(tile(page, label)).not.toContainText('$');
+      }
+
+      // The strongest line of the three: the trading account is denominated in dollars, so
+      // shekels here means it was converted *into* the book rather than the book out to it.
+      await expect(tile(page, 'Total wealth')).toContainText(/Trading account ₪/);
+    } finally {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { displayCurrency: user.displayCurrency },
+      });
+      await prisma.$disconnect();
+    }
+  });
+});

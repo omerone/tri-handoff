@@ -567,7 +567,8 @@
     "preferences": "Preferences",
     "accountLimit": "You can connect up to two MT5 accounts. Disconnect one before adding another.",
     "swingAccount": "Swing account",
-    "dayAccount": "Day-trading account"
+    "dayAccount": "Day-trading account",
+    "currencyShekelOnly": "The finance screen is always read in shekels"
   },
   "calendar": {
     "weekdays": [

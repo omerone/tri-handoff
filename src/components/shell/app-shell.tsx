@@ -102,6 +102,7 @@ export async function AppShell({
               <CurrencyToggle
                 current={asCurrency(session.user.displayCurrency)}
                 label={t('settings.currency')}
+                shekelOnly={t('settings.currencyShekelOnly')}
               />
               <ThemeToggle current={theme} />
               <Link

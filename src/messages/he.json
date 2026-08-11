@@ -567,7 +567,8 @@
     "preferences": "העדפות",
     "accountLimit": "אפשר לחבר עד שני חשבונות MT5. נתק אחד לפני שתחבר אחר.",
     "swingAccount": "חשבון סווינג",
-    "dayAccount": "חשבון דיי טרייד"
+    "dayAccount": "חשבון דיי טרייד",
+    "currencyShekelOnly": "המסך הפיננסי נקרא תמיד בשקלים"
   },
   "calendar": {
     "weekdays": [

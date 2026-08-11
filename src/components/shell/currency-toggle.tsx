@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { setDisplayCurrencyAction } from '@/app/actions/preferences';
 import { CURRENCY_SYMBOL, SUPPORTED_CURRENCIES, type Currency } from '@/lib/money/currency';
@@ -19,8 +20,27 @@ import { CURRENCY_SYMBOL, SUPPORTED_CURRENCIES, type Currency } from '@/lib/mone
  *
  * A menu rather than a cycle-through. Four currencies means three presses to get back to
  * where you started, and two of the intermediate states redraw every figure on the page.
+ *
+ * On the household book it stands down — dimmed and captioned, the way the brother switch
+ * does on the trading screens. That screen is kept in shekels because that is the currency the
+ * money is actually in, so the control genuinely changes nothing there; left looking live it
+ * would read as broken the first time somebody pressed it. It stays pressable because the
+ * choice still applies to every other screen.
  */
-export function CurrencyToggle({ current, label }: { current: Currency; label: string }) {
+const SHEKEL_PATHS = ['/finance'];
+
+export function CurrencyToggle({
+  current,
+  label,
+  shekelOnly,
+}: {
+  current: Currency;
+  label: string;
+  /** Said over the button on the screens that are kept in shekels whatever this says. */
+  shekelOnly: string;
+}) {
+  const pathname = usePathname();
+  const standingDown = SHEKEL_PATHS.some((path) => pathname.startsWith(path));
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const menuId = useId();
@@ -58,7 +78,7 @@ export function CurrencyToggle({ current, label }: { current: Currency; label: s
   };
 
   return (
-    <div ref={box} className="relative">
+    <div ref={box} className={`relative ${standingDown ? 'opacity-55' : ''}`}>
       <button
         ref={trigger}
         type="button"
@@ -70,7 +90,7 @@ export function CurrencyToggle({ current, label }: { current: Currency; label: s
         aria-label={label}
         // Only while it is shut. The hint answers "what is this button", and once the menu is
         // open the menu answers it better — leaving both up puts a tooltip over the choices.
-        data-tip={open ? undefined : label}
+        data-tip={open ? undefined : standingDown ? shekelOnly : label}
         /* Matched to the theme toggle beside it, down to the tap target: these two read as a
            pair and a half-pixel difference in a round button is visible. */
         className="tri-tap border-line bg-raised text-text flex h-[34px] w-[34px] items-center justify-center rounded-full border text-[15px] leading-none font-semibold disabled:opacity-60"

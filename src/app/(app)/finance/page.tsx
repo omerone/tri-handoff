@@ -134,10 +134,24 @@ export default async function FinancePage({
    * that is wrong by roughly the exchange rate and looks entirely plausible.
    */
   const accountCurrencies = [...new Set(accounts.map((one) => one.accountCurrency ?? 'USD'))];
+
+  /*
+   * This screen is read in shekels, whatever the header is set to.
+   *
+   * The header's currency is for the trading side, where the account really is denominated in
+   * dollars and "how much is this in my money" is a live question. The household book is not
+   * that: the rent is in shekels, the salary is in shekels, and the person typing ₪50 into the
+   * form — the field says so — was then shown −$17 in the list underneath it. One screen where
+   * what you write and what you read are different currencies is a screen you cannot check.
+   *
+   * So the trading leg converts *into* shekels here to be added to the cash, rather than the
+   * cash converting out to meet it.
+   */
+  const READ_IN = 'ILS';
   const [cashMoney, ...tradingMoneys] = await Promise.all([
-    displayMoney({ source: 'ILS', display: session.user.displayCurrency, locale }),
+    displayMoney({ source: 'ILS', display: READ_IN, locale }),
     ...accountCurrencies.map((currency) =>
-      displayMoney({ source: currency, display: session.user.displayCurrency, locale }),
+      displayMoney({ source: currency, display: READ_IN, locale }),
     ),
   ]);
   const tradingByCurrency = new Map(
@@ -572,7 +586,7 @@ export default async function FinancePage({
                   code,
                   label: `${CURRENCY_SYMBOL[code]} ${code}`,
                 })),
-                defaultCurrency: session.user.displayCurrency,
+                defaultCurrency: READ_IN,
                 options: [...new Set(byCategory.map((one) => one.category))],
               }}
             />
