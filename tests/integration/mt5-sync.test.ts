@@ -603,3 +603,43 @@ describe('disconnecting and reconnecting the same account', () => {
     expect(await testDb.trade.count({ where: { userId: mia.userId } })).toBe(2);
   });
 });
+
+describe('what a disconnect leaves behind', () => {
+  /**
+   * The row survives so its trades keep their attribution. The credential must not.
+   *
+   * Keeping an investor password for a broker account somebody walked away from serves
+   * nobody, and "we stopped using it" is not the same as "we no longer hold it" — the second
+   * is the only one that survives a database being read by someone who should not have it.
+   * Asserted rather than assumed, because the change that made the row survive is exactly the
+   * change that could have kept the password with it.
+   */
+  it('destroys the stored broker password', async () => {
+    const nora = await createTenantFixture();
+    await connect(nora, '55550000');
+
+    const before = await testDb.mt5Account.findFirstOrThrow({ where: { userId: nora.userId } });
+    expect(before.investorPwEncrypted).not.toBe('');
+
+    await disconnectMt5Account(nora.ctx);
+
+    const after = await testDb.mt5Account.findFirstOrThrow({ where: { userId: nora.userId } });
+    expect(after.investorPwEncrypted).toBe('');
+    expect(after.status).toBe('disconnected');
+    // And nothing will offer it to a broker again, or draw it as a live connection.
+    expect(await readCredentialCiphertexts(nora.ctx)).toEqual([]);
+    expect(await listMt5Accounts(nora.ctx)).toEqual([]);
+  });
+
+  it('cannot be reached across a tenant boundary', async () => {
+    // The whole schema is built on this join; a new query is a new chance to forget it.
+    const owner = await createTenantFixture();
+    const stranger = await createTenantFixture();
+    await connect(owner, '56560000');
+
+    await disconnectMt5Account(crossTenantContext(stranger, owner));
+
+    const untouched = await testDb.mt5Account.findFirstOrThrow({ where: { userId: owner.userId } });
+    expect(untouched.investorPwEncrypted).not.toBe('');
+  });
+});
