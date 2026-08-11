@@ -10,8 +10,8 @@ import { join } from 'path';
 import MarkdownRenderer from '@/components/markdown-renderer';
 
 export const metadata = {
-  title: 'Cookie Policy | TRi',
-  description: 'EU ePrivacy Directive compliant cookie policy for TRi Trading Journal',
+  title: 'Cookie Policy | TRO',
+  description: 'EU ePrivacy Directive compliant cookie policy for TRO Trading Journal',
 };
 
 export default function CookiePolicyPage() {

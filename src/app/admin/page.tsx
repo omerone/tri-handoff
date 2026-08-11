@@ -24,7 +24,7 @@ export default async function AdminPage() {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold">TRi — operator</h1>
+          <h1 className="text-xl font-extrabold">TRO — operator</h1>
           <p className="text-dim text-xs">{admin.email}</p>
         </div>
         <form action={adminSignOutAction}>

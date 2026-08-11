@@ -25,8 +25,8 @@ interface LegalLayoutProps {
 }
 
 export const metadata = {
-  title: 'Legal Documents | TRi',
-  description: 'Privacy Policy, Terms of Service, and legal agreements for TRi Trading Journal',
+  title: 'Legal Documents | TRO',
+  description: 'Privacy Policy, Terms of Service, and legal agreements for TRO Trading Journal',
 };
 
 export default function LegalLayout({ children }: LegalLayoutProps) {

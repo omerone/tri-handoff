@@ -70,10 +70,8 @@ export default async function LearningPage({
    * the switch existed still land on the right brother.
    */
   const who = await currentBrother();
-  const entries =
-    who === null
-      ? everyone
-      : everyone.filter((entry) => learnerKey(entry.learner) === learnerKey(who));
+  // `who` is always a brother — the switch has no merged position — so this narrows, always.
+  const entries = everyone.filter((entry) => learnerKey(entry.learner) === learnerKey(who));
 
   const totals = learningTotals(entries);
 

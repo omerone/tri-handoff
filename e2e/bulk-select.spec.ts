@@ -55,6 +55,9 @@ test.beforeAll(async () => {
         userId: user.id,
         title: `${SEEDED} entry`,
         topic: 'technical',
+        // Always a brother: the two-position switch shows only his rows, so a null learner
+        // here would seed a row the page under test cannot display.
+        learner: 'יוני',
         hours: 1,
         learnedOn: new Date('2026-07-01T00:00:00.000Z'),
       },

@@ -157,19 +157,3 @@ export function groupByLearner(entries: readonly LearningEntry[]): LearnerTotals
   });
 }
 
-/**
- * Every name used so far, for the form to offer.
- *
- * Two people is the case this is built for, so the list is short and the point of offering it
- * is that the second session is attributed with a click rather than retyped — a retyped name
- * is where the spelling drift that `learnerKey` cleans up after comes from.
- */
-export function learnerNames(entries: readonly LearningEntry[]): string[] {
-  const seen = new Map<string, string>();
-  for (const entry of entries) {
-    if (entry.learner === null) continue;
-    const key = learnerKey(entry.learner);
-    if (!seen.has(key)) seen.set(key, entry.learner);
-  }
-  return [...seen.values()].sort((a, b) => a.localeCompare(b));
-}

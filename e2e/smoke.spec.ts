@@ -16,7 +16,7 @@ test.describe('tenant boundary', () => {
   test('a host that is not a client gets a 404 explaining why', async ({ page }) => {
     const response = await page.goto(`${unknownHost}/login`);
     expect(response?.status()).toBe(404);
-    await expect(page.getByText(/TRi client|חשבון TRi/)).toBeVisible();
+    await expect(page.getByText(/TRO client|חשבון TRO/)).toBeVisible();
   });
 
   test('a client host serves the sign-in page', async ({ page }) => {
@@ -105,6 +105,6 @@ test.describe('language', () => {
 
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.getByRole('heading', { name: 'Sign in to TRi' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sign in to TRO' })).toBeVisible();
   });
 });

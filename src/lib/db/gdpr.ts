@@ -288,6 +288,10 @@ export async function exportUserData(userId: string) {
       trades: true,
       financeEntries: true,
       longPositions: true,
+      // The study ledger was missing from this list, and it is now the most *personal* table
+      // here — each row names which brother studied. An Article 20 export that omits a table
+      // is not an export; it is a sample.
+      learning: true,
       syncLogs: true,
     },
   });
@@ -331,6 +335,7 @@ export async function exportUserData(userId: string) {
     })),
     trades: user.trades,
     financeEntries: user.financeEntries,
+    learningEntries: user.learning,
     longPositions: user.longPositions,
     syncLogs: user.syncLogs,
     authEvents,

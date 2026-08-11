@@ -36,7 +36,8 @@ import { holdTimes } from '@/lib/analytics/streaks';
 import { formatDuration } from '@/lib/time/format';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { listLearningEntries } from '@/lib/db';
-import { hoursDecimals, learningTotals } from '@/lib/learning/types';
+import { currentBrother } from '@/lib/preferences/brother';
+import { hoursDecimals, learnerKey, learningTotals } from '@/lib/learning/types';
 import { originalTpBreakdown, tpTimingBreakdown } from '@/lib/review/stats';
 import { ORIGINAL_TP_COLOR, TIMING_COLOR, TOPIC_COLOR } from '@/lib/review/colors';
 import { computeCosts, costsBySymbol } from '@/lib/analytics/costs';
@@ -78,9 +79,13 @@ export default async function AnalyticsPage({
     loadBook(session.ctx, window),
     // The study ledger is not part of the book — nothing about it comes from the broker —
     // but it is narrowed by the same window, so the three donuts below all describe the
-    // same stretch of time.
+    // same stretch of time. And unlike the book, it is *personal*: this screen is joint,
+    // but the hours belong to one brother, so the donut follows the header switch exactly
+    // as the learning screen does. Without the filter the two screens disagreed by the
+    // other brother's hours — same window, same donut, two different answers.
     listLearningEntries(session.ctx, { from: window.from, to: window.to }),
   ]);
+  const brother = await currentBrother();
   const { money, display } = await displayMoney({
     source: book.accountCurrency,
     display: session.user.displayCurrency,
@@ -117,7 +122,9 @@ export default async function AnalyticsPage({
 
   const timing = tpTimingBreakdown(book.trades);
   const original = originalTpBreakdown(book.trades);
-  const learned = learningTotals(learning);
+  const learned = learningTotals(
+    learning.filter((entry) => learnerKey(entry.learner) === learnerKey(brother)),
+  );
 
   const sharePct = (value: number) => `${formatNumber(value * 100, locale, 0)}%`;
   const learningHours = (value: number) => `${formatNumber(value, locale, hoursDecimals(value))}h`;

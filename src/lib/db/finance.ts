@@ -45,10 +45,10 @@ export async function listFinanceEntries(
   /**
    * One brother's money, or everyone's.
    *
-   * Undefined and null both mean "both" — null is the switch resting on the household
-   * position, and the distinction the schema keeps (a row *owned by* nobody) matters on
-   * write, not on read: an unowned row belongs in every view of the shared budget, but a
-   * brother's view holds strictly his own.
+   * Undefined and null both mean "no filter" — a repository-level answer with no screen
+   * behind it any more: the switch always rests on a brother, and the action refuses a row
+   * without one. Kept for the tests and for tooling that legitimately reads the whole table;
+   * a null-owned row, should one ever exist again, is reachable only from here.
    */
   owner?: string | null,
 ): Promise<FinanceEntry[]> {

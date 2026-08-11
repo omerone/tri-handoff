@@ -30,7 +30,7 @@ export async function activeTenant(): Promise<ActiveTenant> {
 
 async function TenantSuspended() {
   const t = await getTranslations('error');
-  return <Notice title="TRi" body={t('suspendedTenant')} />;
+  return <Notice title="TRO" body={t('suspendedTenant')} />;
 }
 
 export function Notice({ title, body }: { title: string; body: string }) {

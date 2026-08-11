@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   hoursDecimals,
-  learnerNames,
   learningTotals,
   normalizeLearner,
   type LearningEntry,
@@ -155,18 +154,6 @@ describe('who studied', () => {
     expect(shimon.byTopic.find((slot) => slot.topic === 'technical')!.hours).toBe(0);
   });
 
-  it('offers each name once, however it was typed, in alphabetical order', () => {
-    // Alphabetical rather than by use: the list is a picker, and two names that swap places
-    // depending on who studied last is a picker people misclick.
-    expect(
-      learnerNames([
-        session({ learner: 'Shimon' }),
-        session({ learner: 'ester' }),
-        session({ learner: 'Shimon ' }),
-        session({ learner: null }),
-      ]),
-    ).toEqual(['ester', 'Shimon']);
-  });
 
   it('treats a blank name as no name at all', () => {
     // The field is optional and a form posts '' rather than nothing, so this is the common

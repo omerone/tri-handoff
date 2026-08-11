@@ -10,8 +10,8 @@ import { join } from 'path';
 import MarkdownRenderer from '@/components/markdown-renderer';
 
 export const metadata = {
-  title: 'Sub-Processors List | TRi',
-  description: 'GDPR Article 28(2) compliant list of data sub-processors used by TRi',
+  title: 'Sub-Processors List | TRO',
+  description: 'GDPR Article 28(2) compliant list of data sub-processors used by TRO',
 };
 
 export default function SubProcessorsPage() {

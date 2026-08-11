@@ -12,5 +12,5 @@ export default async function NotFound() {
   const lookup = await resolveTenant();
   const body = lookup.state === 'unknown' ? t('unknownTenant') : t('notFound');
 
-  return <Notice title="TRi" body={body} />;
+  return <Notice title="TRO" body={body} />;
 }

@@ -21,6 +21,30 @@ const flip = (page: Page, name: string) =>
     .getByRole('button', { name, exact: true });
 
 /**
+ * Open the add sheet — or find the form already inline — surviving hydration.
+ *
+ * On a phone the form is behind an "Add an entry" button whose onClick only exists after
+ * hydration; a click before that is swallowed whole, and no amount of asserting on
+ * server-rendered attributes proves the handler is attached (aria-pressed is true in the
+ * first HTML byte). The only evidence that the click worked is the form becoming visible,
+ * so this clicks until it is.
+ */
+async function openForm(page: Page, field: ReturnType<Page['getByLabel']>) {
+  const opener = page.getByRole('button', { name: /add an entry|הוספת רשומה/i }).first();
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    if (await field.isVisible().catch(() => false)) return;
+    if (await opener.isVisible().catch(() => false)) await opener.click();
+    try {
+      await expect(field).toBeVisible({ timeout: 2_000 });
+      return;
+    } catch {
+      // swallowed by pre-hydration DOM — go again
+    }
+  }
+  throw new Error('the form never became visible');
+}
+
+/**
  * Fill a whole form so it survives hydration, then verify it as one piece.
  *
  * Flipping the switch navigates, and the next screen hydrates while the test is already
@@ -53,8 +77,7 @@ test.describe('the brother switch', () => {
     const evyatar = `דלק ${run}`;
 
     const add = async (label: string) => {
-      const opener = page.getByRole('button', { name: /add an entry|הוספת רשומה/i }).first();
-      if (await opener.isVisible().catch(() => false)) await opener.click();
+      await openForm(page, page.getByLabel(/label|תיאור/i));
       await fillForm([
         { locator: page.getByLabel(/label|תיאור/i), value: label },
         { locator: page.getByLabel(/amount|סכום/i), value: '120' },
@@ -90,9 +113,7 @@ test.describe('the brother switch', () => {
 
     await page.goto('/learning');
     await flip(page, 'יוני').click();
-
-    const opener = page.getByRole('button', { name: /add an entry|הוספת רשומה/i }).first();
-    if (await opener.isVisible().catch(() => false)) await opener.click();
+    await openForm(page, page.getByLabel(/^what|מה נלמד/i));
     // Stated here too — the hidden field carries the switch's answer.
     await expect(page.locator('input[name="learner"]')).toHaveValue('יוני');
     await fillForm([

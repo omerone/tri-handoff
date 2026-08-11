@@ -96,6 +96,10 @@ export async function beginTwoFactorAction(
 
   return {
     setup: {
+      // Still 'TRi', deliberately, through the TRO rename: the issuer names the entry in
+      // the person's authenticator app, and changing it silently strands the existing
+      // entry — the app shows two issuers for one account and no hint which one works.
+      // Rename it only alongside a guided re-enrolment.
       uri: otpauthUri({ secret, account: session.user.email, issuer: 'TRi' }),
       manualKey: formatSecretForEntry(secret),
     },
@@ -138,7 +142,11 @@ export async function confirmTwoFactorAction(
     return {
       error: t('wrongCode'),
       setup: {
-        uri: otpauthUri({ secret, account: session.user.email, issuer: 'TRi' }),
+        // Still 'TRi', deliberately, through the TRO rename: the issuer names the entry in
+      // the person's authenticator app, and changing it silently strands the existing
+      // entry — the app shows two issuers for one account and no hint which one works.
+      // Rename it only alongside a guided re-enrolment.
+      uri: otpauthUri({ secret, account: session.user.email, issuer: 'TRi' }),
         manualKey: formatSecretForEntry(secret),
       },
     };

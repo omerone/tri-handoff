@@ -10,8 +10,8 @@ import { join } from 'path';
 import MarkdownRenderer from '@/components/markdown-renderer';
 
 export const metadata = {
-  title: 'Privacy Policy | TRi',
-  description: 'GDPR-compliant privacy policy for TRi Trading Journal',
+  title: 'Privacy Policy | TRO',
+  description: 'GDPR-compliant privacy policy for TRO Trading Journal',
 };
 
 export default function PrivacyPolicyPage() {

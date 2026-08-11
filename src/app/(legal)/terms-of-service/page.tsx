@@ -10,8 +10,8 @@ import { join } from 'path';
 import MarkdownRenderer from '@/components/markdown-renderer';
 
 export const metadata = {
-  title: 'Terms of Service | TRi',
-  description: 'Terms of Service for TRi Trading Journal',
+  title: 'Terms of Service | TRO',
+  description: 'Terms of Service for TRO Trading Journal',
 };
 
 export default function TermsOfServicePage() {

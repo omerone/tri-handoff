@@ -10,8 +10,8 @@ import { join } from 'path';
 import MarkdownRenderer from '@/components/markdown-renderer';
 
 export const metadata = {
-  title: 'Data Processing Agreement | TRi',
-  description: 'GDPR Article 28 Data Processing Agreement for TRi Trading Journal',
+  title: 'Data Processing Agreement | TRO',
+  description: 'GDPR Article 28 Data Processing Agreement for TRO Trading Journal',
 };
 
 export default function DataProcessingAgreementPage() {

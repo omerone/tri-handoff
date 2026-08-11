@@ -9,7 +9,7 @@ export default async function AdminLoginPage() {
   return (
     <div className="mx-auto max-w-sm pt-16">
       <Card>
-        <h1 className="pt-2 pb-3 text-lg font-extrabold">TRi — super admin</h1>
+        <h1 className="pt-2 pb-3 text-lg font-extrabold">TRO — super admin</h1>
         <AdminLoginForm />
       </Card>
     </div>
