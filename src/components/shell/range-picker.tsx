@@ -90,37 +90,28 @@ export function RangePicker({
    * props, and it closes the popover exactly when the answer above it changed.
    */
   /*
-   * Arriving on a custom range opens the panel — on a wide screen.
+   * Closed until it is asked for.
    *
-   * It exists so a shared link lands on the fields that produced it. Below `lg` that is both
-   * unnecessary and in the way: the trigger *is* the range there, so the panel says nothing new,
-   * and it is a full-width sheet that opens over whatever the page put under it — on the finance
-   * screen, directly over the button for adding an entry.
-   *
-   * Read once, on mount, rather than watched: this decides an initial state, and a panel that
-   * opened or closed itself because a phone was turned sideways is a control moving on its own.
+   * Arriving on a custom range used to open the panel on a wide screen, so a shared link landed
+   * on the fields that produced it. With one layout the trigger already says what the range is,
+   * and a panel that opens itself is a menu covering the page nobody asked to see — the reason
+   * that behaviour was already switched off below `lg`. It also took a media query, a
+   * mount-only effect and a key comparison to express; none of that has anything left to do.
    */
-  const wideEnough = () =>
-    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
-
   const [panel, setPanel] = useState(() => ({ key, open: false, mode: modeOf(current) }));
 
-  useEffect(() => {
-    setPanel((prev) => {
-      if (prev.key !== key) {
-        return { key, open: custom && wideEnough(), mode: modeOf(current) };
-      }
-      return prev;
-    });
-  }, [key, custom, current]);
-
-  // The first paint has to agree between the server and the client, so the mount-time open is
-  // an effect rather than an initial value.
-  useEffect(() => {
-    if (custom && wideEnough()) setPanel((prev) => ({ ...prev, open: true }));
-    // Once, for the range this mounted on.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  /*
+   * Choosing a range closes the panel and re-syncs the mode.
+   *
+   * The answer above it just changed, and a form full of March still standing under a button
+   * reading "Maximum" is a contradiction the reader has to resolve. Adjusted during render
+   * rather than in an effect — this is React's own answer for state that has to follow a prop,
+   * and it re-renders before anything is painted instead of painting the stale panel first and
+   * correcting it a frame later.
+   */
+  if (panel.key !== key) {
+    setPanel({ key, open: false, mode: modeOf(current) });
+  }
 
   const anchor = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -201,28 +192,6 @@ export function RangePicker({
      */
     <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
       <>
-        {/* No label and no icon. The buttons say "maximum", "this month", "last month" and
-            name the custom range outright, so a heading in front of them was restating what
-            they already read as. The group keeps its `aria-label`, so a screen reader — which
-            cannot see that the buttons are a set — is told what they are for. */}
-        <form action={applyRangeAction} className="hidden lg:block">
-          <Where path={pathname} query={query} />
-          <div role="group" aria-label={labels.title} className={`${group} inline-flex`}>
-            {RANGE_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="submit"
-                name="intent"
-                value={presetToken(preset)}
-                aria-pressed={current.kind === preset}
-                className={segment(current.kind === preset)}
-              >
-                {labels.presets[preset]}
-              </button>
-            ))}
-          </div>
-        </form>
-
         <div ref={anchor} className="relative w-full lg:w-auto">
           <button
             ref={trigger}
@@ -245,15 +214,13 @@ export function RangePicker({
           >
             <span className="flex min-w-0 items-center gap-1.5">
               <CalendarRange size={14} aria-hidden className="shrink-0" />
-              {/* The range below `lg`, the words "custom range" above it — where the segmented
-                  row already names the presets and this button is only the other door. */}
-              <span
-                dir={current.kind === 'dates' ? 'ltr' : undefined}
-                className="truncate lg:hidden"
-              >
+              {/* The range itself, at every width. The button used to read "custom range" on a
+                  desktop because a segmented row beside it already named the presets; with the
+                  row gone that would be a control describing one of its options instead of its
+                  answer. */}
+              <span dir={current.kind === 'dates' ? 'ltr' : undefined} className="truncate">
                 {activeLabel}
               </span>
-              <span className="hidden lg:inline">{labels.custom}</span>
             </span>
             <ChevronDown
               size={13}
@@ -264,12 +231,12 @@ export function RangePicker({
 
           {panel.open ? (
             /*
-             * One panel, holding whatever the layout above it does not.
+             * One panel, holding every way to change the range.
              *
-             * From `lg` that is the custom range alone, because the presets are already a row
-             * of buttons outside it. Below `lg` the presets come in here too, as full-width
-             * rows — which is the point of the narrow layout: one control, and every way to
-             * change the range behind it.
+             * This used to hold only the custom fields above `lg`, because a segmented row of
+             * presets sat outside it. Two layouts of one control meant two places a preset
+             * could live and two shapes to keep in agreement; one door is fewer of both, and it
+             * is the shape the narrow layout already proved.
              */
             <div
               id="tri-range-custom"
@@ -277,7 +244,7 @@ export function RangePicker({
               aria-label={labels.title}
               className="tri-sheet border-line bg-surface absolute end-0 top-[calc(100%+6px)] z-30 w-full max-w-[calc(100vw-2rem)] rounded-[14px] border p-3 shadow-xl lg:w-[290px]"
             >
-              <form action={applyRangeAction} className="mb-3 flex flex-col gap-1 lg:hidden">
+              <form action={applyRangeAction} className="mb-3 flex flex-col gap-1">
                 <Where path={pathname} query={query} />
                 {RANGE_PRESETS.map((preset) => (
                   <button

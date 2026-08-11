@@ -39,18 +39,18 @@ function monthBefore(label: string): string {
 /**
  * The picker's trigger, by what it controls rather than by what it says.
  *
- * It says two different things on purpose: "Custom range" from `lg`, where a segmented row of
- * presets sits beside it and this is only the other door — and the *active range itself* below
- * that, where it is the only control and its job is to answer "what am I looking at". A name
- * that changes with the viewport is not a handle a test can hold.
+ * What it says is the active range — "Maximum", "This month", or the dates of a custom one —
+ * because the control's job is to answer "what am I looking at" before it offers to change it.
+ * That makes its name a moving target for a test, so this holds the one thing about it that
+ * does not move: it is the button wired to the panel.
  */
 const picker = (page: Page) => page.locator('button[aria-controls="tri-range-custom"]');
 
 /**
- * A preset, wherever the current layout keeps it — and never the trigger.
+ * A preset inside the panel — and never the trigger.
  *
- * Below `lg` the trigger *is* named after the range, so "the visible button called Last month"
- * matches it once that range is chosen, and every assertion about a preset then lands on a
+ * The trigger is named after the active range, so "the visible button called Last month"
+ * matches it too once that range is chosen, and an assertion about a preset would land on a
  * button that has no `aria-pressed` and never did. The trigger is the one carrying
  * `aria-controls`; excluding it is the whole of the distinction.
  */
@@ -61,11 +61,11 @@ const preset = (page: Page, name: string) =>
     .filter({ visible: true });
 
 /**
- * Choose a preset, whichever layout is drawing them.
+ * Choose a preset: open the panel, then click it.
  *
- * From `lg` they are a row and one click does it. Below that they live in the panel behind the
- * trigger, which is the entire point of the narrow layout — so the panel is opened first. A
- * test about what a *range* does should not have to know which of the two it is looking at.
+ * The presets live behind the trigger at every width now. The count check stays because the
+ * panel may already be open — a test that chooses twice in a row would otherwise close it on
+ * the second call and click nothing.
  */
 async function choose(page: Page, name: string) {
   if ((await preset(page, name).count()) === 0) await picker(page).click();

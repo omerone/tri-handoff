@@ -84,20 +84,37 @@ test.describe('the range picker on a phone', () => {
 test.describe('the range picker on a desktop', () => {
   test.skip(({ isMobile }) => !!isMobile, 'this is the wide layout');
 
-  test('keeps the presets in the row and only the custom range in the panel', async ({ page }) => {
+  /**
+   * One door at every width.
+   *
+   * A segmented row of presets used to sit beside the trigger here, which made the trigger the
+   * *other* way in and left it reading "Custom range" — a control naming one of its options
+   * rather than its answer. Two layouts also meant two places a preset could live and two
+   * shapes to keep in agreement. The narrow layout had already settled what this should be.
+   */
+  test('reads the range, and keeps every option behind it', async ({ page }) => {
     await page.goto('/trades?range=max');
-    await expect(segmented(page).first(), 'the segmented row is missing').toBeVisible();
+
+    await expect(
+      segmented(page).first(),
+      'the segmented row is back beside the trigger',
+    ).toHaveCount(0);
+    await expect(trigger(page), 'the trigger does not read the active range').toHaveText(
+      /maximum|מקסימום/i,
+    );
 
     await trigger(page).click();
     const panel = sheet(page);
     await expect(panel).toBeVisible();
+    // Every way to change the range, in the one place that opens.
+    await expect(panel.getByRole('button', { name: /last month|חודש קודם/i })).toBeVisible();
     await expect(panel.getByRole('button', { name: /apply|החל/i })).toBeVisible();
+  });
 
-    // The presets are already outside it; repeating them here would be two controls for one
-    // choice, sitting one above the other.
-    await expect(
-      panel.getByRole('button', { name: /last month|חודש קודם/i }),
-      'the presets are duplicated inside the panel',
-    ).toHaveCount(0);
+  test('does not open itself when a shared link lands on a custom range', async ({ page }) => {
+    // It used to, so the fields that produced the link were on screen. With the trigger now
+    // saying what the range is, that is a menu covering the page nobody asked to see.
+    await page.goto('/trades?range=2026-03');
+    await expect(sheet(page), 'the panel opened on its own').toHaveCount(0);
   });
 });
