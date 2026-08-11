@@ -1,3 +1,4 @@
+import { normalizeTopic, topicKey } from '@/lib/learning/types';
 import 'server-only';
 import type { TenantContext } from '@/lib/tenant/context';
 import type { LearningEntry, LearningTopic } from '@/lib/learning/types';
@@ -112,4 +113,35 @@ export async function deleteLearningEntry(ctx: TenantContext, id: string): Promi
     where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
   });
   return count > 0;
+}
+
+/**
+ * Every topic this trader has actually used, most recent first.
+ *
+ * The same idea as `listJournalVocabulary`: the form offers what has been typed before so a
+ * topic is chosen rather than re-typed, which is what stops "Back test" and "Backtest" being
+ * two rows in the chart. Folded on `topicKey`, keeping the first spelling seen.
+ *
+ * The two built-ins are not added here — the form lists them itself, so this stays a record
+ * of what the trader has written rather than a mix of theirs and ours.
+ */
+export async function listLearningTopics(ctx: TenantContext): Promise<string[]> {
+  assertContext(ctx);
+  const rows = await prisma.learningEntry.findMany({
+    where: { userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    select: { topic: true },
+    // Oldest first, so the spelling kept is the one that named the topic — the same rule
+    // `groupByTopic` follows, or the suggestion list and the chart would disagree about what
+    // the topic is called.
+    orderBy: { learnedOn: 'asc' },
+    take: 500,
+  });
+
+  const seen = new Map<string, string>();
+  for (const row of rows) {
+    const clean = normalizeTopic(row.topic);
+    const key = topicKey(clean);
+    if (key !== '' && !seen.has(key)) seen.set(key, clean);
+  }
+  return [...seen.values()].reverse();
 }

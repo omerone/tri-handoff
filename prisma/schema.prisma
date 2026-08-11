@@ -593,13 +593,6 @@ model LongPosition {
   @@map("long_positions")
 }
 
-/// What a study session was about. Two answers because they are the two halves a trader can
-/// be weak in independently — reading the chart, and sitting still while it plays out.
-enum LearningTopic {
-  psychology
-  technical
-}
-
 /// A study session: what was learned, for how long, and which half it belongs to.
 ///
 /// A sibling of `FinanceEntry` rather than of `Trade` — it is a ledger the trader keeps by
@@ -609,7 +602,14 @@ model LearningEntry {
 
   userId String @map("user_id")
 
-  topic LearningTopic
+  /// What the session was about, in the trader's own words.
+  ///
+  /// A free string rather than the two-value enum it started as. The pair it shipped with —
+  /// psychology and technical — are still the defaults and still carry their own labels and
+  /// colours, but a trader who spends an evening back-testing has no way to say so, and the
+  /// answer cannot be "ask for a migration each time". The screens group on a folded key, so
+  /// "Back test", "back test" and "Backtest " are one topic however carefully anyone types.
+  topic String
   /// What was learned, in the trader's own words.
   title String
   note  String?

@@ -5,17 +5,13 @@ import { Card } from '@/components/ui/card';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { Chip, EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
-import { listLearningEntries } from '@/lib/db';
+import { listLearningEntries, listLearningTopics } from '@/lib/db';
 import { currentBrother } from '@/lib/preferences/brother';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
-import {
-  learnerKey,
-  learningTotals,
-  type LearningTopic,
-} from '@/lib/learning/types';
+import { isKnownTopic, learnerKey, learningTotals, topicKey } from '@/lib/learning/types';
 import { formatNumber } from '@/lib/money/currency';
 import { currentResolvedRange } from '@/lib/preferences/range';
-import { TOPIC_COLOR } from '@/lib/review/colors';
+import { topicColor } from '@/lib/review/colors';
 import { formatDateAt, formatDuration, hoursToMinutes } from '@/lib/time/format';
 import { toTradeFilter } from '@/lib/time/range';
 import { deleteLearningEntryAction } from './actions';
@@ -54,7 +50,15 @@ export default async function LearningPage({
   const range = await currentResolvedRange(params.range);
   const window = toTradeFilter(range);
 
-  const everyone = await listLearningEntries(session.ctx, { from: window.from, to: window.to });
+  const [everyone, usedTopics] = await Promise.all([
+    listLearningEntries(session.ctx, { from: window.from, to: window.to }),
+    /*
+     * Deliberately not narrowed by the range. The suggestions exist so a topic is chosen
+     * rather than re-typed, and a topic used last year is exactly the one somebody is about to
+     * type from memory and spell differently.
+     */
+    listLearningTopics(session.ctx),
+  ]);
 
   /*
    * Whose numbers these are: the header switch's position, the same one finance follows.
@@ -85,12 +89,19 @@ export default async function LearningPage({
   const hours = (value: number) => formatDuration(hoursToMinutes(value), locale, { maxUnit: 'hour' });
   const percent = (value: number) => `${formatNumber(value * 100, locale, 0)}%`;
 
+  /*
+   * A built-in topic is translated; a topic the trader invented is their own word and is shown
+   * exactly as they typed it. Asking the translator for a key that was never in the message
+   * files is how a dynamic label throws in production.
+   */
+  const topicLabel = (topic: string) => (isKnownTopic(topic) ? t(`topics.${topic}`) : topic);
+
   const slices = totals.byTopic.map((bucket) => ({
     key: bucket.topic,
-    label: t(`topics.${bucket.topic}`),
+    label: topicLabel(bucket.topic),
     value: bucket.hours,
     caption: `${hours(bucket.hours)} · ${percent(totals.hours === 0 ? 0 : bucket.hours / totals.hours)}`,
-    color: TOPIC_COLOR[bucket.topic],
+    color: topicColor(bucket.topic),
   }));
 
   const today = new Date();
@@ -104,7 +115,7 @@ export default async function LearningPage({
         {totals.byTopic.map((bucket) => (
           <KPI
             key={bucket.topic}
-            label={t(`topics.${bucket.topic}`)}
+            label={topicLabel(bucket.topic)}
             value={hours(bucket.hours)}
             sub={t('sessionsCount', { count: bucket.sessions })}
           />
@@ -147,7 +158,22 @@ export default async function LearningPage({
                 note: t('note'),
                 notePlaceholder: t('notePlaceholder'),
                 add: t('add'),
-                topics: { psychology: t('topics.psychology'), technical: t('topics.technical') },
+                /*
+              Built-ins first by their translated labels, then whatever this trader has
+              written before — deduplicated on the folded key so a built-in typed by hand does
+              not appear twice in the list that exists to stop exactly that.
+            */
+            topicOptions: [
+              t('topics.technical'),
+              t('topics.psychology'),
+              ...usedTopics.filter(
+                (one) =>
+                  !isKnownTopic(one) &&
+                  topicKey(one) !== topicKey(t('topics.technical')) &&
+                  topicKey(one) !== topicKey(t('topics.psychology')),
+              ),
+            ],
+            topics: { psychology: t('topics.psychology'), technical: t('topics.technical') },
               }}
             />
           </AddSheet>
@@ -174,7 +200,7 @@ export default async function LearningPage({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-2">
                       <span className="text-text text-sm font-semibold">{entry.title}</span>
-                      <Chip>{t(`topics.${entry.topic as LearningTopic}`)}</Chip>
+                      <Chip>{topicLabel(entry.topic)}</Chip>
                       {/*
                         The name on the row, not only in the summary. A ledger that totals per
                         person but does not say who did any given session cannot be corrected:

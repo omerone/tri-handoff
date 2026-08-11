@@ -7,6 +7,8 @@ import { requireSession } from '@/lib/auth/session';
 import { createLearningEntry, deleteLearningEntry } from '@/lib/db';
 import { isPlausibleDate } from '@/lib/finance/bounds';
 import { isBrother } from '@/lib/household';
+import { LEARNING_TOPICS, normalizeTopic, topicKey } from '@/lib/learning/types';
+import { LOCALES } from '@/i18n/config';
 
 export type LearningFormState = { error?: string; ok?: boolean };
 
@@ -18,7 +20,9 @@ export type LearningFormState = { error?: string; ok?: boolean };
 const MAX_HOURS = 24;
 
 const entrySchema = z.object({
-  topic: z.enum(['psychology', 'technical']),
+  // Free text now, and bounded rather than enumerated: the list of topics is the trader's,
+  // not ours. `resolveTopic` decides whether what arrived is a built-in or their own word.
+  topic: z.string().trim().min(1).max(60),
   /**
    * Who studied. Always one of the two brothers, refused otherwise — the same rule the
    * finance action applies, and it was briefly looser here: this field accepted any string
@@ -57,6 +61,33 @@ const entrySchema = z.object({
  * exactly what this function decided: 35 minutes is 0.5833 hours and reads back as 35 minutes,
  * every time, however many rows are summed.
  */
+/**
+ * What the form submitted → what to store.
+ *
+ * The topic field offers the built-ins by their *translated* labels, because that is what the
+ * trader reads — so "טכני" comes back, not "technical". Storing that verbatim would put a
+ * second, untranslated bucket beside the real one, and switching the interface to English
+ * would leave a Hebrew word in the chart forever.
+ *
+ * So a submission that folds to a built-in's key or to either locale's label for it is stored
+ * as the key. Anything else is the trader's own word and is kept exactly as they wrote it.
+ * Both locales are checked, not just the current one: the account has two of them and a topic
+ * chosen in Hebrew must still be the same topic when the screen is in English.
+ */
+async function resolveTopic(submitted: string): Promise<string> {
+  const clean = normalizeTopic(submitted);
+  if (clean === '') return '';
+
+  const key = topicKey(clean);
+  for (const locale of LOCALES) {
+    const t = await getTranslations({ locale, namespace: 'learning.topics' });
+    for (const known of LEARNING_TOPICS) {
+      if (key === topicKey(known) || key === topicKey(t(known))) return known;
+    }
+  }
+  return clean;
+}
+
 function totalHours(hoursField: string, minutesField: string): number | null {
   const read = (value: string): number | null => {
     const trimmed = value.trim();
@@ -95,8 +126,11 @@ export async function createLearningEntryAction(
   const total = totalHours(parsed.data.hours, parsed.data.minutes);
   if (total === null) return { error: t('invalid') };
 
+  const topic = await resolveTopic(parsed.data.topic);
+  if (topic === '') return { error: t('invalid') };
+
   await createLearningEntry(session.ctx, {
-    topic: parsed.data.topic,
+    topic,
     title: parsed.data.title,
     note: parsed.data.note || null,
     hours: total,

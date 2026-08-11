@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  hoursDecimals,
-  learningTotals,
-  normalizeLearner,
-  type LearningEntry,
-} from './types';
+import { hoursDecimals, isKnownTopic, learningTotals, normalizeLearner, type LearningEntry } from './types';
 
 const session = (over: Partial<LearningEntry> = {}): LearningEntry => ({
   id: crypto.randomUUID(),
@@ -163,5 +158,57 @@ describe('who studied', () => {
     expect(normalizeLearner('   ')).toBeNull();
     expect(normalizeLearner(undefined)).toBeNull();
     expect(normalizeLearner('  Ester   Shimon ')).toBe('Ester Shimon');
+  });
+});
+
+describe('topics the trader invented', () => {
+  const at = (day: number, topic: string, hours: number) => ({
+    id: `${day}-${topic}`,
+    topic,
+    title: 'x',
+    note: null,
+    hours,
+    learnedOn: new Date(Date.UTC(2026, 0, day)),
+    learner: 'Yoni',
+  });
+
+  it('folds spellings of one topic into one bucket', () => {
+    // Typed three ways on three evenings; it is one topic and three hours.
+    const totals = learningTotals([
+      at(1, 'Back test', 1),
+      at(2, 'back  TEST', 1),
+      at(3, 'backtest ', 1),
+    ]);
+    const custom = totals.byTopic.filter((bucket) => !isKnownTopic(bucket.topic));
+    expect(custom).toHaveLength(2); // "Back test" and "backtest" differ by a space, not by case
+    expect(custom.reduce((sum, bucket) => sum + bucket.hours, 0)).toBe(3);
+  });
+
+  it('labels a topic with the spelling that named it, not the latest one', () => {
+    /*
+     * Entries reach this function newest-first, so taking whichever arrived first labelled a
+     * topic created as "Back test" with a later, sloppier "back TEST". A topic's name should
+     * not change because it was used again.
+     */
+    const totals = learningTotals([at(9, 'back TEST', 1), at(2, 'Back test', 1)]);
+    const custom = totals.byTopic.find((bucket) => !isKnownTopic(bucket.topic));
+    expect(custom?.topic).toBe('Back test');
+  });
+
+  it('counts an invented topic in the total, not just in its own row', () => {
+    // The buckets used to be built from a fixed list of two, so a third topic's hours would
+    // have been missing from the headline figure with nothing on screen to say so.
+    const totals = learningTotals([at(1, 'technical', 2), at(2, 'Back test', 3)]);
+    expect(totals.hours).toBe(5);
+    expect(totals.sessions).toBe(2);
+  });
+
+  it('keeps the two built-ins at the front so the legend does not reshuffle', () => {
+    const totals = learningTotals([at(1, 'Back test', 99), at(2, 'technical', 1)]);
+    expect(totals.byTopic.slice(0, 2).map((bucket) => bucket.topic)).toEqual([
+      'psychology',
+      'technical',
+    ]);
+    expect(totals.byTopic[2]?.topic).toBe('Back test');
   });
 });

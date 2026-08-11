@@ -19,6 +19,8 @@ export type LearningFormLabels = {
   notePlaceholder: string;
   add: string;
   topics: { psychology: string; technical: string };
+  /** Built-ins first, then whatever this trader has written before. */
+  topicOptions: string[];
 };
 
 /**
@@ -57,12 +59,33 @@ export function LearningEntryForm({
       {/* Two columns on a phone, the original inline row from `sm` — see the note on the
           same grid in `long/manual-trade-form.tsx`. */}
       <div className="grid grid-cols-2 items-end gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-2">
+        {/*
+          A field, not a dropdown.
+          
+          The two the product ships with are not the whole of the craft — an evening spent
+          back-testing is neither — and a closed list means every new answer is a migration.
+          This is the same shape the trade journal already uses for strategy and tags: type
+          anything, and what has been typed before is offered so it is chosen rather than
+          re-typed. `list` gives that natively, so there is no dropdown to open on a phone and
+          nothing to hydrate.
+          
+          The grouping folds case and spacing, so "Back test" and "backtest" are one topic
+          whichever way it is typed on the day — see `topicKey`.
+        */}
         <label className="flex flex-col gap-1">
           <span className="text-dim text-[11px] font-semibold">{labels.topic}</span>
-          <select name="topic" defaultValue="technical" className={`${field} sm:w-36`}>
-            <option value="technical">{labels.topics.technical}</option>
-            <option value="psychology">{labels.topics.psychology}</option>
-          </select>
+          <input
+            name="topic"
+            list="learning-topics"
+            required
+            defaultValue={labels.topics.technical}
+            className={`${field} sm:w-40`}
+          />
+          <datalist id="learning-topics">
+            {labels.topicOptions.map((option) => (
+              <option key={option} value={option} />
+            ))}
+          </datalist>
         </label>
 
         {/*

@@ -37,9 +37,9 @@ import { formatDuration, hoursToMinutes } from '@/lib/time/format';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { listLearningEntries } from '@/lib/db';
 import { currentBrother } from '@/lib/preferences/brother';
-import { learnerKey, learningTotals } from '@/lib/learning/types';
+import { isKnownTopic, learnerKey, learningTotals } from '@/lib/learning/types';
 import { originalTpBreakdown, tpTimingBreakdown } from '@/lib/review/stats';
-import { ORIGINAL_TP_COLOR, TIMING_COLOR, TOPIC_COLOR } from '@/lib/review/colors';
+import { ORIGINAL_TP_COLOR, TIMING_COLOR, topicColor } from '@/lib/review/colors';
 import { computeCosts, costsBySymbol } from '@/lib/analytics/costs';
 import { computeExcursions } from '@/lib/analytics/excursions';
 import { concentration, dayLoads, riskConsistency, underwater } from '@/lib/analytics/consistency';
@@ -148,10 +148,10 @@ export default async function AnalyticsPage({
 
   const learningSlices = learned.byTopic.map((bucket) => ({
     key: bucket.topic,
-    label: t(`learning.topics.${bucket.topic}`),
+    label: isKnownTopic(bucket.topic) ? t(`learning.topics.${bucket.topic}`) : bucket.topic,
     value: bucket.hours,
     caption: `${learningHours(bucket.hours)} · ${sharePct(learned.hours === 0 ? 0 : bucket.hours / learned.hours)}`,
-    color: TOPIC_COLOR[bucket.topic],
+    color: topicColor(bucket.topic),
   }));
 
   if (book.trades.length === 0) {

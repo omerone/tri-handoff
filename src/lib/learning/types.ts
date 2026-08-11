@@ -6,18 +6,49 @@
  */
 
 /**
- * Which half of the craft a session was about.
+ * What a session was about.
  *
- * Two answers because they are the two halves a trader can be weak in independently: reading
- * the chart, and sitting still while it plays out. A book full of technical study and no
- * psychology is a visible pattern, which is the reason to record it at all.
+ * It started as a two-value enum — the two halves a trader can be weak in independently, and
+ * the reason the ledger records a topic at all. It is a free string now, because those two
+ * are not the whole of the craft: an evening spent back-testing is neither, and a fixed list
+ * means every new answer is a migration.
+ *
+ * The two originals stay *known*: they keep their own translated labels and their own colours,
+ * so the screens they have always appeared on do not change. Anything else is shown as the
+ * person typed it, which is the only sensible label for a word they chose.
  */
-export type LearningTopic = 'psychology' | 'technical';
+export type LearningTopic = string;
 
-export const LEARNING_TOPICS: readonly LearningTopic[] = ['psychology', 'technical'];
+/** The two the product ships with, in the order they are offered. */
+export const LEARNING_TOPICS = ['psychology', 'technical'] as const;
 
-export function isLearningTopic(value: unknown): value is LearningTopic {
+export type KnownLearningTopic = (typeof LEARNING_TOPICS)[number];
+
+export function isKnownTopic(value: unknown): value is KnownLearningTopic {
   return typeof value === 'string' && (LEARNING_TOPICS as readonly string[]).includes(value);
+}
+
+/** Kept for the callers that only ever meant "is this a usable topic at all". */
+export function isLearningTopic(value: unknown): value is LearningTopic {
+  return typeof value === 'string' && value.trim() !== '';
+}
+
+/**
+ * The key two spellings of one topic agree on.
+ *
+ * Exactly the problem `learnerKey` solves for names, arrived at from the other direction:
+ * "Back test", "back test" and "Backtest " are one topic however carefully anyone types, and
+ * grouping on the raw string splits an evening's work across three rows and three colours.
+ * Folded for comparison only — the display keeps the first spelling seen, because it is the
+ * trader's word and not a slug.
+ */
+export function topicKey(topic: string): string {
+  return topic.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+/** What a topic looks like once stored: trimmed, inner runs of space collapsed. */
+export function normalizeTopic(topic: string | null | undefined): string {
+  return (topic ?? '').trim().replace(/\s+/g, ' ');
 }
 
 /**
@@ -86,22 +117,85 @@ export type LearningTotals = {
  * shows psychology sitting at zero rather than dropping off the legend — the absence is the
  * finding.
  */
+/**
+ * Hours and sessions per topic — every topic that appears, plus the two built-ins.
+ *
+ * The built-ins are seeded even at zero so the chart keeps a stable legend, which is what it
+ * has always done. Everything else is whatever the trader has written, folded on `topicKey`
+ * so three spellings are one bucket, and labelled with the first spelling seen.
+ *
+ * The two built-ins keep their fixed positions at the front, whatever their hours. That is
+ * deliberate and it is why they are seeded at zero in the first place: the legend under the
+ * chart should not reshuffle itself because one evening's study overtook another. Topics the
+ * trader invented follow, ordered by hours — they have no natural position, so the useful one
+ * is where the time actually went.
+ */
+export function groupByTopic(
+  entries: readonly LearningEntry[],
+): { topic: LearningTopic; hours: number; sessions: number }[] {
+  const buckets = new Map<string, { topic: LearningTopic; hours: number; sessions: number }>();
+
+  for (const topic of LEARNING_TOPICS) {
+    buckets.set(topicKey(topic), { topic, hours: 0, sessions: 0 });
+  }
+
+  /*
+   * The label is the spelling of the *earliest* entry — the one that named the topic.
+   *
+   * "First spelling seen" is not the same thing, and the difference showed up immediately:
+   * entries arrive newest-first, so a topic created as "Back test" and typed once more as
+   * "back TEST" was labelled by the later, sloppier spelling. The name a topic was given
+   * should not change because it was used again.
+   */
+  /*
+   * Ordered before grouping, so the label does not depend on what the database happened to
+   * return. Two sessions studied on the same day — the common case, since the form defaults to
+   * today — tie on `learnedOn`, and without the second key the spelling flipped between them
+   * from one page load to the next. `id` is a cuid, which sorts by creation, so the tiebreak
+   * is "whichever was entered first" rather than anything arbitrary.
+   */
+  const inOrder = [...entries].sort((a, b) => {
+    const byDate = a.learnedOn.getTime() - b.learnedOn.getTime();
+    return byDate !== 0 ? byDate : a.id.localeCompare(b.id);
+  });
+
+  for (const entry of inOrder) {
+    const key = topicKey(entry.topic);
+    if (key === '') continue;
+
+    const bucket = buckets.get(key) ?? { topic: normalizeTopic(entry.topic), hours: 0, sessions: 0 };
+    bucket.hours += entry.hours;
+    bucket.sessions += 1;
+
+    buckets.set(key, bucket);
+  }
+
+  const builtIn = LEARNING_TOPICS.map((topic) => buckets.get(topicKey(topic))!);
+  const custom = [...buckets.entries()]
+    .filter(([key]) => !LEARNING_TOPICS.some((topic) => topicKey(topic) === key))
+    .map(([, bucket]) => bucket)
+    .sort((a, b) => b.hours - a.hours);
+
+  return [...builtIn, ...custom];
+}
+
 export function learningTotals(entries: readonly LearningEntry[]): LearningTotals {
   const byLearner = groupByLearner(entries);
 
-  const byTopic = LEARNING_TOPICS.map((topic) => {
-    const mine = entries.filter((entry) => entry.topic === topic);
-    return {
-      topic,
-      hours: mine.reduce((sum, entry) => sum + entry.hours, 0),
-      sessions: mine.length,
-    };
-  });
+  const byTopic = groupByTopic(entries);
 
   return {
     byTopic,
     byLearner,
-    hours: byTopic.reduce((sum, bucket) => sum + bucket.hours, 0),
+    /*
+     * Summed from the entries, not from the buckets.
+     *
+     * They agree, and they have to be written so that they cannot stop agreeing: the buckets
+     * used to be built from a fixed list of two, so the day a third topic existed its hours
+     * would have been missing from the total with nothing on screen to say so. Totalling the
+     * source means a topic can only ever be missing from the *breakdown*, which is visible.
+     */
+    hours: entries.reduce((sum, entry) => sum + entry.hours, 0),
     sessions: entries.length,
   };
 }
