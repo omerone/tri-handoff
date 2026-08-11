@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { AddSheet } from '@/components/ui/add-sheet';
 import { Trash2 } from 'lucide-react';
@@ -9,6 +10,7 @@ import { listLearningEntries } from '@/lib/db';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import {
   hoursDecimals,
+  learnerKey,
   learnerNames,
   learningTotals,
   type LearningTopic,
@@ -42,7 +44,7 @@ import { LearningEntryForm } from './entry-form';
 export default async function LearningPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; who?: string }>;
 }) {
   const session = await requireSession();
   const t = await getTranslations('learning');
@@ -54,8 +56,31 @@ export default async function LearningPage({
   const range = await currentResolvedRange(params.range);
   const window = toTradeFilter(range);
 
-  const entries = await listLearningEntries(session.ctx, { from: window.from, to: window.to });
+  const everyone = await listLearningEntries(session.ctx, { from: window.from, to: window.to });
+
+  /*
+   * Whose numbers these are.
+   *
+   * The card below compares the two people; this narrows *everything else* to one of them —
+   * the totals, the donut and the list. Two people sharing a login was the reason to record a
+   * name at all, and a per-person split that only ever appears as one extra card leaves the
+   * headline figures answering a question about the pair that neither of them asked.
+   *
+   * Filtered here rather than in SQL: the window is already loaded for the comparison card, so
+   * a second query would fetch a subset of rows this request is holding anyway.
+   */
+  const names = learnerNames(everyone);
+  const who = params.who && names.some((name) => learnerKey(name) === params.who)
+    ? params.who
+    : null;
+  const entries = who === null
+    ? everyone
+    : everyone.filter((entry) => learnerKey(entry.learner) === who);
+
   const totals = learningTotals(entries);
+  // The comparison is over the whole window whichever person is selected — it is the thing the
+  // selection is made *from*, and recomputing it from the filtered set would leave one row.
+  const comparison = learningTotals(everyone);
 
   const hours = (value: number) => `${formatNumber(value, locale, hoursDecimals(value))}h`;
   const percent = (value: number) => `${formatNumber(value * 100, locale, 0)}%`;
@@ -71,8 +96,49 @@ export default async function LearningPage({
   const today = new Date();
   const defaultDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
+  const whoHref = (key: string | null) => {
+    const next = new URLSearchParams();
+    if (params.range) next.set('range', params.range);
+    if (key) next.set('who', key);
+    const query = next.toString();
+    return query ? `/learning?${query}` : '/learning';
+  };
+
   return (
     <div className="flex flex-col gap-4">
+      {/*
+        Whose ledger is on screen.
+
+        Links rather than a client control, so the choice is in the URL: it survives a reload,
+        it can be sent to the other person, and the page stays a server component. Drawn only
+        once somebody has been named — with no names it would be a single tab reading
+        "everyone", which is a control offering one option.
+      */}
+      {names.length > 0 ? (
+        <div
+          role="group"
+          aria-label={t('whoseHours')}
+          className="border-line bg-raised inline-flex flex-wrap gap-1 self-start rounded-[12px] border p-1"
+        >
+          {[null, ...names].map((name) => {
+            const key = name === null ? null : learnerKey(name);
+            const active = who === key;
+            return (
+              <Link
+                key={key ?? 'everyone'}
+                href={whoHref(key)}
+                aria-current={active ? 'true' : undefined}
+                className={`min-h-8 rounded-[9px] px-3 py-1 text-xs ${
+                  active ? 'bg-brand text-on-brand font-bold' : 'text-dim hover:text-text font-medium'
+                }`}
+              >
+                {name ?? t('everyone')}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KPI label={t('totalHours')} value={hours(totals.hours)} />
         <KPI label={t('sessions')} value={formatNumber(totals.sessions, locale)} />
@@ -104,10 +170,10 @@ export default async function LearningPage({
         once somebody has been named — before that it would be a panel with one row reading
         "unattributed", which is a worse way of saying nothing.
       */}
-      {totals.byLearner.some((row) => row.learner !== null) ? (
+      {who === null && comparison.byLearner.some((row) => row.learner !== null) ? (
         <Card title={t('byLearner')}>
           <ul className="divide-line divide-y">
-            {totals.byLearner.map((row) => (
+            {comparison.byLearner.map((row) => (
               <li
                 key={row.learner ?? 'unattributed'}
                 className="flex items-baseline justify-between gap-3 py-2.5"

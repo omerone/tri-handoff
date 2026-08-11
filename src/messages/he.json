@@ -658,7 +658,9 @@
     "learner": "מי למד",
     "learnerPlaceholder": "שם",
     "byLearner": "שעות לפי אדם",
-    "unattributed": "לא נרשם שם"
+    "unattributed": "לא נרשם שם",
+    "everyone": "שניהם",
+    "whoseHours": "של מי השעות"
   },
   "review": {
     "tpTiming": "עיתוי היציאה",

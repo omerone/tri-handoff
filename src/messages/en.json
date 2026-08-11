@@ -658,7 +658,9 @@
     "learner": "Who studied",
     "learnerPlaceholder": "Name",
     "byLearner": "Hours per person",
-    "unattributed": "No name recorded"
+    "unattributed": "No name recorded",
+    "everyone": "Everyone",
+    "whoseHours": "Whose hours"
   },
   "review": {
     "tpTiming": "Exit timing",
