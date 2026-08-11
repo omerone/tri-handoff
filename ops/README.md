@@ -127,6 +127,16 @@ ends on a certificate-name mismatch, because the generic redirect sends it to
 `https://167.233.250.233` where the certificate is for the domain. Remove the
 block once nobody reaches for the old address.
 
+### The origin only answers Cloudflare
+
+`ufw` allows 443 from Cloudflare's published ranges and nobody else. Before that,
+`https://167.233.250.233` served the whole app: anyone who knew the address
+skipped the WAF, the DDoS protection and the edge entirely. Refresh the ranges
+with the loop in this file's history when Cloudflare publishes new ones.
+
+Port 80 stays open to everyone on purpose — it proxies nothing, it only redirects,
+and leaving it open is what keeps the old bookmark working instead of timing out.
+
 ### Still open
 
 **Outbound mail is not wired.** `SMTP_HOST=localhost:1025` points at a dev mailbox
