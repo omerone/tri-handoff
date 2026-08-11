@@ -310,14 +310,31 @@ export async function repairAssetClasses(ctx: TenantContext): Promise<number> {
     .map((row) => ({ id: row.id, correct: classifySymbol(row.symbol), stored: row.assetClass }))
     .filter((row) => row.correct !== row.stored);
 
+  /*
+   * `updateMany` rather than `update`, and the difference is the whole sweep.
+   *
+   * There is a gap between reading the rows and writing them back, and a row can leave in
+   * that gap — a trader disconnecting a broker account, deleting a hand-typed trade, or a
+   * replace confirming while the hourly timer is mid-pass. `update` treats a vanished row as
+   * an error (P2025), and one thrown from inside this loop abandons the rest of it: every
+   * trader after the one that raced keeps their stale figures until the next hour, silently,
+   * and the log records a failure nobody can reproduce because the row is already gone.
+   *
+   * A repair that skips something that no longer exists has done its job. `updateMany` matches
+   * nothing and moves on, and the tenant scope stays inside the statement exactly as before.
+   */
+  let repaired = 0;
   for (const row of wrong) {
-    await prisma.trade.update({
+    const { count } = await prisma.trade.updateMany({
       where: { id: row.id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
       data: { assetClass: row.correct },
     });
+    repaired += count;
   }
 
-  return wrong.length;
+  // What was actually written, not what was intended — the caller reports this number to a
+  // human, and counting rows that had already been deleted would overstate the work.
+  return repaired;
 }
 
 /**
@@ -474,14 +491,19 @@ export async function repairMissingRisk(
     repairs.push({ id: row.id, risk, rr: Number(row.profit) / risk });
   }
 
+  // `updateMany`, for the reason spelled out in `repairAssetClasses`: a row can be deleted
+  // between the read above and the write here, and `update` turns that into a thrown P2025
+  // that abandons every remaining repair in the pass.
+  let repaired = 0;
   for (const repair of repairs) {
-    await prisma.trade.update({
+    const { count } = await prisma.trade.updateMany({
       where: { id: repair.id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
       data: { risk: repair.risk, rr: repair.rr },
     });
+    repaired += count;
   }
 
-  return repairs.length;
+  return repaired;
 }
 
 /**

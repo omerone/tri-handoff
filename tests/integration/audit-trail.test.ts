@@ -25,7 +25,18 @@ let alice: Fixture;
 const buyDate = new Date(Date.UTC(2026, 0, 15));
 
 /** The write is fire-and-forget, so the assertion has to wait for it rather than assume it. */
-async function waitForAuditRow(recordId: string, timeoutMs = 4000) {
+/**
+ * Polls until the trigger has written the row.
+ *
+ * Fifteen seconds rather than four. The audit row is written by a database trigger, so it
+ * lands a moment after the statement returns and the only honest assertion is "eventually";
+ * four seconds was a guess that sat right on the edge once the whole suite runs against one
+ * Postgres at once, and the test failed at random with "expected null not to be null" — the
+ * least informative way a passing feature can look broken. The happy path still returns in
+ * about fifty milliseconds, so the longer deadline costs nothing except in the case that was
+ * already failing.
+ */
+async function waitForAuditRow(recordId: string, timeoutMs = 15_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const row = await testDb.databaseAuditLog.findFirst({
