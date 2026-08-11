@@ -50,74 +50,82 @@ Install:
     ln -sf /etc/nginx/sites-available/tri-app /etc/nginx/sites-enabled/tri-app
     nginx -t && systemctl reload nginx
 
-## Going to a domain and TLS
+## The domain and TLS
 
-Today the app is served over plain HTTP on an IP address, so the session cookie
-cannot carry `Secure` and the password crosses the network in the clear. It is
-the largest open item in the audit and it needs a domain name before any of it
-can be fixed.
+Done on 2026-08-11. The app is served at **https://ester.troinvest.uk** behind
+Cloudflare, and the session cookie carries `Secure` — the password no longer
+crosses the network in the clear, which was the largest open item in the audit.
 
-The plan is Cloudflare in front, terminating TLS at the edge, and a Cloudflare
-Origin CA certificate on this box so the leg between them is encrypted too. Two
-files here are already written for it:
+    visitor ──TLS──> Cloudflare ──TLS──> nginx :443 ──> app :3000
 
-- `nginx-cloudflare-realip.conf` — **installed already, and inert until
-  Cloudflare is actually in front.** It teaches nginx to take the visitor's
-  address from `CF-Connecting-IP`, but only for requests that arrived from
-  Cloudflare's own ranges. Without it every visitor arrives as a Cloudflare
-  address, and the per-IP sign-in limiter either locks out strangers or stops
-  protecting anything. It is inert today because nothing arrives from those
-  ranges yet.
-- `nginx-tri-app-tls.conf` — **staged to `/etc/nginx/sites-available/tri-app-tls`
-  and deliberately not enabled**, because its port-80 block redirects to https
-  and doing that before a certificate exists is an error page for every visitor.
+Two files here are the origin half:
 
-### Cutover, in order
+- `nginx-cloudflare-realip.conf` → `/etc/nginx/conf.d/`. Recovers the visitor's
+  address from `CF-Connecting-IP`, and only for requests that actually arrived
+  from Cloudflare's published ranges — without that second half anyone could send
+  the header themselves and rotate it to defeat every per-IP limit. Without the
+  file at all, every visitor arrives as a Cloudflare address and the sign-in rate
+  limiter either locks out strangers or protects nothing.
+- `nginx-tri-app-tls.conf` → `/etc/nginx/sites-available/tri-app`. Serves 443 for
+  any host (`server_name _`, mirroring the Caddyfile) because the app resolves the
+  tenant from `Host` and refuses one it does not know; naming domains here too
+  would mean reloading the proxy to onboard a client, for no protection the app is
+  not already giving.
 
-The order matters: every step before the last one is reversible, and the last
-one is the one that stops plain HTTP working.
+### The certificate renews itself
 
-1. Point the domain at `167.233.250.233` in Cloudflare DNS — an `A` record for
-   the apex and one for `*`, both **Proxied**. The wildcard is what lets a new
-   client be a new row in `tenants` rather than a DNS change.
-2. Set SSL/TLS mode to **Full (strict)**. Not Flexible: Flexible encrypts only
-   as far as Cloudflare and speaks plain HTTP to this box, which is a padlock in
-   the browser over the same exposure we are removing.
-3. Create an Origin Certificate covering `example.com` **and** `*.example.com`,
-   and put it on the box:
+Let's Encrypt, wildcard, issued through **DNS-01** rather than the usual HTTP-01:
+the origin sits behind Cloudflare's proxy, so the ACME server cannot reach port 80
+here — and DNS-01 is the only route to a wildcard, which is what lets a new client
+be a row in `tenants` instead of a new certificate.
 
-        mkdir -p /etc/ssl/cloudflare
-        tee /etc/ssl/cloudflare/origin.pem   # paste the certificate, Ctrl-D
-        tee /etc/ssl/cloudflare/origin.key   # paste the key, Ctrl-D
-        chmod 600 /etc/ssl/cloudflare/origin.key
+    /etc/letsencrypt/live/troinvest.uk/{fullchain,privkey}.pem
+    /etc/letsencrypt/cloudflare.ini          # API token, mode 600
+    /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
 
-4. Tell the app it is behind TLS. It reads `APP_PROTOCOL` for the cookie's
-   `Secure` flag rather than inferring it from the request, so this is not
-   optional:
+That last file matters more than it looks. certbot renews the files on disk;
+nginx keeps the old certificate in memory until it is told. Without the hook the
+site serves an expired certificate ninety days from now, and the renewal that was
+meant to prevent it will have succeeded. `certbot renew --dry-run` exercises the
+whole path.
 
-        sed -i 's|^APP_PROTOCOL=.*|APP_PROTOCOL=https|'            /opt/tri-handoff/.env
-        sed -i 's|^APP_BASE_DOMAIN=.*|APP_BASE_DOMAIN=example.com|' /opt/tri-handoff/.env
-        cd /opt/tri-handoff && docker compose up -d app
+The token in `cloudflare.ini` is scoped to `Zone:DNS:Edit` on this zone alone and
+is needed at every renewal, so it stays. Rolling it means writing the new value
+there too.
 
-5. Move the tenant onto its new hostname. The app matches `Host` against
-   `tenants.domain` exactly, so until this row changes the new name resolves to
-   no client:
+### Zone settings that are load-bearing
 
-        docker exec tri-handoff-postgres-1 psql -U tri -d tri \
-          -c "update tenants set domain='ester.example.com' where domain='167.233.250.233';"
+- **SSL/TLS mode: Full (strict).** On *Flexible*, Cloudflare speaks plain HTTP to
+  this box and the certificate above is never used — a padlock in the browser with
+  the password in the clear on the last hop, which is the exact exposure this work
+  removed.
+- **Email Obfuscation: off.** It rewrites any email address in the HTML at the
+  edge and injects a decode script. The footer prints the signed-in user's
+  address, so every page came back with markup the server had not rendered and
+  React failed hydration on it. Turning it on again brings that back.
 
-6. Enable the TLS proxy:
+### Adding a client
 
-        ln -sf /etc/nginx/sites-available/tri-app-tls /etc/nginx/sites-enabled/tri-app
-        nginx -t && systemctl reload nginx
+One row. `*.troinvest.uk` already resolves and the wildcard certificate already
+covers it, so there is no DNS and no certificate work:
 
-7. Only once https is confirmed working, turn on **Always Use HTTPS** and then
-   **HSTS** in Cloudflare. HSTS is hard to walk back — a browser that has seen it
-   refuses plain HTTP for the whole max-age — so it goes last and only after the
-   rest is proven.
+    insert into tenants (…, domain) values (…, 'someone.troinvest.uk');
 
-To roll back before step 6, re-point the symlink at `tri-app` and reload; before
-step 4, nothing has changed at all.
+### The old address
+
+`http://167.233.250.233` redirects to the new hostname — a migration aid, and the
+one place a tenant hostname is written into the proxy. Without it that bookmark
+ends on a certificate-name mismatch, because the generic redirect sends it to
+`https://167.233.250.233` where the certificate is for the domain. Remove the
+block once nobody reaches for the old address.
+
+### Still open
+
+**Outbound mail is not wired.** `SMTP_HOST=localhost:1025` points at a dev mailbox
+that does not run here, and the app says so in its own log: *"password reset will
+accept the request and deliver nothing"*. The screen tells the client an email was
+sent and none is. Fixing it needs a real SMTP provider plus SPF/DKIM/DMARC records
+on this domain — now possible, since there is a domain.
 
 ## tri-disk-guard
 
