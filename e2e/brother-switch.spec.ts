@@ -69,6 +69,21 @@ async function fillForm(fields: { locator: ReturnType<Page['getByLabel']>; value
   throw new Error('the form never held its values');
 }
 
+/**
+ * Every form on the screen states the same brother.
+ *
+ * There is more than one now — the ledger writes an entry, the card below it writes a budget
+ * ceiling — and each carries its own hidden owner. Checking only the first would leave the
+ * other free to file אביתר's allowance under יוני, which is the exact confusion the switch
+ * exists to prevent, and it would not show on screen until the money was already in the wrong
+ * book. The first field gets the long timeout: that is the one waiting for the flip to land.
+ */
+async function ownedBy(page: Page, brother: string) {
+  const owners = page.locator('input[name="owner"]');
+  await expect(owners.first()).toHaveValue(brother, { timeout: 10_000 });
+  for (const owner of await owners.all()) await expect(owner).toHaveValue(brother);
+}
+
 test.describe('the brother switch', () => {
   test('swaps the budget between the brothers, with the owner stated by the screen', async ({
     page,
@@ -90,12 +105,12 @@ test.describe('the brother switch', () => {
     // statement is his name.
     await page.goto('/finance');
     await flip(page, 'יוני').click();
-    await expect(page.locator('input[name="owner"]')).toHaveValue('יוני', { timeout: 10_000 });
+    await ownedBy(page, 'יוני');
     await add(yoni);
 
     await flip(page, 'אביתר').click();
     await expect(page.getByText(yoni), "יוני's money on אביתר's screen").toHaveCount(0);
-    await expect(page.locator('input[name="owner"]')).toHaveValue('אביתר');
+    await ownedBy(page, 'אביתר');
     await add(evyatar);
 
     await flip(page, 'יוני').click();

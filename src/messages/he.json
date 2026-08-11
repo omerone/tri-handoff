@@ -336,6 +336,16 @@
     "trading": "חשבון מסחר",
     "longPositions": "השקעות ארוכות",
     "byCategory": "הוצאות לפי קטגוריה",
+    "budgets": "תקציבים",
+    "budgetsEmpty": "עוד לא הוגדרו תקציבים. הגדר תקרה חודשית לקטגוריה כדי לראות כמה נשאר ממנה.",
+    "budgetsNeedPeriod": "בחר חודש או טווח כדי לראות ניצול תקציב — תקציב הוא סכום חודשי, ואין לו משמעות מול \"מקסימום\".",
+    "budgetCategoryPlaceholder": "בזבוזים",
+    "budgetAmount": "תקרה לחודש",
+    "budgetAdd": "הגדרה",
+    "budgetRemove": "הסרת תקציב",
+    "budgetOver": "חריגה",
+    "budgetLeftOf": "נותר מתוך {budget}",
+    "budgetSpent": "נוצל {spent}",
     "prevMonth": "חודש קודם",
     "nextMonth": "חודש הבא",
     "yearToDate": "מתחילת השנה",
@@ -365,7 +375,8 @@
     "fxStale": "שער החליפין אינו מהיום.",
     "deleteSeriesConfirm": "למחוק את הסדרה כולה? היא תיעלם מכל החודשים, כולל אלה שכבר עברו. כדי לעצור אותה מכאן ואילך בלי לשנות את העבר, השתמש ב״סיום הסדרה״.",
     "yearToDateAsOfToday": "מתחילת השנה (עד היום)",
-    "ownerLabel": "של מי"
+    "ownerLabel": "של מי",
+    "budgetSet": "הגדרת תקציב"
   },
   "long": {
     "title": "השקעות ארוכות טווח",

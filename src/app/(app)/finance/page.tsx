@@ -9,7 +9,10 @@ import { applyRangeAction } from '@/app/actions/range';
 import { currentBrother } from '@/lib/preferences/brother';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { describeRange } from '@/lib/time/range';
-import { listFinanceEntries, listLongPositions, listMt5Accounts } from '@/lib/db';
+import { listBudgets, listFinanceEntries, listLongPositions, listMt5Accounts } from '@/lib/db';
+import { budgetUse, monthsCovered } from '@/lib/finance/budgets';
+import { BudgetGauge } from '@/components/charts/budget-gauge';
+import { BudgetForm, BudgetRemove } from './budget-form';
 import { computeMetrics } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { portfolioTotals } from '@/lib/positions/valuation';
@@ -65,11 +68,13 @@ export default async function FinancePage({
    */
   const brother = await currentBrother();
 
-  const [entries, accounts, positions] = await Promise.all([
+  const [entries, accounts, positions, budgets] = await Promise.all([
     listFinanceEntries(session.ctx, brother),
     // Every connected account, not the first one — see the trading leg below.
     listMt5Accounts(session.ctx),
     listLongPositions(session.ctx),
+    // The ceilings belong to whoever the header switch is resting on, like the ledger itself.
+    listBudgets(session.ctx, brother),
   ]);
 
   const today = wallClock(new Date());
@@ -264,6 +269,17 @@ export default async function FinancePage({
   const Next = rtl ? ChevronLeft : ChevronRight;
 
   const byCategory = expensesByCategory(balance);
+
+  /*
+   * A budget is a monthly figure and this screen can be showing any window, so the ceiling is
+   * scaled to the months on screen — otherwise a quarter's spending is compared to one
+   * month's allowance and every normal quarter reads as a wild overrun.
+   *
+   * `max` has no month span at all, so the gauges are simply not drawn for it: there is no
+   * honest number to put on a dial that means "all time versus one month".
+   */
+  const monthsOnScreen = monthsCovered(range.months);
+  const gauges = monthsOnScreen === null ? [] : budgetUse(budgets, byCategory, monthsOnScreen);
   const suggestions = (type: 'income' | 'expense') =>
     suggestedCategories(type).map((value) => ({ value, label: t(`categories.${value}`) }));
 
@@ -431,6 +447,73 @@ export default async function FinancePage({
             ))}
           </BulkSelect>
         )}
+      </Card>
+
+      {/*
+        Above the category breakdown rather than below it: this is the same money, read as
+        "how much is left" instead of "where it went", and the question with a limit attached
+        is the one somebody opens this screen to answer.
+      */}
+      <Card title={t('budgets')}>
+        <div className="flex flex-col gap-4">
+          {monthsOnScreen === null ? (
+            <p className="text-dim text-xs">{t('budgetsNeedPeriod')}</p>
+          ) : gauges.length === 0 ? (
+            <p className="text-dim text-xs">{t('budgetsEmpty')}</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {gauges.map((gauge) => {
+                const tone = gauge.over > 0 ? 'over' : gauge.ratio >= 0.8 ? 'close' : 'ok';
+                return (
+                  <div key={gauge.category} className="flex flex-col items-center gap-1">
+                    <BudgetGauge
+                      ratio={gauge.ratio}
+                      tone={tone}
+                      label={categoryLabel(gauge.category)}
+                      /* The headline answers the question the tone just raised: still inside,
+                         and this is what is left; past it, and this is by how much. */
+                      value={
+                        gauge.over > 0
+                          ? `+${ils(gauge.over)}`
+                          : ils(gauge.remaining)
+                      }
+                      caption={
+                        gauge.over > 0
+                          ? t('budgetOver')
+                          : t('budgetLeftOf', { budget: ils(gauge.budget) })
+                      }
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-dim text-[10px]">
+                        {t('budgetSpent', { spent: ils(gauge.spent) })}
+                      </span>
+                      <BudgetRemove id={budgets.find((one) => one.category === gauge.category)!.id} label={t('budgetRemove')} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/*
+            Behind a button on a phone, for the same reason the entry form above it is: the
+            dials are what this card is for, and a row of fields above them is a row of fields
+            you scroll past every time you come to read one.
+          */}
+          <AddSheet label={t('budgetSet')}>
+            <BudgetForm
+              owner={brother}
+              labels={{
+                category: t('category'),
+                categoryPlaceholder: t('budgetCategoryPlaceholder'),
+                amount: t('budgetAmount'),
+                add: t('budgetAdd'),
+                remove: t('budgetRemove'),
+                options: [...new Set(byCategory.map((one) => one.category))],
+              }}
+            />
+          </AddSheet>
+        </div>
       </Card>
 
       {byCategory.length > 0 ? (

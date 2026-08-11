@@ -28,6 +28,7 @@ export * from './manual-trades';
 export * from './sync-logs';
 export * from './snapshots';
 export * from './finance';
+export * from './budgets';
 export * from './learning';
 export * from './long-positions';
 export * from './fx';

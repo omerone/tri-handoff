@@ -336,6 +336,16 @@
     "trading": "Trading account",
     "longPositions": "Long positions",
     "byCategory": "Expenses by category",
+    "budgets": "Budgets",
+    "budgetsEmpty": "No budgets yet. Set a monthly ceiling on a category to see how much of it is left.",
+    "budgetsNeedPeriod": "Pick a month or a range to see budget use — a budget is a monthly figure and means nothing against \"maximum\".",
+    "budgetCategoryPlaceholder": "Spending",
+    "budgetAmount": "Monthly ceiling",
+    "budgetAdd": "Set",
+    "budgetRemove": "Remove budget",
+    "budgetOver": "over",
+    "budgetLeftOf": "left of {budget}",
+    "budgetSpent": "{spent} used",
     "prevMonth": "Previous month",
     "nextMonth": "Next month",
     "yearToDate": "Year to date",
@@ -365,7 +375,8 @@
     "fxStale": "The exchange rate is not from today.",
     "deleteSeriesConfirm": "Delete the whole series? It disappears from every month, including past ones. To stop it from here on without changing history, use \"End series\".",
     "yearToDateAsOfToday": "Year to date (as of today)",
-    "ownerLabel": "Whose"
+    "ownerLabel": "Whose",
+    "budgetSet": "Set a budget"
   },
   "long": {
     "title": "Long-term positions",

@@ -126,6 +126,7 @@ model User {
   mt5Accounts    Mt5Account[]
   trades         Trade[]
   financeEntries FinanceEntry[]
+  budgets        Budget[]
   longPositions  LongPosition[]
   learning       LearningEntry[]
   syncLogs       SyncLog[]
@@ -488,6 +489,42 @@ model Trade {
 enum FinanceType {
   income
   expense
+}
+
+/// A monthly ceiling for one category of spending, for one brother.
+///
+/// The ledger already answers "what did I spend"; this is what turns that into "how much is
+/// left". Per calendar month, because that is the unit an allowance is decided in — the
+/// screen scales it to whatever window is being read rather than storing a second figure.
+///
+/// Per brother for the same reason `FinanceEntry.owner` is: their money is separate, and a
+/// shared ceiling on separate spending is a number neither of them agreed to.
+model Budget {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+  /// One of the names in `src/lib/household.ts`. Never null — unlike a ledger row, a budget
+  /// with no owner belongs to nobody and would be drawn on both brothers' screens.
+  owner  String
+
+  /// Free text, exactly like `FinanceEntry.category`, so a budget can be set on whatever the
+  /// trader actually writes down rather than on a list somebody else chose.
+  category String
+
+  /// Shekels a month. ILS-native like every other figure in this module; the display
+  /// conversion happens at render.
+  amountIls Decimal @map("amount_ils") @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// One ceiling per category per brother. Setting the same one again is an edit, not a
+  /// second row that silently doubles the allowance.
+  @@unique([userId, owner, category])
+  @@index([userId, owner])
+  @@map("budgets")
 }
 
 model FinanceEntry {
