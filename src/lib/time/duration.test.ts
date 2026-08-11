@@ -25,8 +25,8 @@ describe('durations in hours and minutes', () => {
 
   it('speaks Hebrew in Hebrew', () => {
     // A bare `m` in a Hebrew sentence is an English abbreviation nobody chose.
-    expect(formatDuration(95, 'he')).toBe("1ש 35דק'");
-    expect(formatDuration(35, 'he')).toBe("35דק'");
+    expect(formatDuration(95, 'he')).toBe("1 שע׳ 35 דק׳");
+    expect(formatDuration(35, 'he')).toBe("35 דק׳");
   });
 
   /*
@@ -62,6 +62,33 @@ describe('how far the largest unit goes', () => {
     // Nobody says they studied for two days, and rolling up would drop the minutes — which
     // is the one thing the ledger was asked to show.
     expect(formatDuration(52 * 60 + 20, 'en', { maxUnit: 'hour' })).toBe('52h 20m');
-    expect(formatDuration(52 * 60 + 20, 'he', { maxUnit: 'hour' })).toBe("52ש 20דק'");
+    expect(formatDuration(52 * 60 + 20, 'he', { maxUnit: 'hour' })).toBe("52 שע׳ 20 דק׳");
+  });
+});
+
+describe('Hebrew durations read as Hebrew', () => {
+  /**
+   * The study ledger's tiles rendered "1ש39דק׳" — one unbroken smear. Digits run
+   * left-to-right inside a right-to-left line, so with nothing between the runs the reader
+   * has to work out where each figure starts, and `ש` on its own is a letter rather than the
+   * abbreviation for שעות. Both halves of that are pinned here.
+   */
+  const GERESH = '׳';
+
+  it('puts a space between every figure and its unit', () => {
+    expect(formatDuration(99, 'he')).toBe(`1 שע${GERESH} 39 דק${GERESH}`);
+    // No digit may touch a Hebrew letter anywhere in the output.
+    expect(formatDuration(99, 'he')).not.toMatch(/\d[֐-׿]/u);
+    expect(formatDuration(3 * 24 * 60 + 120, 'he')).not.toMatch(/\d[֐-׿]/u);
+  });
+
+  it('abbreviates with a geresh, not a bare letter or an ASCII apostrophe', () => {
+    const text = formatDuration(3 * 24 * 60 + 120, 'he');
+    expect(text).toBe(`3 ימ${GERESH} 2 שע${GERESH}`);
+    expect(text, 'an ASCII apostrophe a font may curl into a quote').not.toContain("'");
+  });
+
+  it('leaves English tight, because "1h 39m" is how English writes it', () => {
+    expect(formatDuration(99, 'en')).toBe('1h 39m');
   });
 });

@@ -185,26 +185,41 @@ export function formatDateTimeAt(instant: Date, timeZone: string = ANALYTICS_TIM
  * on one screen and "1h 30m" on another is two facts as far as the reader is concerned.
  */
 /**
- * Unit suffixes, per locale.
+ * Unit suffixes, per locale, and whether a space goes in front of them.
  *
  * In code rather than in the message files, following `CURRENCY_SYMBOL`: this is a formatter,
  * it is synchronous, and it is called from places that cannot await a translator. A bare `m`
  * in a Hebrew sentence reads as an English abbreviation nobody chose — "35 דק'" is what the
  * person actually says.
+ *
+ * Two things here are Hebrew being Hebrew rather than English with different letters:
+ *
+ * The space is not optional. "1h39m" is a typo in English and "1ש39דק'" is worse in Hebrew,
+ * because the digits are left-to-right inside a right-to-left line: with nothing between the
+ * runs the reader gets one unbroken smear of numbers and letters and has to work out where
+ * each figure starts. It rendered exactly that way on the study ledger's tiles.
+ *
+ * And an abbreviation needs its geresh. `ש` alone is a letter, not a word — the abbreviation
+ * for שעות is שע׳, the way דק׳ is for דקות. Both use U+05F3 GERESH rather than the ASCII
+ * apostrophe: it is the Hebrew punctuation mark for exactly this, and unlike `'` it is never
+ * turned into a curly quote by a font that thinks it is quoting somebody.
  */
-const DURATION_UNITS: Record<Locale, { d: string; h: string; m: string }> = {
-  he: { d: 'י', h: 'ש', m: "דק'" },
-  en: { d: 'd', h: 'h', m: 'm' },
+const GERESH = '\u05f3';
+
+const DURATION_UNITS: Record<Locale, { d: string; h: string; m: string; sep: string }> = {
+  he: { d: `ימ${GERESH}`, h: `שע${GERESH}`, m: `דק${GERESH}`, sep: ' ' },
+  en: { d: 'd', h: 'h', m: 'm', sep: '' },
 };
 
 /**
  * A span of minutes, written the way it is spoken.
  *
  * The minutes are kept beside the hours rather than folded into a decimal. "1.65h" is a number
- * a person has to convert before it means anything; "1h 39דק'" is the answer. It is why the
- * study ledger takes minutes as their own field, and it is the same shape a hold time wants.
+ * a person has to convert before it means anything; "1h 39m" — "1 שע׳ 39 דק׳" — is the answer.
+ * It is why the study ledger takes minutes as their own field, and it is the same shape a hold
+ * time wants.
  *
- * A whole number of hours drops the minutes — "2ש" rather than "2ש 0דק'".
+ * A whole number of hours drops the minutes — "2 שע׳" rather than "2 שע׳ 0 דק׳".
  */
 export function formatDuration(
   minutes: number,
@@ -214,7 +229,7 @@ export function formatDuration(
   const unit = DURATION_UNITS[locale] ?? DURATION_UNITS.en;
   const whole = Math.max(0, Math.round(minutes));
 
-  if (whole < 60) return `${formatNumber(whole, locale)}${unit.m}`;
+  if (whole < 60) return `${formatNumber(whole, locale)}${unit.sep}${unit.m}`;
 
   /*
    * Where the largest unit stops, and it is not the same answer for both callers.
@@ -229,15 +244,15 @@ export function formatDuration(
     const hours = Math.floor(whole / 60);
     const rest = whole % 60;
     return rest === 0
-      ? `${formatNumber(hours, locale)}${unit.h}`
-      : `${formatNumber(hours, locale)}${unit.h} ${formatNumber(rest, locale)}${unit.m}`;
+      ? `${formatNumber(hours, locale)}${unit.sep}${unit.h}`
+      : `${formatNumber(hours, locale)}${unit.sep}${unit.h} ${formatNumber(rest, locale)}${unit.sep}${unit.m}`;
   }
 
   const days = Math.floor(whole / (60 * 24));
   const hours = Math.floor((whole % (60 * 24)) / 60);
   return hours === 0
-    ? `${formatNumber(days, locale)}${unit.d}`
-    : `${formatNumber(days, locale)}${unit.d} ${formatNumber(hours, locale)}${unit.h}`;
+    ? `${formatNumber(days, locale)}${unit.sep}${unit.d}`
+    : `${formatNumber(days, locale)}${unit.sep}${unit.d} ${formatNumber(hours, locale)}${unit.sep}${unit.h}`;
 }
 
 /** Hours as stored → the same span in whole minutes, which is what the ledger is entered in. */
