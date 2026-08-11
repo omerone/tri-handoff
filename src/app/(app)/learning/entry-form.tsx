@@ -58,7 +58,20 @@ export function LearningEntryForm({
 
       {/* Two columns on a phone, the original inline row from `sm` — see the note on the
           same grid in `long/manual-trade-form.tsx`. */}
-      <div className="grid grid-cols-2 items-end gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-2">
+      {/*
+        One row from `lg`, and it has to stay one.
+        
+        Seven controls on `flex-wrap` fit until they do not, and what gave way was the date and
+        the button — they dropped to a second line with the whole width of the card empty
+        beside them, which reads as two forms rather than one. Nothing here needs a generous
+        width: the widest is a free-text topic, and the numbers are two digits. So the row
+        stops wrapping and the fields give way instead, each shrinking to what it holds.
+        
+        Below `lg` it is still two columns — that is a phone, where one row of seven would be
+        unreadable at any width. The note keeps its own line at every size, because it is a
+        sentence rather than a field.
+      */}
+      <div className="grid grid-cols-2 items-end gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:gap-2 lg:flex-nowrap">
         {/*
           A field, not a dropdown.
           
@@ -79,7 +92,7 @@ export function LearningEntryForm({
             list="learning-topics"
             required
             defaultValue={labels.topics.technical}
-            className={`${field} sm:w-40`}
+            className={`${field} sm:w-40 lg:w-auto lg:min-w-0 lg:flex-1`}
           />
           <datalist id="learning-topics">
             {labels.topicOptions.map((option) => (
@@ -104,7 +117,7 @@ export function LearningEntryForm({
             inputMode="numeric"
             dir="ltr"
             placeholder="1"
-            className={`${field} sm:w-20`}
+            className={`${field} sm:w-20 lg:w-16 lg:shrink`}
           />
         </label>
 
@@ -115,7 +128,7 @@ export function LearningEntryForm({
             inputMode="numeric"
             dir="ltr"
             placeholder="30"
-            className={`${field} sm:w-20`}
+            className={`${field} sm:w-20 lg:w-16 lg:shrink`}
           />
         </label>
 
@@ -128,14 +141,14 @@ export function LearningEntryForm({
           row, which on a phone it needs — a half cell gave it 169px and the placeholder is
           three examples long, clipped before the first one ended.
         */}
-        <label className="flex flex-col gap-1 sm:min-w-[9rem]">
+        <label className="flex flex-col gap-1 sm:min-w-[9rem] lg:min-w-0 lg:shrink">
           <span className="text-dim text-[11px] font-semibold">{labels.learner}</span>
           {/* Stated, not asked — the header switch is where "whose" changes. */}
           <span className={`${field} flex items-center font-semibold`}>{learner}</span>
           <input type="hidden" name="learner" value={learner} />
         </label>
 
-        <label className="col-span-2 flex flex-col gap-1 sm:col-auto sm:min-w-[12rem] sm:flex-1">
+        <label className="col-span-2 flex flex-col gap-1 sm:col-auto sm:min-w-[12rem] sm:flex-1 lg:min-w-0">
           <span className="text-dim text-[11px] font-semibold">{labels.what}</span>
           <input
             name="title"
@@ -151,11 +164,11 @@ export function LearningEntryForm({
           defaultValue={defaultDate}
           label={labels.date}
           required
-          className={`${field} sm:w-40`}
+          className={`${field} sm:w-40 lg:w-36 lg:shrink-0`}
           wrapperClassName="col-span-2 sm:col-auto"
         />
 
-        <SubmitButton className="col-span-2 w-full sm:col-auto sm:w-auto">
+        <SubmitButton className="col-span-2 w-full sm:col-auto sm:w-auto lg:shrink-0 lg:whitespace-nowrap">
           <span className="inline-flex items-center gap-1.5">
             <Plus size={14} aria-hidden /> {labels.add}
           </span>

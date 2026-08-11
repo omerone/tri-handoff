@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 export type DonutSlice = {
@@ -35,6 +36,7 @@ export function DonutChart({
   centerLabel: string;
   emptyLabel: string;
 }) {
+  const [hovered, setHovered] = useState(false);
   const drawable = data.filter((slice) => slice.value > 0);
 
   /*
@@ -73,6 +75,9 @@ export function DonutChart({
                 outerRadius={80}
                 paddingAngle={drawable.length > 1 ? 2 : 0}
                 strokeWidth={0}
+                // Which slice the pointer is on, so the hole can stand down for it.
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
                 // A ring that spins on every re-render is noise, and this page re-renders
                 // whenever the shared range changes.
                 isAnimationActive={false}
@@ -82,14 +87,18 @@ export function DonutChart({
                 ))}
               </Pie>
               <Tooltip
+                // Recharts follows the pointer, and the pointer is on a ring whose hole holds
+                // the total — so the card landed on top of it and two answers shared one
+                // space. The shadow is what separates the card from the ring behind it; the
+                // hole standing down (below) is what stops it being read through.
                 content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const slice = payload[0]?.payload as DonutSlice | undefined;
                   if (!slice) return null;
                   return (
-                    <div className="border-line bg-raised rounded-[10px] border px-2.5 py-1.5 text-xs">
+                    <div className="border-line bg-raised rounded-[10px] border px-2.5 py-1.5 text-xs shadow-lg shadow-black/40">
                       <div className="text-dim">{slice.label}</div>
-                      <div className="tri-num text-text">{slice.caption}</div>
+                      <div className="tri-num text-text font-semibold">{slice.caption}</div>
                     </div>
                   );
                 }}
@@ -98,9 +107,21 @@ export function DonutChart({
           </ResponsiveContainer>
         )}
 
-        {/* The total belongs in the hole rather than above the chart: it is what every slice
-            is a share of, and putting it anywhere else makes the reader hunt for the base. */}
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        {/*
+          The total belongs in the hole rather than above the chart: it is what every slice is
+          a share of, and putting it anywhere else makes the reader hunt for the base.
+          
+          It fades while a slice is hovered. The hover card is drawn at the pointer, which on a
+          ring means over the hole, so the two sat on top of each other and neither could be
+          read — the total, the slice's name and its hours all in one smear. One answer at a
+          time in one space; the total is back the instant the pointer leaves.
+        */}
+        <div
+          data-ring="total"
+          className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-150 ${
+            hovered ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
           <span className="tri-num text-text text-lg font-extrabold">{total}</span>
           <span className="text-dim text-[10px]">{centerLabel}</span>
         </div>
