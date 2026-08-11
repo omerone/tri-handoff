@@ -21,11 +21,12 @@ export const HOUSEHOLD = ['יוני', 'אביתר'] as const;
 export type Brother = (typeof HOUSEHOLD)[number];
 
 /**
- * The switch's three positions: one brother, the other, or the household as a whole.
+ * A repository-level filter: one brother, or null for "no filter".
  *
- * `null` is "both" — deliberately not a third name in the list, because "both" is the absence
- * of a filter rather than a person, and code that treats it as a person ends up writing rows
- * owned by nobody-in-particular when the switch happens to rest there.
+ * The *screens* never pass null any more — the switch has exactly two positions, because the
+ * brothers asked for their money apart, full stop, and a third "both" position was a merged
+ * view neither of them wanted. Null stays at this layer for the tests and for any tooling
+ * that legitimately reads the whole table.
  */
 export type BrotherFilter = Brother | null;
 
@@ -37,12 +38,13 @@ export function isBrother(value: unknown): value is Brother {
 export const BROTHER_COOKIE = 'tri-brother';
 
 /**
- * Reads a raw cookie value back into a filter, treating anything unrecognised as "both".
+ * Reads a raw cookie value back into a position, defaulting to the first brother.
  *
- * Tolerant on purpose: this value survives deployments in people's browsers, and a renamed
- * brother or a stale value must degrade to showing everything rather than to an error — or
- * worse, to silently filtering by a person who no longer exists.
+ * There is no "both": the switch rests on somebody, always. Tolerant of stale or
+ * unrecognisable values on purpose — this survives deployments inside people's browsers, and
+ * a renamed brother must degrade to a working screen rather than to an error or to a filter
+ * on a person who no longer exists.
  */
-export function parseBrother(value: string | undefined): BrotherFilter {
-  return isBrother(value) ? value : null;
+export function parseBrother(value: string | undefined): Brother {
+  return isBrother(value) ? value : HOUSEHOLD[0];
 }

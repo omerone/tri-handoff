@@ -50,13 +50,11 @@ const entrySchema = z.object({
   }),
   isRecurring: z.coerce.boolean().default(false),
   /**
-   * Whose money. One of the two brothers, or empty for a shared row — validated against the
-   * household list so a stray value cannot invent a third person in the dropdowns.
+   * Whose money. Always one of the two brothers: the switch has no "both" position any more,
+   * so there is nobody for an unowned row to belong to. Refused rather than defaulted — a
+   * tampered value silently becoming somebody's expense is the wrong failure.
    */
-  owner: z
-    .string()
-    .optional()
-    .transform((value) => (isBrother(value) ? value : null)),
+  owner: z.string().refine(isBrother),
 });
 
 function parse(formData: FormData) {

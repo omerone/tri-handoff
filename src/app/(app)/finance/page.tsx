@@ -6,7 +6,6 @@ import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { isAtOrBefore, stepMonth } from '@/lib/finance/bounds';
 import { applyRangeAction } from '@/app/actions/range';
-import { HOUSEHOLD } from '@/lib/household';
 import { currentBrother } from '@/lib/preferences/brother';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { describeRange } from '@/lib/time/range';
@@ -347,10 +346,8 @@ export default async function FinancePage({
         <div className="border-line border-b pb-3">
           <AddSheet label={tBulk('addEntry')}>
             <EntryForm
-              defaultOwner={brother}
-              owners={HOUSEHOLD}
+              owner={brother}
               ownerLabel={t('ownerLabel')}
-              ownerShared={t('ownerShared')}
               labels={{
                 label: t('label'),
                 amount: t('amount'),
@@ -411,8 +408,9 @@ export default async function FinancePage({
                       type: occurrence.type,
                       label: occurrence.label,
                       category: categoryLabel(occurrence.category),
-                      // Named only in the household view; see the note on EntryRowData.
-                      owner: brother === null ? occurrence.owner : null,
+                      // The screen is always one brother's, so a chip repeating his name on
+                      // every row would be a column of the same word.
+                      owner: null,
                       amount: ils(occurrence.amountIls),
                       // Stored as UTC midnight: a calendar date, not an instant.
                       date: formatDayMonthAt(occurrence.occurrenceDate, 'UTC'),

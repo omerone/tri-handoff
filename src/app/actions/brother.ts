@@ -19,19 +19,16 @@ export async function applyBrotherAction(formData: FormData): Promise<void> {
   const path = safeAppPath(formData.get('path'));
   const query = String(formData.get('query') ?? '');
 
-  const jar = await cookies();
+  // Only a real name moves the switch. Anything else — a tampered form, a stale button from
+  // a cached page — redraws the screen where it was rather than inventing a position.
   if (isBrother(value)) {
-    jar.set(BROTHER_COOKIE, value, {
+    (await cookies()).set(BROTHER_COOKIE, value, {
       // Not a secret — it is a name that is on the screen — and only the server reads it.
       httpOnly: false,
       sameSite: 'lax',
       path: '/',
       maxAge: 365 * 24 * 60 * 60,
     });
-  } else {
-    // "Both" is the absence of a filter, so it is the absence of the cookie. Deleting rather
-    // than storing a sentinel means a stale or renamed value can never masquerade as a person.
-    jar.delete(BROTHER_COOKIE);
   }
 
   redirect(query ? `${path}?${query}` : path);

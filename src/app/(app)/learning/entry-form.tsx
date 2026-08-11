@@ -29,25 +29,19 @@ export type LearningFormLabels = {
 export function LearningEntryForm({
   labels,
   defaultDate,
-  learners,
-  defaultLearner,
+  learner,
 }: {
   labels: LearningFormLabels;
   /** Formatted on the server, so the field does not depend on the client's clock. */
   defaultDate: string;
   /**
-   * The two brothers, from `src/lib/household.ts` — a select now, not suggestions.
+   * The header switch's position — who this session belongs to, stated rather than asked.
    *
-   * The field began as free text with a datalist, which invited "Ester" beside "ester" and
-   * left `learnerKey` to fold the drift back together. With the household fixed at two named
-   * people there is nothing free text can add except typos, so the input became a choice.
+   * The field has been free text, then a datalist, then a select of the two brothers; every
+   * form of asking allowed the same contradiction, a session entered on אביתר's screen and
+   * attributed to יוני, gone from view the moment it saved. The switch already answered.
    */
-  learners: readonly string[];
-  /**
-   * The header switch's position: studying while the screen is narrowed to one brother
-   * records his session without a second control being touched.
-   */
-  defaultLearner: string | null;
+  learner: string;
 }) {
   const [state, action] = useActionState<LearningFormState, FormData>(
     createLearningEntryAction,
@@ -95,20 +89,9 @@ export function LearningEntryForm({
         */}
         <label className="flex flex-col gap-1 sm:min-w-[9rem]">
           <span className="text-dim text-[11px] font-semibold">{labels.learner}</span>
-          {/* keyed so moving the header switch re-defaults a form nobody has touched yet */}
-          <select
-            name="learner"
-            key={defaultLearner ?? 'both'}
-            defaultValue={defaultLearner ?? ''}
-            className={field}
-          >
-            {learners.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-            <option value="">{labels.learnerPlaceholder}</option>
-          </select>
+          {/* Stated, not asked — the header switch is where "whose" changes. */}
+          <span className={`${field} flex items-center font-semibold`}>{learner}</span>
+          <input type="hidden" name="learner" value={learner} />
         </label>
 
         <label className="col-span-2 flex flex-col gap-1 sm:col-auto sm:min-w-[12rem] sm:flex-1">

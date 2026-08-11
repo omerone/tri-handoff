@@ -1,66 +1,88 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * The brother switch: one login, two people, and a header control deciding whose money and
- * whose hours the owned screens show.
+ * The brother switch: one login, two people, and a header control that always rests on one
+ * of them — there is no merged position, because the brothers asked for their money apart
+ * and a combined view of two private budgets is the thing they were separating.
  *
- * Trading is joint on purpose — the reason the product is a single tenant — so the switch must
- * do exactly two things and no third: swap the finance and learning data between יוני and
- * אביתר, and visibly stand down on the screens where the data is shared.
+ * Whose row a new entry becomes is *stated* by the form, not asked: the switch already
+ * answered, and a second control that could disagree was a contradiction waiting to be
+ * clicked — a session entered on אביתר's screen, attributed to יוני, gone the moment it saved.
  *
- * Titles are unique per run because both ledgers accumulate across runs; the names cannot be,
- * because they are the two fixed brothers. So every assertion is about presence of this run's
- * rows, never about totals arithmetic that older runs would drift.
+ * Titles are unique per run because the ledgers accumulate across runs; the names cannot be,
+ * so no assertion here does totals arithmetic.
  */
 
 const run = Date.now().toString(36).slice(-5);
 
-/**
- * A switch position by name. The brothers' names are names and never translate; the third
- * position is a label and does — the seeded e2e user reads English, a real one Hebrew.
- */
-const flip = (page: Page, name: string | RegExp) =>
+const flip = (page: Page, name: string) =>
   page
     .getByRole('group', { name: /whose data|של מי הנתונים/i })
-    .getByRole('button', { name, exact: typeof name === 'string' });
+    .getByRole('button', { name, exact: true });
+
+/**
+ * Fill a whole form so it survives hydration, then verify it as one piece.
+ *
+ * Flipping the switch navigates, and the next screen hydrates while the test is already
+ * typing. React re-rendering an uncontrolled input wipes whatever was typed into the
+ * pre-hydration DOM — and it can wipe a field *after* it was individually verified, while the
+ * test is busy with the next one. Per-field retries lost that race twice; filling everything,
+ * then checking everything, then repeating if anything was eaten, cannot lose it — once a
+ * whole pass verifies, hydration is over, because hydration only strikes once.
+ */
+async function fillForm(fields: { locator: ReturnType<Page['getByLabel']>; value: string }[]) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    for (const field of fields) await field.locator.fill(field.value);
+    try {
+      for (const field of fields) {
+        await expect(field.locator).toHaveValue(field.value, { timeout: 1_000 });
+      }
+      return;
+    } catch {
+      // something was eaten mid-pass — hydration landed; the next pass sticks
+    }
+  }
+  throw new Error('the form never held its values');
+}
 
 test.describe('the brother switch', () => {
-  test('swaps the budget between the brothers, and "both" holds everything', async ({ page }) => {
+  test('swaps the budget between the brothers, with the owner stated by the screen', async ({
+    page,
+  }) => {
     const yoni = `חשמל ${run}`;
     const evyatar = `דלק ${run}`;
 
-    // Everything visible while the switch rests on "both".
-    await page.goto('/finance');
-    await flip(page, /^both$|^שניהם$/i).click();
-
-    const add = async (owner: string, label: string) => {
+    const add = async (label: string) => {
       const opener = page.getByRole('button', { name: /add an entry|הוספת רשומה/i }).first();
       if (await opener.isVisible().catch(() => false)) await opener.click();
-      // By role: the switch's group carries an aria-label that also says 'whose', and a bare
-      // label match resolves to both.
-      await page.getByRole('combobox', { name: /whose|של מי/i }).selectOption(owner);
-      await page.getByLabel(/label|תיאור/i).fill(label);
-      await page.getByLabel(/amount|סכום/i).fill('120');
+      await fillForm([
+        { locator: page.getByLabel(/label|תיאור/i), value: label },
+        { locator: page.getByLabel(/amount|סכום/i), value: '120' },
+      ]);
       await page.getByRole('button', { name: /^add$|^הוסף$/i }).click();
       await expect(page.getByText(label).first()).toBeVisible();
     };
 
-    await add('יוני', yoni);
-    await add('אביתר', evyatar);
+    // On יוני's screen the form can only write to יוני — the owner is a statement, and the
+    // statement is his name.
+    await page.goto('/finance');
+    await flip(page, 'יוני').click();
+    await expect(page.locator('input[name="owner"]')).toHaveValue('יוני', { timeout: 10_000 });
+    await add(yoni);
 
-    // Narrowed to one brother, the other's money is gone from the screen.
+    await flip(page, 'אביתר').click();
+    await expect(page.getByText(yoni), "יוני's money on אביתר's screen").toHaveCount(0);
+    await expect(page.locator('input[name="owner"]')).toHaveValue('אביתר');
+    await add(evyatar);
+
     await flip(page, 'יוני').click();
     await expect(page.getByText(yoni).first()).toBeVisible();
     await expect(page.getByText(evyatar)).toHaveCount(0);
 
-    await flip(page, 'אביתר').click();
-    await expect(page.getByText(evyatar).first()).toBeVisible();
-    await expect(page.getByText(yoni)).toHaveCount(0);
-
-    // And the position survives a reload — it is a cookie, not client state.
+    // The position is a cookie: it survives a reload.
     await page.reload();
-    await expect(page.getByText(evyatar).first()).toBeVisible();
-    await expect(page.getByText(yoni)).toHaveCount(0);
+    await expect(page.getByText(yoni).first()).toBeVisible();
+    await expect(page.getByText(evyatar)).toHaveCount(0);
   });
 
   test('follows the same position on the study ledger', async ({ page }) => {
@@ -71,19 +93,26 @@ test.describe('the brother switch', () => {
 
     const opener = page.getByRole('button', { name: /add an entry|הוספת רשומה/i }).first();
     if (await opener.isVisible().catch(() => false)) await opener.click();
-    // The learner select already defaults to the switch's position — that is the point.
-    await expect(page.getByLabel(/who studied|מי למד/i)).toHaveValue('יוני');
-    await page.getByLabel(/^what|מה נלמד/i).fill(title);
-    await page.getByLabel(/^hours|שעות/i).first().fill('2');
+    // Stated here too — the hidden field carries the switch's answer.
+    await expect(page.locator('input[name="learner"]')).toHaveValue('יוני');
+    await fillForm([
+      { locator: page.getByLabel(/^what|מה נלמד/i), value: title },
+      { locator: page.getByLabel(/^hours|שעות/i).first(), value: '2' },
+    ]);
     await page.getByRole('button', { name: /^add$|^הוסף$/i }).click();
     await expect(page.getByText(title).first()).toBeVisible();
 
-    // The other brother's view does not hold this session.
+    // The other brother's ledger does not hold this session.
     await flip(page, 'אביתר').click();
     await expect(page.getByText(title)).toHaveCount(0);
+  });
 
-    await flip(page, /^both$|^שניהם$/i).click();
-    await expect(page.getByText(title).first()).toBeVisible();
+  test('offers exactly two positions', async ({ page }) => {
+    // "Both" existed briefly and merged the ledgers. Asserted as an absence so it cannot
+    // quietly return: a third button is a merged view of two private budgets.
+    await page.goto('/finance');
+    const group = page.getByRole('group', { name: /whose data|של מי הנתונים/i });
+    await expect(group.getByRole('button')).toHaveCount(2);
   });
 
   test('stands down on the trading screens instead of pretending to filter', async ({ page }) => {

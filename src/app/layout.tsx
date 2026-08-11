@@ -28,21 +28,21 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'TRi — Trade · Risk · Insight',
+  title: 'TRO — Trade · Risk · Outcome',
   description: 'Trading journal and personal finance dashboard.',
   robots: { index: false, follow: false },
   /*
    * The name under the icon, once this is on a Home Screen.
    *
    * Without it iOS labels the tile with `title` — the whole strapline — and then truncates it
-   * to roughly nine characters, so what a person actually ends up with is "TRi — Tra…". The
+   * to roughly nine characters, so what a person actually ends up with is "TRO — Tra…". The
    * install sheet still shows the long one; this is only what survives underneath.
    *
    * `statusBarStyle` is deliberately left alone. On its default, iOS tints the status bar with
    * `themeColor` below, which already answers light and dark separately — pinning it to
    * `black` would be right for the dark theme and wrong for the other one.
    */
-  appleWebApp: { capable: true, title: 'TRi' },
+  appleWebApp: { capable: true, title: 'TRO' },
 };
 
 export const viewport: Viewport = {

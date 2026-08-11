@@ -61,7 +61,13 @@ export async function AppShell({
 
       <div className="relative z-10">
         <header className="border-line bg-header sticky top-0 z-20 border-b backdrop-blur-[8px]">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          {/*
+            `flex-wrap`: the switch joined a row that was already full on a phone, and at
+            ~400px the brand's tagline was what gave way — "Trade · Risk · Insight" folded to
+            three lines and grew the sticky header every screen scrolls under. Wrapping drops
+            the whole controls cluster to its own line instead, whole, under the brand.
+          */}
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
             <div className="flex items-center gap-3">
               <TriMark size={36} />
               <div>
@@ -80,14 +86,13 @@ export async function AppShell({
             The header is for what is true right now — is the data synced, is it light or
             dark. Everything you go somewhere to change is behind one door.
           */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Whose money and whose hours the owned screens show. First in the row: it is
                   an answer about identity, and the rest of the row is about state. */}
               <BrotherSwitch
                 current={brother}
                 labels={{
                   title: t('household.title'),
-                  both: t('household.both'),
                   shared: t('household.shared'),
                 }}
               />

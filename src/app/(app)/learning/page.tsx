@@ -6,7 +6,6 @@ import { DonutChart } from '@/components/charts/donut-chart';
 import { Chip, EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { listLearningEntries } from '@/lib/db';
-import { HOUSEHOLD } from '@/lib/household';
 import { currentBrother } from '@/lib/preferences/brother';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import {
@@ -165,8 +164,7 @@ export default async function LearningPage({
           <AddSheet label={tBulk('addEntry')}>
             <LearningEntryForm
               defaultDate={defaultDate}
-              learners={HOUSEHOLD}
-              defaultLearner={who}
+              learner={who}
               labels={{
                 learner: t('learner'),
                 learnerPlaceholder: t('learnerPlaceholder'),

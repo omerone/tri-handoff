@@ -33,10 +33,8 @@ export function EntryForm({
   labels,
   categories,
   defaultDate,
-  defaultOwner,
-  owners,
+  owner,
   ownerLabel,
-  ownerShared,
   window,
 }: {
   labels: EntryFormLabels;
@@ -44,18 +42,16 @@ export function EntryForm({
   /** Today, formatted on the server so the field does not depend on the client's clock. */
   defaultDate: string;
   /**
-   * The header switch's position, which is the answer this form assumes.
+   * The header switch's position — and the row's owner, with no way to disagree.
    *
-   * When the screen is narrowed to one brother, a row added on it is his without another
-   * click — entering money on "יוני" and having it land under "both" because a second control
-   * defaulted differently is the contradiction this closes. On "both" the select defaults to
-   * shared and the person picks.
+   * This was a select offering the other brother too, and it was a contradiction waiting to
+   * be clicked: the screen says אביתר, the form quietly says יוני, and the row vanishes the
+   * moment it is saved because the view it was born under does not contain it. Whose money is
+   * being entered was already answered by the switch; the form states the answer instead of
+   * re-asking it.
    */
-  defaultOwner: string | null;
-  /** The two names, plus the shared option's label. */
-  owners: readonly string[];
+  owner: string;
   ownerLabel: string;
-  ownerShared: string;
   /**
    * What the screen is currently showing, as `yyyy-mm-dd` bounds. Posted with the entry so
    * the action can tell whether the thing just added would land somewhere the user cannot
@@ -100,18 +96,13 @@ export function EntryForm({
           <input name="label" required maxLength={120} className={field} />
         </label>
 
-        <label className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1">
           <span className="text-dim text-[11px] font-semibold">{ownerLabel}</span>
-          {/* keyed so moving the header switch re-defaults a form nobody has touched yet */}
-          <select name="owner" key={defaultOwner ?? 'both'} defaultValue={defaultOwner ?? ''} className={field}>
-            {owners.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-            <option value="">{ownerShared}</option>
-          </select>
-        </label>
+          {/* Stated, not asked — change it with the header switch, where the whole screen
+              follows, rather than in a corner of a form where only this row would. */}
+          <span className={`${field} flex items-center font-semibold`}>{owner}</span>
+          <input type="hidden" name="owner" value={owner} />
+        </div>
 
         <label className="flex flex-col gap-1">
           <span className="text-dim text-[11px] font-semibold">{labels.category}</span>

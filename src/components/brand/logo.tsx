@@ -1,5 +1,5 @@
 /**
- * The TRi mark: a rising line with an arrow, inside its own frame.
+ * The TRO mark: a rising line with an arrow, inside its own frame.
  *
  * Four days and a breakout, plotted on a grid — the picture the product is about, drawn the
  * way the dashboard draws it: the run is not a clean ascent, it dips twice on the way, and the
@@ -32,7 +32,7 @@ export function TriMark({ size = 36, className = '' }: { size?: number; classNam
       height={size}
       className={className}
       role="img"
-      aria-label="TRi"
+      aria-label="TRO"
       style={{
         filter: 'drop-shadow(0 0 2px color-mix(in oklab, var(--tri-brand) 55%, transparent))',
       }}

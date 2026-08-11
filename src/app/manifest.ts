@@ -5,7 +5,7 @@ import type { MetadataRoute } from 'next';
  *
  * It exists for the icon, but the icon is not the only thing that was wrong when there was no
  * manifest. Added to a Home Screen the app was a grey square with a `T` in it, labelled with
- * the whole strapline — "TRi — Trade · Risk · Insight" — which iOS then truncates to about
+ * the whole strapline — "TRO — Trade · Risk · Outcome" — which iOS then truncates to about
  * nine characters of it. `short_name` is what sits under the icon; `name` is what the install
  * sheet shows.
  *
@@ -18,8 +18,8 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'TRi — Trade · Risk · Insight',
-    short_name: 'TRi',
+    name: 'TRO — Trade · Risk · Outcome',
+    short_name: 'TRO',
     description: 'Trading journal and personal finance dashboard.',
     start_url: '/',
     display: 'standalone',

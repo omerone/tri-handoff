@@ -2,13 +2,11 @@
 
 import { usePathname, useSearchParams } from 'next/navigation';
 import { applyBrotherAction } from '@/app/actions/brother';
-import { HOUSEHOLD, type BrotherFilter } from '@/lib/household';
+import { HOUSEHOLD, type Brother } from '@/lib/household';
 
 export type BrotherSwitchLabels = {
   /** The group's name for a screen reader, and the tooltip's subject. */
   title: string;
-  /** The third position: no filter. */
-  both: string;
   /** Said over the switch on screens whose data is joint, so a pressed name that changes
    * nothing there reads as "this screen is shared" rather than as a broken control. */
   shared: string;
@@ -39,17 +37,19 @@ export function BrotherSwitch({
   labels,
 }: {
   /** The cookie's position, resolved on the server so the first paint agrees with it. */
-  current: BrotherFilter;
+  current: Brother;
   labels: BrotherSwitchLabels;
 }) {
   const pathname = usePathname();
   const params = useSearchParams();
   const owned = OWNED_PATHS.some((path) => pathname.startsWith(path));
 
-  const positions: { value: BrotherFilter; label: string }[] = [
-    ...HOUSEHOLD.map((name) => ({ value: name as BrotherFilter, label: name })),
-    { value: null, label: labels.both },
-  ];
+  /*
+   * Two positions and no third. There was briefly a "both" that merged the ledgers; the
+   * brothers asked for their money apart, and a merged view of two private budgets is the
+   * exact thing they were separating. The switch always rests on somebody.
+   */
+  const positions = HOUSEHOLD.map((name) => ({ value: name as Brother, label: name }));
 
   return (
     <form
@@ -70,10 +70,10 @@ export function BrotherSwitch({
           const active = current === position.value;
           return (
             <button
-              key={position.value ?? 'both'}
+              key={position.value}
               type="submit"
               name="brother"
-              value={position.value ?? ''}
+              value={position.value}
               aria-pressed={active}
               className={`tri-tap min-h-7 rounded-full px-2.5 text-xs whitespace-nowrap ${
                 active ? 'bg-brand text-on-brand font-bold' : 'text-dim hover:text-text font-medium'

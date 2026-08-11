@@ -44,11 +44,11 @@ test.describe('adding the app to a home screen', () => {
   test('names itself in the nine characters iOS gives it', async ({ page }) => {
     await page.goto('/login');
 
-    // `title` is the strapline and gets truncated to something like "TRi — Tra…" under the
+    // `title` is the strapline and gets truncated to something like "TRO — Tra…" under the
     // icon. This is what actually appears there.
     await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute(
       'content',
-      'TRi',
+      'TRO',
     );
   });
 
@@ -59,7 +59,7 @@ test.describe('adding the app to a home screen', () => {
     await expect(link).toHaveCount(1);
 
     const manifest = await (await request.get((await link.getAttribute('href'))!)).json();
-    expect(manifest.short_name).toBe('TRi');
+    expect(manifest.short_name).toBe('TRO');
     // Not whichever page they happened to be on when they added it.
     expect(manifest.start_url).toBe('/');
     expect(manifest.display).toBe('standalone');
