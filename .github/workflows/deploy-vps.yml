@@ -130,6 +130,17 @@ jobs:
           # The public URL, over TLS and through Cloudflare — the path a client actually
           # takes. The old check hit http://<ip>/login, which is a 301 to the domain now, so
           # it would fail every deploy while the site was perfectly healthy.
-          code=$(curl -s -o /dev/null -w '%{http_code}' https://troinvest.uk/login)
-          echo "GET https://troinvest.uk/login -> $code"
-          [ "$code" = "200" ] || { echo "::error title=Production unhealthy::/login returned $code"; exit 1; }
+          #
+          # Retried, because the first request lands seconds after the container swap and has
+          # to cross Cloudflare to an app that is still warming. One cold 522 marked two
+          # perfectly good deploys as failures — the box's own log said "health check passed"
+          # twenty seconds before the pipeline said the site was down. A minute of patience is
+          # the difference between a check and a coin flip.
+          for attempt in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://troinvest.uk/login)
+            echo "attempt $attempt: GET https://troinvest.uk/login -> $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 6
+          done
+          echo "::error title=Production unhealthy::/login never returned 200"
+          exit 1
