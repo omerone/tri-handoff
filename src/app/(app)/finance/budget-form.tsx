@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { Check, Pencil, Trash2, X } from 'lucide-react';
+import { SuggestField } from '@/components/ui/suggest-field';
 import {
   setBudgetAction,
   deleteBudgetAction,
@@ -52,18 +53,13 @@ export function BudgetForm({ owner, labels }: { owner: string; labels: BudgetFor
 
       <label className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-none sm:w-44">
         <span className="text-dim text-[11px] font-semibold">{labels.category}</span>
-        <input
+        <SuggestField
           name="category"
-          list="budget-categories"
+          options={labels.options}
           required
           placeholder={labels.categoryPlaceholder}
           className={field}
         />
-        <datalist id="budget-categories">
-          {labels.options.map((option) => (
-            <option key={option} value={option} />
-          ))}
-        </datalist>
       </label>
 
       <label className="flex w-28 flex-col gap-1">

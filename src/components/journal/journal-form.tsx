@@ -1,5 +1,7 @@
 'use client';
 
+import { SuggestField } from '@/components/ui/suggest-field';
+
 import { useActionState } from 'react';
 import { Star } from 'lucide-react';
 import { useState } from 'react';
@@ -82,38 +84,24 @@ export function JournalForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
           <span className="text-dim text-xs font-semibold">{labels.strategy}</span>
-          <input
+          <SuggestField
             name="strategy"
+            options={vocabulary.strategies}
             defaultValue={values.strategy}
             placeholder={labels.strategyPlaceholder}
-            list="tri-strategies"
-            maxLength={60}
-            autoComplete="off"
             className={field}
           />
-          <datalist id="tri-strategies">
-            {vocabulary.strategies.map((value) => (
-              <option key={value} value={value} />
-            ))}
-          </datalist>
         </label>
 
         <label className="flex flex-col gap-1.5">
           <span className="text-dim text-xs font-semibold">{labels.mood}</span>
-          <input
+          <SuggestField
             name="mood"
+            options={vocabulary.moods}
             defaultValue={values.mood}
             placeholder={labels.moodPlaceholder}
-            list="tri-moods"
-            maxLength={40}
-            autoComplete="off"
             className={field}
           />
-          <datalist id="tri-moods">
-            {vocabulary.moods.map((value) => (
-              <option key={value} value={value} />
-            ))}
-          </datalist>
         </label>
       </div>
 
@@ -121,19 +109,14 @@ export function JournalForm({
         <span className="text-dim text-xs font-semibold">
           {labels.tags} <span className="font-normal">· {labels.tagsHint}</span>
         </span>
-        <input
+        <SuggestField
           name="tags"
+          options={vocabulary.tags}
           defaultValue={values.tags}
-          list="tri-tags"
           maxLength={500}
-          autoComplete="off"
+          multiple
           className={field}
         />
-        <datalist id="tri-tags">
-          {vocabulary.tags.map((value) => (
-            <option key={value} value={value} />
-          ))}
-        </datalist>
       </label>
 
       <div className="flex flex-col gap-1.5">

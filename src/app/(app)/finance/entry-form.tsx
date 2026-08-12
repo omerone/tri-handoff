@@ -1,5 +1,7 @@
 'use client';
 
+import { SuggestField } from '@/components/ui/suggest-field';
+
 import { useActionState, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { DateField } from '@/components/ui/date-field';
@@ -24,7 +26,7 @@ export type CategoryOption = { value: string; label: string };
  * The add-entry row from the prototype, with the two things the prototype left out: a
  * category and a recurring flag (both 🔶 in SPEC §3.1, both resolved as "yes").
  *
- * The category input is free text backed by a datalist rather than a select. One user per
+ * The category input is free text with suggestions rather than a select. One user per
  * tenant means whatever words that person thinks in are the correct ones — but with no
  * suggestions at all, "Food", "food" and "Groceries" become three categories by the third
  * month and the breakdown stops meaning anything.
@@ -106,17 +108,14 @@ export function EntryForm({
 
         <label className="flex flex-col gap-1">
           <span className="text-dim text-[11px] font-semibold">{labels.category}</span>
-          <input
+          <SuggestField
             name="category"
-            list="tri-finance-categories"
-            className={`${field} sm:w-36`}
-            autoComplete="off"
+            options={options.map((option) => option.label)}
+            boxClassName="sm:w-36"
+            /* Fills its wrapper rather than sizing itself: the wrapper is what the
+               suggestion panel measures, and an input wider than it hangs over the edge. */
+            className={`${field} sm:w-full`}
           />
-          <datalist id="tri-finance-categories">
-            {options.map((option) => (
-              <option key={option.value} value={option.label} />
-            ))}
-          </datalist>
         </label>
 
         <label className="flex flex-col gap-1">

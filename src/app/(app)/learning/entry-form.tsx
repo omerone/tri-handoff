@@ -1,5 +1,7 @@
 'use client';
 
+import { SuggestField } from '@/components/ui/suggest-field';
+
 import { useActionState } from 'react';
 import { Plus } from 'lucide-react';
 import { DateField } from '@/components/ui/date-field';
@@ -38,7 +40,7 @@ export function LearningEntryForm({
   /**
    * The header switch's position — who this session belongs to, stated rather than asked.
    *
-   * The field has been free text, then a datalist, then a select of the two brothers; every
+   * The field has been free text, then a suggestion list, then a select of the two brothers; every
    * form of asking allowed the same contradiction, a session entered on אביתר's screen and
    * attributed to יוני, gone from view the moment it saved. The switch already answered.
    */
@@ -87,18 +89,14 @@ export function LearningEntryForm({
         */}
         <label className="flex flex-col gap-1">
           <span className="text-dim text-[11px] font-semibold">{labels.topic}</span>
-          <input
+          <SuggestField
             name="topic"
-            list="learning-topics"
+            options={labels.topicOptions}
             required
             defaultValue={labels.topics.technical}
-            className={`${field} sm:w-40 lg:w-auto lg:min-w-0 lg:flex-1`}
+            boxClassName="sm:w-40 lg:w-auto lg:min-w-0 lg:flex-1"
+            className={`${field} sm:w-full`}
           />
-          <datalist id="learning-topics">
-            {labels.topicOptions.map((option) => (
-              <option key={option} value={option} />
-            ))}
-          </datalist>
         </label>
 
         {/*

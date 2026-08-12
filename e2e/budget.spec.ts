@@ -58,9 +58,8 @@ function tile(page: Page, category: string) {
  * hydration, so a click that lands too early is swallowed silently. Clicking until the field
  * is actually visible is the only evidence the handler was attached.
  */
-async function setCeiling(page: Page, category: string, amount: number, currency = 'ILS') {
-  const form = page.locator('form:has(input[list="budget-categories"])');
-  const field = form.locator('input[name="category"]');
+async function openBudgetForm(page: Page) {
+  const field = page.locator('form:has(select[name="currency"]) input[name="category"]');
   const opener = page.getByRole('button', { name: 'Set a budget' }).first();
 
   for (let attempt = 0; attempt < 6 && !(await field.isVisible().catch(() => false)); attempt += 1) {
@@ -69,12 +68,42 @@ async function setCeiling(page: Page, category: string, amount: number, currency
       .toBeVisible({ timeout: 2_000 })
       .catch(() => undefined);
   }
+}
+
+async function setCeiling(page: Page, category: string, amount: number, currency = 'ILS') {
+  const form = page.locator('form:has(select[name="currency"])');
+  const field = form.locator('input[name="category"]');
+  await openBudgetForm(page);
 
   await field.fill(category);
   await form.locator('input[name="amount"]').fill(String(amount));
   // Stated rather than left to the default, which follows whatever the header is reading in.
   await form.locator('select[name="currency"]').selectOption(currency);
   await form.getByRole('button', { name: 'Set', exact: true }).click();
+}
+
+/**
+ * What the category field offers, read off the panel rather than out of the markup.
+ *
+ * The suggestions used to be a `<datalist>`, which could be counted without opening it. They
+ * are ours now, which means asserting on them means opening them — and that is the better
+ * test anyway: what is in the DOM and what a person is shown are the same question only if
+ * something checks.
+ */
+async function suggestions(page: Page, which: 'spending' | 'budget'): Promise<string[]> {
+  // Both forms are behind a button on a phone, and a panel cannot be read through a sheet
+  // that has not been opened.
+  const form =
+    which === 'budget' ? 'form:has(select[name="currency"])' : 'form:has(input[name="label"])';
+  if (which === 'budget') await openBudgetForm(page);
+  else await openAddForm(page);
+
+  const field = page.locator(`${form} input[name="category"]`);
+  await field.click();
+  const offered = await page.locator('[role="option"]').allInnerTexts();
+  await page.keyboard.press('Escape');
+  if (which === 'spending') await closeAddForm(page);
+  return offered.map((one) => one.trim());
 }
 
 async function spend(page: Page, label: string, category: string, amount: number) {
@@ -182,20 +211,16 @@ test.describe('a budget ceiling', () => {
     await page.goto('/finance');
     await setCeiling(page, CATEGORY, 1_000);
 
-    await expect(
-      page.locator(`#tri-finance-categories option[value="${CATEGORY}"]`),
-      'the budgeted category is missing from the expense form',
-    ).toHaveCount(1);
+    // Read off the panel a person actually sees rather than out of the markup behind it.
+    const offered = await suggestions(page, 'spending');
+    expect(offered, 'the budgeted category is missing from the expense form').toContain(CATEGORY);
 
     // And only the ceilings: a built-in offered underneath them is a way to file money
     // somewhere no dial is watching, on the one form whose whole job is filing money.
-    await expect(
-      page.locator('#tri-finance-categories option[value="Rent"]'),
-      'the starting list is still showing under the ceilings',
-    ).toHaveCount(0);
+    expect(offered, 'the starting list is still showing under the ceilings').not.toContain('Rent');
 
     // The form that *invents* a category keeps the full list — that is where it is needed.
-    await expect(page.locator('#budget-categories option[value="Rent"]')).toHaveCount(1);
+    expect(await suggestions(page, 'budget')).toContain('Rent');
   });
 
   test('finds the money when the ceiling was written by the category’s name', async ({ page }) => {
