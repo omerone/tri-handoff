@@ -186,6 +186,16 @@ test.describe('a budget ceiling', () => {
       page.locator(`#tri-finance-categories option[value="${CATEGORY}"]`),
       'the budgeted category is missing from the expense form',
     ).toHaveCount(1);
+
+    // And only the ceilings: a built-in offered underneath them is a way to file money
+    // somewhere no dial is watching, on the one form whose whole job is filing money.
+    await expect(
+      page.locator('#tri-finance-categories option[value="Rent"]'),
+      'the starting list is still showing under the ceilings',
+    ).toHaveCount(0);
+
+    // The form that *invents* a category keeps the full list — that is where it is needed.
+    await expect(page.locator('#budget-categories option[value="Rent"]')).toHaveCount(1);
   });
 
   test('finds the money when the ceiling was written by the category’s name', async ({ page }) => {

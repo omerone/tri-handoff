@@ -92,24 +92,29 @@ export function categoryKey(category: string): string {
 /**
  * What to offer when somebody types a category, in the order they want to see it.
  *
- * The suggestions were the twelve built-ins and nothing else, so a category the person had
- * invented — and set a budget against — was missing from the list on the one form that files
- * money into it. Retyping it by hand is where the two sides drift apart: an expense under
- * "בזבוזים " with a trailing space is money the dial for "בזבוזים" will never see.
+ * Three sources, and the caller picks which of them apply, because the two forms on the
+ * finance screen are asking different questions. The form that *spends* money offers the
+ * ceilings and nothing else: a trader who has said what their categories are does not want
+ * twelve more underneath them, and the list they see is the one that keeps the ledger and
+ * the dials filed under the same word. The form that *creates* a ceiling offers everything,
+ * because that is where a category is invented and the starting list is worth having.
  *
- * Budgeted categories lead, because those are the ones with a ceiling being watched and the
- * ones a person is most likely to be filing against. Then everything else already in the
- * book, then the built-ins as a starting point for whatever has not been used yet.
+ * The field is free text either way. Nothing here is a restriction on what can be typed —
+ * only on what is worth suggesting.
  *
  * Returned as stored — keys for the built-ins, the person's own words for the rest — so the
  * caller can translate the ones that have a translation.
  */
 export function categoryVocabulary(
   type: FinanceType,
-  /** Everything in the book, so a category used in March is still offered in August. */
-  used: readonly { type: FinanceType; category: string }[],
-  /** Categories worth offering whether or not they have been spent against yet. */
-  budgeted: readonly string[] = [],
+  source: {
+    /** Categories with a ceiling. First, because they are what the person is managing. */
+    budgeted?: readonly string[];
+    /** Everything in the book, so a category used in March is still offered in August. */
+    used?: readonly { type: FinanceType; category: string }[];
+    /** The twelve built-ins, as a starting point for whatever has not been used yet. */
+    includeSuggested?: boolean;
+  },
 ): string[] {
   const seen = new Set<string>();
   const vocabulary: string[] = [];
@@ -121,9 +126,9 @@ export function categoryVocabulary(
     vocabulary.push(category);
   };
 
-  budgeted.forEach(offer);
-  for (const entry of used) if (entry.type === type) offer(entry.category);
-  suggestedCategories(type).forEach(offer);
+  source.budgeted?.forEach(offer);
+  for (const entry of source.used ?? []) if (entry.type === type) offer(entry.category);
+  if (source.includeSuggested) suggestedCategories(type).forEach(offer);
 
   return vocabulary;
 }

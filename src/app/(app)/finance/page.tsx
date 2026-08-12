@@ -340,10 +340,32 @@ export default async function FinancePage({
    * missing from the list entirely.
    */
   const budgetedCategories = budgets.map((one) => one.category);
-  const suggestions = (type: 'income' | 'expense') =>
-    categoryVocabulary(type, entries, type === 'expense' ? budgetedCategories : []).map(
-      (value) => ({ value, label: categoryLabel(value) }),
-    );
+  const named = (values: string[]) => values.map((value) => ({ value, label: categoryLabel(value) }));
+
+  /*
+   * Spending is filed against a ceiling, so once there are ceilings they are the whole list.
+   *
+   * Twelve built-ins under the two categories a person actually keeps is a list you scroll
+   * past, and every one of them is a way to file money somewhere no dial is watching. Until
+   * the first budget exists there is nothing to offer, so the starting list stands in.
+   */
+  const expenseOptions = named(
+    budgetedCategories.length > 0
+      ? categoryVocabulary('expense', { budgeted: budgetedCategories })
+      : categoryVocabulary('expense', { used: entries, includeSuggested: true }),
+  );
+  // Income has no ceilings to file against, so it keeps the book and the starting list.
+  const incomeOptions = named(
+    categoryVocabulary('income', { used: entries, includeSuggested: true }),
+  );
+  /* Where a category is invented, so this one offers everything there is. */
+  const budgetOptions = named(
+    categoryVocabulary('expense', {
+      budgeted: budgetedCategories,
+      used: entries,
+      includeSuggested: true,
+    }),
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -437,7 +459,7 @@ export default async function FinancePage({
                 recurringHint: t('recurringHint'),
                 add: t('add'),
               }}
-              categories={{ income: suggestions('income'), expense: suggestions('expense') }}
+              categories={{ income: incomeOptions, expense: expenseOptions }}
               defaultDate={defaultDateFor(period, today)}
               window={{ from: iso(period.from), to: iso(period.to) }}
             />
@@ -598,7 +620,7 @@ export default async function FinancePage({
                   label: `${CURRENCY_SYMBOL[code]} ${code}`,
                 })),
                 defaultCurrency: READ_IN,
-                options: suggestions('expense').map((one) => one.label),
+                options: budgetOptions.map((one) => one.label),
               }}
             />
           </AddSheet>
