@@ -7,6 +7,7 @@ import { requireSession } from '@/lib/auth/session';
 import { deleteBudget, setBudget, setBudgetAmount } from '@/lib/db';
 import { isBrother } from '@/lib/household';
 import { isSupportedCurrency } from '@/lib/money/currency';
+import { resolveCategoryKey } from '@/lib/finance/categories';
 
 export type BudgetFormState = { error?: string };
 
@@ -54,7 +55,15 @@ export async function setBudgetAction(
 
   await setBudget(session.ctx, {
     owner: parsed.data.owner,
-    category: parsed.data.category,
+    /*
+     * Back to a key, exactly as the ledger does with the same word.
+     *
+     * The list offers translated labels, so a Hebrew reader picking "תחבורה" hands back that
+     * string while the expenses filed under it are stored as `transport`. Left unresolved,
+     * the ceiling and the money never meet and the dial reads a confident zero forever —
+     * the one failure on this screen that looks exactly like a correct answer.
+     */
+    category: resolveCategoryKey(parsed.data.category, (key) => t(`categories.${key}`)),
     amount: parsed.data.amount,
     currency: parsed.data.currency,
   });

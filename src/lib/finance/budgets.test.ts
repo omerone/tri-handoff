@@ -141,3 +141,47 @@ describe('months covered', () => {
     expect(monthsCovered(null)).toBeNull();
   });
 });
+
+describe('the join between a ceiling and the money', () => {
+  const rate = () => 1;
+
+  /*
+   * The failure this guards is the quiet one. A budget on "Food" while the expenses are
+   * filed under "food" is a dial that reads zero forever — not an error, not a blank, a
+   * confident and wrong number that says the allowance is untouched.
+   */
+  it('does not care how the category was capitalised', () => {
+    const [use] = budgetUse(
+      [{ category: 'Food', amount: 1000, currency: 'ILS' }],
+      [{ category: 'food', total: 250, count: 1 }],
+      1,
+      rate,
+    );
+    expect(use!.spent).toBe(250);
+  });
+
+  it('ignores a space left on the end of one of them', () => {
+    const [use] = budgetUse(
+      [{ category: 'בזבוזים', amount: 1000, currency: 'ILS' }],
+      [{ category: 'בזבוזים ', total: 200, count: 1 }],
+      1,
+      rate,
+    );
+    expect(use!.spent).toBe(200);
+  });
+
+  it('adds up two spellings of one category rather than taking the last', () => {
+    // Both are the same category to whoever typed them, so both come off the same ceiling.
+    const [use] = budgetUse(
+      [{ category: 'food', amount: 1000, currency: 'ILS' }],
+      [
+        { category: 'Food', total: 300, count: 1 },
+        { category: 'food', total: 200, count: 1 },
+      ],
+      1,
+      rate,
+    );
+    expect(use!.spent).toBe(500);
+    expect(use!.remaining).toBe(500);
+  });
+});

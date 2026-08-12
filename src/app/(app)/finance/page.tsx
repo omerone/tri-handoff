@@ -23,7 +23,7 @@ import {
   totalWealth,
   yearBalance,
 } from '@/lib/finance/balance';
-import { isKnownCategory, suggestedCategories } from '@/lib/finance/categories';
+import { categoryVocabulary, isKnownCategory } from '@/lib/finance/categories';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import {
   CURRENCY_SYMBOL,
@@ -331,8 +331,19 @@ export default async function FinancePage({
   /** A figure in whatever currency its own budget is kept in. */
   const inBudget = (value: number, currency: string) =>
     formatMoney(value, currency, locale, { decimals: 0 });
+  /*
+   * What the category field offers, on both forms.
+   *
+   * Drawn from the whole book rather than the window on screen, because a category used in
+   * March is still the right suggestion in August, and from the budgets as well — the ones
+   * with a ceiling are exactly the ones a person is about to file money into, and they were
+   * missing from the list entirely.
+   */
+  const budgetedCategories = budgets.map((one) => one.category);
   const suggestions = (type: 'income' | 'expense') =>
-    suggestedCategories(type).map((value) => ({ value, label: t(`categories.${value}`) }));
+    categoryVocabulary(type, entries, type === 'expense' ? budgetedCategories : []).map(
+      (value) => ({ value, label: categoryLabel(value) }),
+    );
 
   return (
     <div className="flex flex-col gap-4">
@@ -587,7 +598,7 @@ export default async function FinancePage({
                   label: `${CURRENCY_SYMBOL[code]} ${code}`,
                 })),
                 defaultCurrency: READ_IN,
-                options: [...new Set(byCategory.map((one) => one.category))],
+                options: suggestions('expense').map((one) => one.label),
               }}
             />
           </AddSheet>

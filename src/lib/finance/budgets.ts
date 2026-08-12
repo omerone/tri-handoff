@@ -1,3 +1,4 @@
+import { categoryKey } from './categories';
 import type { CategoryTotal } from './balance';
 
 /**
@@ -74,7 +75,19 @@ export function budgetUse(
   months: number,
   rate: (currency: string) => number | null,
 ): BudgetUse[] {
-  const spentBy = new Map(spending.map((one) => [one.category, one.total]));
+  /*
+   * Folded, and summed rather than overwritten.
+   *
+   * "Food" and "food" are one category to the person who typed both, so a ceiling on either
+   * has to see the money filed under the other — and if the book contains both spellings,
+   * the dial has to count them together. Keying the map on the raw string put whichever
+   * came last in front of the rest, which reads as an underspend and never as an error.
+   */
+  const spentBy = new Map<string, number>();
+  for (const one of spending) {
+    const key = categoryKey(one.category);
+    spentBy.set(key, (spentBy.get(key) ?? 0) + one.total);
+  }
 
   return budgets
     .flatMap((budget) => {
@@ -82,7 +95,7 @@ export function budgetUse(
       if (toBudget === null) return [];
 
       const scaled = budget.amount * Math.max(1, months);
-      const spent = (spentBy.get(budget.category) ?? 0) * toBudget;
+      const spent = (spentBy.get(categoryKey(budget.category)) ?? 0) * toBudget;
       const over = Math.max(0, spent - scaled);
 
       return [

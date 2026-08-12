@@ -73,3 +73,57 @@ export function resolveCategoryKey(typed: string, label: (key: string) => string
 }
 
 export const DEFAULT_CATEGORY = 'other';
+
+/**
+ * The identity two categories are compared by.
+ *
+ * Free text is the point of this module — whatever word the person thinks in is the right
+ * one — but it means "Food" and "food" are two categories to a computer and one category to
+ * the person who typed both. Anywhere two sides of the app have to agree on which category
+ * something belongs to, they agree on this rather than on the raw string.
+ *
+ * Not used for storing or displaying: the category is kept exactly as it was written, so the
+ * capital letter somebody chose survives.
+ */
+export function categoryKey(category: string): string {
+  return category.trim().toLowerCase();
+}
+
+/**
+ * What to offer when somebody types a category, in the order they want to see it.
+ *
+ * The suggestions were the twelve built-ins and nothing else, so a category the person had
+ * invented — and set a budget against — was missing from the list on the one form that files
+ * money into it. Retyping it by hand is where the two sides drift apart: an expense under
+ * "בזבוזים " with a trailing space is money the dial for "בזבוזים" will never see.
+ *
+ * Budgeted categories lead, because those are the ones with a ceiling being watched and the
+ * ones a person is most likely to be filing against. Then everything else already in the
+ * book, then the built-ins as a starting point for whatever has not been used yet.
+ *
+ * Returned as stored — keys for the built-ins, the person's own words for the rest — so the
+ * caller can translate the ones that have a translation.
+ */
+export function categoryVocabulary(
+  type: FinanceType,
+  /** Everything in the book, so a category used in March is still offered in August. */
+  used: readonly { type: FinanceType; category: string }[],
+  /** Categories worth offering whether or not they have been spent against yet. */
+  budgeted: readonly string[] = [],
+): string[] {
+  const seen = new Set<string>();
+  const vocabulary: string[] = [];
+
+  const offer = (category: string) => {
+    const key = categoryKey(category);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    vocabulary.push(category);
+  };
+
+  budgeted.forEach(offer);
+  for (const entry of used) if (entry.type === type) offer(entry.category);
+  suggestedCategories(type).forEach(offer);
+
+  return vocabulary;
+}

@@ -33,6 +33,8 @@ test.afterAll(async () => {
   try {
     await prisma.financeEntry.deleteMany({ where: { label: { startsWith: PREFIX } } });
     await prisma.budget.deleteMany({ where: { category: { startsWith: PREFIX } } });
+    // A built-in, used below to prove a ceiling written by a category's *name* finds it.
+    await prisma.budget.deleteMany({ where: { category: 'food' } });
   } finally {
     await prisma.$disconnect();
   }
@@ -167,6 +169,43 @@ test.describe('a budget ceiling', () => {
     await expect(tile(page, CATEGORY)).not.toContainText('₪');
     // Around three shekels to the dollar, and the rate moves: assert the shape, not the cents.
     await expect(tile(page, CATEGORY)).toContainText(/\$(29\d|30\d) used/);
+  });
+
+  test('is offered on the form that files money into it', async ({ page }) => {
+    /*
+     * The reported bug. A category the trader invented, given a ceiling, and then missing
+     * from the list on the expense form — so the only way to spend against it was to retype
+     * it by hand, which is where the two sides drift apart. One trailing space and the dial
+     * never sees the money.
+     */
+    const CATEGORY = category('offered');
+    await page.goto('/finance');
+    await setCeiling(page, CATEGORY, 1_000);
+
+    await expect(
+      page.locator(`#tri-finance-categories option[value="${CATEGORY}"]`),
+      'the budgeted category is missing from the expense form',
+    ).toHaveCount(1);
+  });
+
+  test('finds the money when the ceiling was written by the category’s name', async ({ page }) => {
+    /*
+     * Built-in categories are stored as keys and offered by their translated name, so a
+     * ceiling set by picking "Food & dining" hands back that phrase while the expenses under
+     * it are filed as `food`. Left unresolved the two never meet, and the dial reads a
+     * confident zero — the failure on this screen that looks exactly like a right answer.
+     *
+     * Deliberately a category whose name is not its key with a capital letter on it: the
+     * folding that makes "Food" and "food" one category would otherwise cover this up, and
+     * in Hebrew — where the name is "מזון ומסעדות" — there would be nothing to cover it.
+     */
+    const NAME = 'Food & dining';
+    await page.goto('/finance');
+    await setCeiling(page, NAME, 3_000);
+    await spend(page, `${PREFIX} restaurant`, NAME, 500);
+
+    await expect(tile(page, NAME)).not.toContainText('₪0 used');
+    await expect(tile(page, NAME)).toContainText('left of ₪3,000');
   });
 
   test('says a monthly figure means nothing against an unbounded window', async ({ page }) => {

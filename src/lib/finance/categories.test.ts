@@ -5,6 +5,8 @@ import {
   DEFAULT_CATEGORY,
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
+  categoryKey,
+  categoryVocabulary,
   isKnownCategory,
   resolveCategoryKey,
   suggestedCategories,
@@ -80,5 +82,52 @@ describe('the suggestion lists', () => {
       const labels = keys.map((key) => label(key).toLowerCase());
       expect(new Set(labels).size).toBe(labels.length);
     }
+  });
+});
+
+describe('what the category field offers', () => {
+  const entry = (type: 'income' | 'expense', category: string) => ({ type, category });
+
+  it('leads with the categories that have a ceiling', () => {
+    // The reported bug: a category invented by the trader, given a budget, and then missing
+    // from the list on the one form that files money into it.
+    const offered = categoryVocabulary('expense', [], ['בזבוזים']);
+    expect(offered[0]).toBe('בזבוזים');
+    expect(offered).toContain('rent');
+  });
+
+  it('offers what the book already contains, whatever month it was used in', () => {
+    const offered = categoryVocabulary('expense', [entry('expense', 'ציוד')], []);
+    expect(offered).toContain('ציוד');
+  });
+
+  it('keeps income and expense apart', () => {
+    const used = [entry('income', 'freelance'), entry('expense', 'ציוד')];
+    expect(categoryVocabulary('income', used, [])).toContain('freelance');
+    expect(categoryVocabulary('income', used, [])).not.toContain('ציוד');
+    expect(categoryVocabulary('expense', used, [])).not.toContain('freelance');
+  });
+
+  it('does not offer the same category twice in two spellings', () => {
+    // Offering both is how the second one gets picked and the ledger ends up holding two.
+    const offered = categoryVocabulary('expense', [entry('expense', 'Food')], ['food ']);
+    expect(offered.filter((one) => categoryKey(one) === 'food')).toHaveLength(1);
+  });
+
+  it('offers each built-in once even when it has been used', () => {
+    const offered = categoryVocabulary('expense', [entry('expense', 'rent')], ['rent']);
+    expect(offered.filter((one) => one === 'rent')).toHaveLength(1);
+  });
+});
+
+describe('the identity two categories are compared by', () => {
+  it('ignores case and the space somebody left on the end', () => {
+    expect(categoryKey(' Food ')).toBe(categoryKey('food'));
+  });
+
+  it('is not what gets stored', () => {
+    // The capital letter someone chose is theirs; folding is only for deciding sameness.
+    const offered = categoryVocabulary('expense', [{ type: 'expense', category: 'Food' }], []);
+    expect(offered).toContain('Food');
   });
 });
