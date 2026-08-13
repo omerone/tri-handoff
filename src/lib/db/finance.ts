@@ -97,10 +97,40 @@ export async function createFinanceEntry(
   return toEntry(row);
 }
 
-export async function updateFinanceEntry(
+/** What a correction is allowed to change. Deliberately not `FinanceEntryInput`. */
+export type FinanceCorrection = {
+  type: 'income' | 'expense';
+  label: string;
+  category: string;
+  amountIls: number;
+  /** Left out for a recurring row — see below. */
+  entryDate?: Date;
+};
+
+/**
+ * Corrects what a row says, not what it is.
+ *
+ * There used to be a general `updateFinanceEntry` here, taking the same input as the create.
+ * It was unreachable from any screen, and the comment beside the actions explained why: it
+ * wrote `recurringUntil: input.recurringUntil ?? null`, so anything that called it without
+ * carrying that field forward would silently re-open a series somebody had deliberately
+ * ended — retroactively adding every month after the end date. That is a loaded gun in a
+ * drawer, so it is gone rather than guarded.
+ *
+ * This one cannot do it, by not being able to say it: `isRecurring` and `recurringUntil` are
+ * absent from the type, so no correction reaches them. Whether a row is a rule or a record,
+ * and how long the rule runs, are changed by the controls that exist for that — the recurring
+ * box when it is written, and "end series" afterwards.
+ *
+ * `entryDate` is optional for the same reason. A recurring row's date is the anchor its
+ * months are counted from, and the editor is opened from an arbitrary occurrence; moving it
+ * from there would shift every other month by the difference. Omitting the key leaves the
+ * column alone rather than writing it back.
+ */
+export async function correctFinanceEntry(
   ctx: TenantContext,
   id: string,
-  input: FinanceEntryInput,
+  input: FinanceCorrection,
 ): Promise<boolean> {
   assertContext(ctx);
   // updateMany rather than update: it takes a WHERE that can carry the tenant scope, and
@@ -111,11 +141,8 @@ export async function updateFinanceEntry(
       type: input.type,
       category: input.category,
       label: input.label,
-      owner: input.owner,
       amountIls: input.amountIls,
-      entryDate: input.entryDate,
-      isRecurring: input.isRecurring,
-      recurringUntil: input.recurringUntil ?? null,
+      ...(input.entryDate ? { entryDate: input.entryDate } : {}),
     },
   });
   return count > 0;

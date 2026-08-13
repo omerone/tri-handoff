@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  correctFinanceEntry,
   createFinanceEntry,
   deleteFinanceEntry,
   endRecurringSeries,
   listFinanceEntries,
-  updateFinanceEntry,
 } from '@/lib/db';
 import { monthBalance } from '@/lib/finance/balance';
 import { cleanup, createTenantFixture, crossTenantContext, type Fixture } from '../helpers/fixtures';
@@ -146,14 +146,12 @@ describe('tenant isolation', () => {
   it("will not update another tenant's entry", async () => {
     const target = (await listFinanceEntries(alice.ctx))[0]!;
 
-    const updated = await updateFinanceEntry(crossTenantContext(bob, alice), target.id, {
+    const updated = await correctFinanceEntry(crossTenantContext(bob, alice), target.id, {
       type: 'expense',
-      owner: null,
       category: 'other',
       label: 'hijacked',
       amountIls: 1,
       entryDate: day(2026, 1, 1),
-      isRecurring: false,
     });
 
     expect(updated).toBe(false);
@@ -264,5 +262,92 @@ describe('what the actions refuse', () => {
     // the whole table the way an ignored filter would.
     expect(await listFinanceEntries(fixture.ctx, 'יוני')).toHaveLength(1);
     expect(await listFinanceEntries(fixture.ctx, 'מישהו אחר')).toHaveLength(0);
+  });
+});
+
+describe('correcting an entry', () => {
+  it('changes what the row says', async () => {
+    const before = await createFinanceEntry(alice.ctx, {
+      type: 'expense',
+      owner: null,
+      category: 'food',
+      label: 'Resturant',
+      amountIls: 14,
+      entryDate: day(2026, 3, 4),
+      isRecurring: false,
+    });
+
+    expect(
+      await correctFinanceEntry(alice.ctx, before.id, {
+        type: 'expense',
+        category: 'leisure',
+        label: 'Restaurant',
+        amountIls: 141,
+        entryDate: day(2026, 3, 5),
+      }),
+    ).toBe(true);
+
+    const after = (await listFinanceEntries(alice.ctx)).find((one) => one.id === before.id)!;
+    expect(after).toMatchObject({ label: 'Restaurant', category: 'leisure', amountIls: 141 });
+    expect(after.entryDate.toISOString()).toBe(day(2026, 3, 5).toISOString());
+  });
+
+  /*
+   * The one this is narrow for.
+   *
+   * The general update this replaced wrote `recurringUntil: input.recurringUntil ?? null`, so
+   * an action that did not carry the field forward re-opened a series its owner had ended —
+   * silently, and retroactively, for every month after the end date. A correction has no way
+   * to name either recurring column, which is what makes it safe rather than careful.
+   */
+  it('leaves an ended series ended, and a rule a rule', async () => {
+    const salary = await createFinanceEntry(alice.ctx, {
+      type: 'income',
+      owner: null,
+      category: 'salary',
+      label: 'Salary',
+      amountIls: 9_000,
+      entryDate: day(2026, 1, 10),
+      isRecurring: true,
+    });
+    await endRecurringSeries(alice.ctx, salary.id, { year: 2026, month: 6 });
+    const ended = (await listFinanceEntries(alice.ctx)).find((one) => one.id === salary.id)!;
+    expect(ended.recurringUntil).not.toBeNull();
+
+    await correctFinanceEntry(alice.ctx, salary.id, {
+      type: 'income',
+      category: 'salary',
+      label: 'Salary',
+      amountIls: 9_500,
+    });
+
+    const after = (await listFinanceEntries(alice.ctx)).find((one) => one.id === salary.id)!;
+    expect(after.amountIls).toBe(9_500);
+    expect(after.isRecurring).toBe(true);
+    expect(after.recurringUntil?.toISOString()).toBe(ended.recurringUntil!.toISOString());
+  });
+
+  it('leaves the anchor date alone when none is given', async () => {
+    // The editor omits the date on a recurring row: it is opened from whichever occurrence was
+    // on screen, and writing that back would shift every other month by the difference.
+    const rent = await createFinanceEntry(alice.ctx, {
+      type: 'expense',
+      owner: null,
+      category: 'rent',
+      label: 'Rent',
+      amountIls: 4_000,
+      entryDate: day(2026, 2, 1),
+      isRecurring: true,
+    });
+
+    await correctFinanceEntry(alice.ctx, rent.id, {
+      type: 'expense',
+      category: 'rent',
+      label: 'Rent',
+      amountIls: 4_200,
+    });
+
+    const after = (await listFinanceEntries(alice.ctx)).find((one) => one.id === rent.id)!;
+    expect(after.entryDate.toISOString()).toBe(day(2026, 2, 1).toISOString());
   });
 });

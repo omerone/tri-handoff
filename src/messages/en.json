@@ -379,7 +379,8 @@
     "budgetEditOf": "Change the ceiling on {category}",
     "budgetRemoveOf": "Remove the budget on {category}",
     "budgetCurrency": "Currency",
-    "budgetNoRate": "No exchange rate for {categories}, so their budget has no gauge."
+    "budgetNoRate": "No exchange rate for {categories}, so their budget has no gauge.",
+    "editsEveryMonth": "A change here applies to every month of the series, not just this one."
   },
   "long": {
     "title": "Long-term positions",

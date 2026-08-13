@@ -379,7 +379,8 @@
     "budgetEditOf": "שינוי התקרה של {category}",
     "budgetRemoveOf": "מחיקת התקציב של {category}",
     "budgetCurrency": "מטבע",
-    "budgetNoRate": "אין שער חליפין ל{categories}, אז אין מד ניצול לתקציב שלהם."
+    "budgetNoRate": "אין שער חליפין ל{categories}, אז אין מד ניצול לתקציב שלהם.",
+    "editsEveryMonth": "שינוי כאן משנה את כל החודשים של הסדרה, לא רק את זה."
   },
   "long": {
     "title": "השקעות ארוכות טווח",

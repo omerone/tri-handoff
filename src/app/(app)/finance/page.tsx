@@ -516,6 +516,20 @@ export default async function FinancePage({
                       date: formatDayMonthAt(occurrence.occurrenceDate, 'UTC'),
                       isRecurring: occurrence.isRecurring,
                       generated: occurrence.generated,
+                      /* Unformatted, for the editor — and the row's own date rather than
+                         this occurrence's, which differ on a generated month. */
+                      edit: {
+                        category: categoryLabel(occurrence.category),
+                        amountIls: occurrence.amountIls,
+                        /* The row is stored as UTC midnight — a calendar date, not an
+                           instant — so it is read back in UTC and not in the reader's zone,
+                           where a date in the Americas is the day before. */
+                        date: iso(wallClock(occurrence.entryDate, 'UTC')),
+                      },
+                    }}
+                    categories={{
+                      income: incomeOptions.map((one) => one.label),
+                      expense: expenseOptions.map((one) => one.label),
                     }}
                     labels={{
                       recurringBadge: t('recurringBadge'),
@@ -524,6 +538,16 @@ export default async function FinancePage({
                       endSeries: t('endSeries'),
                       endSeriesConfirm: t('endSeriesConfirm'),
                       deleteSeriesConfirm: t('deleteSeriesConfirm'),
+                      edit: t('edit'),
+                      save: t('save'),
+                      cancel: t('cancel'),
+                      label: t('label'),
+                      category: t('category'),
+                      amount: t('amount'),
+                      date: t('date'),
+                      typeIncome: t('typeIncome'),
+                      typeExpense: t('typeExpense'),
+                      editsEveryMonth: t('editsEveryMonth'),
                     }}
                   />
                 </div>

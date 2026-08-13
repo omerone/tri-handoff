@@ -253,3 +253,67 @@ test.describe('the household book is read in shekels', () => {
     }
   });
 });
+
+test.describe('correcting an entry already written', () => {
+  /*
+   * Delete-and-re-add was the only way to fix a typo, which throws away the row along with
+   * the mistake. It was also the only *safe* way for a long time: the repository's general
+   * update could re-open a recurring series somebody had ended. The correction path is narrow
+   * enough that it cannot, and these are the two halves of that.
+   */
+  test('changes what the row says without writing a second one', async ({ page }) => {
+    const label = `${PREFIX} cofee ${process.env.TEST_PARALLEL_INDEX ?? '0'}-${Date.now()}`;
+    await page.goto('/finance');
+    await addEntry(page, { type: 'expense', label, amount: 14 });
+
+    await page.getByRole('button', { name: `Edit: ${label}` }).click();
+    const editor = page.locator('form:has(input[name="id"]):has(input[name="amountIls"])').first();
+    await expect(editor.locator('input[name="label"]')).toHaveValue(label);
+    await expect(editor.locator('input[name="amountIls"]')).toHaveValue('14');
+
+    const fixed = label.replace('cofee', 'coffee');
+    await editor.locator('input[name="label"]').fill(fixed);
+    await editor.locator('input[name="amountIls"]').fill('141');
+    await editor.getByRole('button', { name: 'Save' }).click();
+
+    await expect(page.getByText(fixed)).toBeVisible();
+    await expect(page.getByText(label, { exact: true })).toHaveCount(0);
+    // One row, corrected — not the old one plus a new one.
+    await expect(page.getByText(fixed)).toHaveCount(1);
+  });
+
+  test('offers a recurring row no date, and leaves it a series', async ({ page }) => {
+    /*
+     * A recurring row's date is the anchor its months are counted from, and the editor opens
+     * from whichever occurrence was on screen — writing that back would shift every other
+     * month by the difference. The field is absent rather than disabled, because the action
+     * leaves the column alone exactly when it is not posted.
+     */
+    const label = `${PREFIX} premium ${process.env.TEST_PARALLEL_INDEX ?? '0'}-${Date.now()}`;
+    await page.goto('/finance');
+    await addEntry(page, { type: 'expense', label, amount: 95, recurring: true });
+
+    await page.getByRole('button', { name: `Edit: ${label}` }).click();
+    const editor = page.locator('form:has(input[name="id"]):has(input[name="amountIls"])').first();
+    await expect(editor.locator('input[name="entryDate"]')).toHaveCount(0);
+    await expect(editor).toContainText('every month of the series');
+
+    await editor.locator('input[name="amountIls"]').fill('105');
+    await editor.getByRole('button', { name: 'Save' }).click();
+
+    await expect(page.getByText(label)).toBeVisible();
+
+    /*
+     * Still a rule, on *this* row.
+     *
+     * The first version asserted that an "End series" button existed anywhere on the page,
+     * which it always does — the book has other recurring rows — so it passed with the
+     * correction resetting `isRecurring` to false. Walked out from the one control that
+     * carries this row's label instead.
+     */
+    const actions = page
+      .getByRole('button', { name: `Edit: ${label}` })
+      .locator('xpath=ancestor::div[1]');
+    await expect(actions.getByRole('button', { name: 'End series' })).toBeVisible();
+  });
+});

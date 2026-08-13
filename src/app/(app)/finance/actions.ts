@@ -6,7 +6,12 @@ import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { isBrother } from '@/lib/household';
 import { requireSession } from '@/lib/auth/session';
-import { createFinanceEntry, deleteFinanceEntry, endRecurringSeries } from '@/lib/db';
+import {
+  correctFinanceEntry,
+  createFinanceEntry,
+  deleteFinanceEntry,
+  endRecurringSeries,
+} from '@/lib/db';
 import { isPlausibleDate, isPlausibleMonth, MIN_YEAR } from '@/lib/finance/bounds';
 import { DEFAULT_CATEGORY, resolveCategoryKey } from '@/lib/finance/categories';
 import { setRangeCookie } from '@/lib/preferences/cookies';
@@ -126,14 +131,66 @@ function monthOutsideWindow(
   return inside ? null : { year: at.year, month: at.month };
 }
 
-/*
- * There is deliberately no "edit entry" action.
+/**
+ * Correcting a row that is already written.
  *
- * An earlier draft had one, unreachable from any UI. Its schema had no `recurringUntil`, and
- * the repository wrote `input.recurringUntil ?? null` — so wiring it up would have silently
- * re-opened a series the user had deliberately ended, retroactively changing every month
- * after the end date. Correcting an entry is delete-and-re-add, which cannot do that.
+ * There was deliberately no edit here for a long time, and the reason was a good one: the
+ * repository's general update wrote `recurringUntil: input.recurringUntil ?? null`, so any
+ * action that forgot to carry that field forward would silently re-open a series somebody had
+ * ended — retroactively adding every month after the end date. Delete-and-re-add could not do
+ * that, so delete-and-re-add was the answer.
+ *
+ * It is a poor answer for a mistyped amount on a row with a month of history behind it, so
+ * the update is narrow instead of absent: `correctFinanceEntry` has no way to name
+ * `isRecurring` or `recurringUntil`, which is what makes this safe rather than careful.
+ *
+ * The date is optional and the editor omits it for a recurring row: that date is the anchor
+ * its months are counted from, and this is opened from whichever occurrence was on screen.
  */
+const correctionSchema = z.object({
+  id: z.string().trim().min(1),
+  type: z.enum(['income', 'expense']),
+  label: z.string().trim().min(1).max(120),
+  amountIls: z.coerce.number().positive().finite().max(1_000_000_000),
+  category: z.string().trim().max(60).default(DEFAULT_CATEGORY),
+  entryDate: z.coerce
+    .date()
+    .refine((date) => isPlausibleDate(date), {
+      message: `The date must be between ${MIN_YEAR} and a few years from now.`,
+    })
+    .optional(),
+});
+
+export async function editFinanceEntryAction(
+  _prev: FinanceFormState,
+  formData: FormData,
+): Promise<FinanceFormState> {
+  const session = await requireSession();
+  const t = await getTranslations('finance');
+
+  const posted = formData.get('entryDate');
+  const parsed = correctionSchema.safeParse({
+    id: formData.get('id') ?? '',
+    type: formData.get('type'),
+    label: formData.get('label'),
+    amountIls: formData.get('amountIls'),
+    category: formData.get('category') || DEFAULT_CATEGORY,
+    // Absent, not blank: an empty string coerces to the epoch, which is a date the row would
+    // happily accept and nobody meant.
+    ...(posted ? { entryDate: posted } : {}),
+  });
+  if (!parsed.success) return { error: t('invalid') };
+
+  const { id, ...correction } = parsed.data;
+  await correctFinanceEntry(session.ctx, id, {
+    ...correction,
+    category: await categoryKeyFor(correction.category),
+  });
+
+  revalidatePath('/finance');
+  return { ok: true };
+}
+
 export async function deleteFinanceEntryAction(formData: FormData): Promise<void> {
   const session = await requireSession();
   const id = String(formData.get('id') ?? '');
