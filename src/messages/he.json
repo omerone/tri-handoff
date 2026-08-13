@@ -679,7 +679,10 @@
       "psychology": "פסיכולוגיה",
       "technical": "טכני"
     },
-    "learner": "מי למד"
+    "learner": "מי למד",
+    "edit": "עריכה",
+    "save": "שמירה",
+    "cancel": "ביטול"
   },
   "review": {
     "tpTiming": "עיתוי היציאה",

@@ -3,10 +3,14 @@
 import { SuggestField } from '@/components/ui/suggest-field';
 
 import { useActionState } from 'react';
-import { Plus } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { DateField } from '@/components/ui/date-field';
 import { FormMessage, SubmitButton } from '@/components/ui/form';
-import { createLearningEntryAction, type LearningFormState } from './actions';
+import {
+  createLearningEntryAction,
+  updateLearningEntryAction,
+  type LearningFormState,
+} from './actions';
 
 export type LearningFormLabels = {
   /** "Who studied" — the field label. */
@@ -20,6 +24,9 @@ export type LearningFormLabels = {
   note: string;
   notePlaceholder: string;
   add: string;
+  /** The submit button when the form is rewriting a row rather than adding one. */
+  save: string;
+  cancel: string;
   topics: { psychology: string; technical: string };
   /** Built-ins first, then whatever this trader has written before. */
   topicOptions: string[];
@@ -29,10 +36,28 @@ export type LearningFormLabels = {
  * The add-session row, shaped like the finance one so the two ledgers are operated the same
  * way: pick a kind, describe it, give it a number and a date.
  */
+/**
+ * A session already recorded, when this form is rewriting one rather than adding one.
+ *
+ * The hours arrive split back into hours and minutes, because that is the shape the two
+ * fields hold — reversing the arithmetic in the component would put the rounding in a second
+ * place, and the two would drift.
+ */
+export type LearningEntryEdit = {
+  id: string;
+  topic: string;
+  title: string;
+  note: string;
+  hours: string;
+  minutes: string;
+  learnedOn: string;
+};
+
 export function LearningEntryForm({
   labels,
   defaultDate,
   learner,
+  editing,
 }: {
   labels: LearningFormLabels;
   /** Formatted on the server, so the field does not depend on the client's clock. */
@@ -45,9 +70,18 @@ export function LearningEntryForm({
    * attributed to יוני, gone from view the moment it saved. The switch already answered.
    */
   learner: string;
+  /**
+   * The row being rewritten, or undefined when this is the add form.
+   *
+   * One component for both, rather than a second form beside it. The fields, the validation
+   * and the arithmetic are the same either way — the only honest difference is where the
+   * result goes — and two copies of a form is how a screen ends up accepting on Tuesday what
+   * it refused on Monday.
+   */
+  editing?: LearningEntryEdit;
 }) {
   const [state, action] = useActionState<LearningFormState, FormData>(
-    createLearningEntryAction,
+    editing ? updateLearningEntryAction : createLearningEntryAction,
     {},
   );
 
@@ -55,8 +89,14 @@ export function LearningEntryForm({
     'border-line bg-raised text-text placeholder:text-dim/60 min-h-11 w-full rounded-[10px] border px-3 py-2 text-sm sm:min-h-9 sm:w-auto';
 
   return (
-    <form action={action} className="flex flex-col gap-3">
+    /*
+     * `key` on the row's id: React keeps an uncontrolled input's value across a re-render, so
+     * moving from one row's edit form to another's — or back to the add form — would leave the
+     * previous session's words in the fields. A new key is a new form.
+     */
+    <form action={action} key={editing?.id ?? 'new'} className="flex flex-col gap-3">
       <FormMessage error={state.error} />
+      {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
 
       {/* Two columns on a phone, the original inline row from `sm` — see the note on the
           same grid in `long/manual-trade-form.tsx`. */}
@@ -93,7 +133,7 @@ export function LearningEntryForm({
             name="topic"
             options={labels.topicOptions}
             required
-            defaultValue={labels.topics.technical}
+            defaultValue={editing?.topic ?? labels.topics.technical}
             boxClassName="sm:w-40 lg:w-auto lg:min-w-0 lg:flex-1"
             className={`${field} sm:w-full`}
           />
@@ -115,6 +155,7 @@ export function LearningEntryForm({
             inputMode="numeric"
             dir="ltr"
             placeholder="1"
+            defaultValue={editing?.hours ?? ''}
             className={`${field} sm:w-20 lg:w-16 lg:shrink`}
           />
         </label>
@@ -126,6 +167,7 @@ export function LearningEntryForm({
             inputMode="numeric"
             dir="ltr"
             placeholder="30"
+            defaultValue={editing?.minutes ?? ''}
             className={`${field} sm:w-20 lg:w-16 lg:shrink`}
           />
         </label>
@@ -153,13 +195,14 @@ export function LearningEntryForm({
             required
             maxLength={120}
             placeholder={labels.whatPlaceholder}
+            defaultValue={editing?.title ?? ''}
             className={field}
           />
         </label>
 
         <DateField
           name="learnedOn"
-          defaultValue={defaultDate}
+          defaultValue={editing?.learnedOn ?? defaultDate}
           label={labels.date}
           required
           className={`${field} sm:w-40 lg:w-36 lg:shrink-0`}
@@ -168,9 +211,22 @@ export function LearningEntryForm({
 
         <SubmitButton className="col-span-2 w-full sm:col-auto sm:w-auto lg:shrink-0 lg:whitespace-nowrap">
           <span className="inline-flex items-center gap-1.5">
-            <Plus size={14} aria-hidden /> {labels.add}
+            {editing ? <Check size={14} aria-hidden /> : <Plus size={14} aria-hidden />}
+            {editing ? labels.save : labels.add}
           </span>
         </SubmitButton>
+
+        {/* A way out that is not the browser's back button: the form is a URL, so leaving it
+            is a link back to the plain list rather than anything this component has to undo.
+            A plain anchor for the same reason the edit link is one — see the note there. */}
+        {editing ? (
+          <a
+            href="/learning"
+            className="text-dim hover:text-text col-span-2 flex min-h-11 items-center justify-center rounded-[10px] px-3 text-sm sm:col-auto sm:min-h-9 lg:shrink-0"
+          >
+            {labels.cancel}
+          </a>
+        ) : null}
       </div>
 
       <label className="flex flex-col gap-1">
@@ -180,6 +236,7 @@ export function LearningEntryForm({
           rows={2}
           maxLength={2000}
           placeholder={labels.notePlaceholder}
+          defaultValue={editing?.note ?? ''}
           className={field}
         />
       </label>

@@ -86,6 +86,42 @@ export async function createLearningEntry(
   return toEntry(row);
 }
 
+/**
+ * Rewrites one session in place.
+ *
+ * `updateMany` rather than `update`: it takes a WHERE that can carry the tenant scope, and
+ * returns 0 instead of throwing when the row belongs to somebody else — the same shape the
+ * finance ledger already uses, and the reason a mistyped id is a no-op rather than a leak.
+ *
+ * Every field is written, none is optional. A partial update would let a form that lost a
+ * field on the way in blank it silently; the screen sends the whole row back because the whole
+ * row is what it showed.
+ */
+export async function updateLearningEntry(
+  ctx: TenantContext,
+  id: string,
+  input: LearningEntryInput,
+): Promise<boolean> {
+  assertContext(ctx);
+  const { count } = await prisma.learningEntry.updateMany({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+    data: input,
+  });
+  return count > 0;
+}
+
+/** One session, for the form that is about to rewrite it. */
+export async function findLearningEntry(
+  ctx: TenantContext,
+  id: string,
+): Promise<LearningEntry | null> {
+  assertContext(ctx);
+  const row = await prisma.learningEntry.findFirst({
+    where: { id, userId: ctx.userId, user: { tenantId: ctx.tenantId } },
+  });
+  return row ? toEntry(row) : null;
+}
+
 /** Returns false when the row does not belong to this context, rather than throwing. */
 /**
  * The rows a user picked out of the list, in one statement.

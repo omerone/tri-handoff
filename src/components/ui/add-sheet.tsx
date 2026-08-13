@@ -26,12 +26,22 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 export function AddSheet({
   /** The button, and the sheet's heading — "Add a trade", "Add an entry". */
   label,
+  /**
+   * Open from the first paint.
+   *
+   * For a form the *page* has already decided to show — arriving on `?edit=…`, where the
+   * fields are seeded with a row and the reader pressed something to get here. Without it the
+   * phone draws the sheet closed over a form that is ready, and the press reads as a control
+   * that did nothing.
+   */
+  openOnMount = false,
   children,
 }: {
   label: string;
+  openOnMount?: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(openOnMount);
   const sheetId = useId();
 
   // Escape closes it, and the page behind it does not scroll while it is up — otherwise a

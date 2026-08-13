@@ -163,6 +163,22 @@ export function formatDateAt(instant: Date, timeZone: string = ANALYTICS_TIME_ZO
   return formatDate(wallClock(instant, timeZone));
 }
 
+/**
+ * A stored calendar date, as the `yyyy-mm-dd` a date field carries.
+ *
+ * UTC and not the analytics zone, unlike its neighbours: these columns hold a date rather than
+ * an instant — `@db.Date`, written as UTC midnight — so reading them anywhere west of
+ * Greenwich would hand the form the previous day, and a session edited without touching the
+ * date would move.
+ */
+export function toIsoDateAt(instant: Date): string {
+  return toIsoDate({
+    year: instant.getUTCFullYear(),
+    month: instant.getUTCMonth() + 1,
+    day: instant.getUTCDate(),
+  });
+}
+
 export function formatDayMonthAt(instant: Date, timeZone: string = ANALYTICS_TIME_ZONE): string {
   return formatDayMonth(wallClock(instant, timeZone));
 }

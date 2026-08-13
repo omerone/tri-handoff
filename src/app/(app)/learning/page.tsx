@@ -1,18 +1,18 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { AddSheet } from '@/components/ui/add-sheet';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { Chip, EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
-import { listLearningEntries, listLearningTopics } from '@/lib/db';
+import { findLearningEntry, listLearningEntries, listLearningTopics } from '@/lib/db';
 import { currentBrother } from '@/lib/preferences/brother';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { isKnownTopic, learnerKey, learningTotals, topicKey } from '@/lib/learning/types';
 import { formatNumber } from '@/lib/money/currency';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { topicColor } from '@/lib/review/colors';
-import { formatDateAt, formatDuration, hoursToMinutes } from '@/lib/time/format';
+import { toIsoDateAt, formatDateAt, formatDuration, hoursToMinutes } from '@/lib/time/format';
 import { toTradeFilter } from '@/lib/time/range';
 import { deleteLearningEntryAction } from './actions';
 import { deleteLearningEntriesAction } from '../bulk-delete-actions';
@@ -38,7 +38,7 @@ import { LearningEntryForm } from './entry-form';
 export default async function LearningPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; edit?: string }>;
 }) {
   const session = await requireSession();
   const t = await getTranslations('learning');
@@ -49,6 +49,16 @@ export default async function LearningPage({
 
   const range = await currentResolvedRange(params.range);
   const window = toTradeFilter(range);
+
+  /*
+   * Which session is being rewritten, if any — from the URL rather than from client state.
+   *
+   * It survives a reload, it can be sent to the other brother, the back button leaves the form
+   * rather than the screen, and the page stays a server component. A row that does not exist,
+   * or belongs to somebody else, simply loads nothing: the form is then the add form, which is
+   * what a stale link should land on.
+   */
+  const editing = params.edit ? await findLearningEntry(session.ctx, params.edit) : null;
 
   const [everyone, usedTopics] = await Promise.all([
     listLearningEntries(session.ctx, { from: window.from, to: window.to }),
@@ -143,10 +153,26 @@ export default async function LearningPage({
 
       <Card title={`${t('title')} · ${t('subtitle')}`}>
         <div className="border-line border-b pb-3">
-          <AddSheet label={tBulk('addEntry')}>
+          <AddSheet label={editing ? t('edit') : tBulk('addEntry')} openOnMount={editing !== null}>
             <LearningEntryForm
               defaultDate={defaultDate}
               learner={who}
+              editing={
+                editing
+                  ? {
+                      id: editing.id,
+                      topic: topicLabel(editing.topic),
+                      title: editing.title,
+                      note: editing.note ?? '',
+                      // Back into the pair of fields the form holds. Splitting here rather
+                      // than in the component keeps the rounding in one place — the same
+                      // place the action reverses it.
+                      hours: String(Math.floor(editing.hours)),
+                      minutes: String(Math.round((editing.hours % 1) * 60)),
+                      learnedOn: toIsoDateAt(editing.learnedOn),
+                    }
+                  : undefined
+              }
               labels={{
                 learner: t('learner'),
                 what: t('what'),
@@ -158,6 +184,8 @@ export default async function LearningPage({
                 note: t('note'),
                 notePlaceholder: t('notePlaceholder'),
                 add: t('add'),
+              save: t('save'),
+              cancel: t('cancel'),
                 /*
               Built-ins first by their translated labels, then whatever this trader has
               written before — deduplicated on the folded key so a built-in typed by hand does
@@ -220,6 +248,32 @@ export default async function LearningPage({
                   <span className="tri-num text-text shrink-0 text-sm font-bold">
                     {hours(entry.hours)}
                   </span>
+
+                  {/*
+                      Editing beside deleting, because a mistyped hour used to leave only one way
+                      out: delete the row and type the whole session again. The link carries the
+                      range with it, so saving comes back to the window it was opened in.
+
+                      A plain anchor, not `<Link>`.
+
+                      `next.config.ts` keeps a visited route in the client router cache for
+                      thirty seconds (`staleTimes: { dynamic: 30 }`), which is a measured win
+                      for the nav tabs and wrong here: a client-side navigation to the same
+                      route with a new `?edit=` is answered from that cache, so the form opens
+                      unseeded and the button still reads "Add". Pressing edit within half a
+                      minute of loading the page — which is every real press — got the wrong
+                      screen. A full navigation always asks the server.
+                  */}
+                  <a
+                    href={`/learning?${new URLSearchParams({
+                      ...(params.range ? { range: params.range } : {}),
+                      edit: entry.id,
+                    })}`}
+                    aria-label={t('edit')}
+                    className="text-dim/60 hover:text-text flex size-7 shrink-0 items-center justify-center rounded-lg"
+                  >
+                    <Pencil size={14} aria-hidden />
+                  </a>
 
                   {/*
                   A plain form rather than a confirm dialog: one user per tenant, an entry is

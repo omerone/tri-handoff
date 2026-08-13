@@ -1,10 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth/session';
-import { createLearningEntry, deleteLearningEntry } from '@/lib/db';
+import { createLearningEntry, deleteLearningEntry, updateLearningEntry } from '@/lib/db';
 import { isPlausibleDate } from '@/lib/finance/bounds';
 import { isBrother } from '@/lib/household';
 import { LEARNING_TOPICS, normalizeTopic, topicKey } from '@/lib/learning/types';
@@ -142,6 +143,61 @@ export async function createLearningEntryAction(
   // The hours pie lives on the analytics screen, so that is stale now too.
   revalidatePath('/analytics');
   return { ok: true };
+}
+
+/**
+ * Rewrites a session that is already recorded.
+ *
+ * The same schema and the same arithmetic as creating one, because it is the same row — a
+ * separate lenient path for edits is how a screen ends up accepting on Tuesday what it refused
+ * on Monday. What it adds is the id, and the redirect: the form lives in the URL, so saving
+ * has to take the reader back out of it.
+ *
+ * A row that matches nothing — a stale tab, somebody else's id — closes the form rather than
+ * reporting an error. There is nothing the reader could do about it, and the list they land on
+ * is the honest answer to "what happened to it".
+ */
+export async function updateLearningEntryAction(
+  _prev: LearningFormState,
+  formData: FormData,
+): Promise<LearningFormState> {
+  const session = await requireSession();
+  const t = await getTranslations('learning');
+
+  const id = String(formData.get('id') ?? '');
+  if (!id) return { error: t('invalid') };
+
+  const parsed = entrySchema.safeParse({
+    topic: formData.get('topic'),
+    learner: formData.get('learner') ?? '',
+    title: formData.get('title') ?? '',
+    note: formData.get('note') ?? '',
+    hours: String(formData.get('hours') ?? ''),
+    minutes: String(formData.get('minutes') ?? ''),
+    learnedOn: String(formData.get('learnedOn') ?? ''),
+  });
+  if (!parsed.success) return { error: t('invalid') };
+
+  const total = totalHours(parsed.data.hours, parsed.data.minutes);
+  if (total === null) return { error: t('invalid') };
+
+  const topic = await resolveTopic(parsed.data.topic);
+  if (topic === '') return { error: t('invalid') };
+
+  await updateLearningEntry(session.ctx, id, {
+    topic,
+    title: parsed.data.title,
+    note: parsed.data.note || null,
+    hours: total,
+    learnedOn: parsed.data.learnedOn,
+    learner: parsed.data.learner,
+  });
+
+  revalidatePath('/learning');
+  revalidatePath('/analytics');
+  // Out of the form and back to the list. `redirect` signals by throwing, so nothing after
+  // it runs and the state this function returns is never read on the happy path.
+  redirect('/learning');
 }
 
 export async function deleteLearningEntryAction(formData: FormData): Promise<void> {

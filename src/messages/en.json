@@ -679,7 +679,10 @@
       "psychology": "Psychology",
       "technical": "Technical"
     },
-    "learner": "Who studied"
+    "learner": "Who studied",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel"
   },
   "review": {
     "tpTiming": "Exit timing",
