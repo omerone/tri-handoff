@@ -127,6 +127,7 @@ model User {
   trades         Trade[]
   financeEntries FinanceEntry[]
   budgets        Budget[]
+  goals            Goal[]
   longPositions  LongPosition[]
   learning       LearningEntry[]
   syncLogs       SyncLog[]
@@ -499,6 +500,38 @@ enum FinanceType {
 ///
 /// Per brother for the same reason `FinanceEntry.owner` is: their money is separate, and a
 /// shared ceiling on separate spending is a number neither of them agreed to.
+/// A goal for one day: something to do, and whether it was done.
+///
+/// Deliberately a day rather than an instant. This is a checklist for a week, and "Tuesday"
+/// is the answer a person gives when asked when something should happen — a time of day would
+/// be a field nobody fills in and a false precision in every statistic built on it.
+model Goal {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+
+  /// Whose week. Like the ledger and the study hours, and unlike the trading screens: two
+  /// brothers share this login and their days are their own.
+  owner String
+
+  title String
+
+  /// The day it belongs to. A calendar date, stored as one.
+  dueOn DateTime @map("due_on") @db.Date
+
+  /// When it was ticked, or null. A timestamp rather than a boolean because "done" and "done
+  /// at" are the same fact, and the second one is the one a streak is ever computed from.
+  doneAt DateTime? @map("done_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dueOn])
+  @@map("goals")
+}
+
 model Budget {
   id String @id @default(cuid())
 

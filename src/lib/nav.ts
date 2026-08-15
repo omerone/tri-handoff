@@ -16,6 +16,7 @@ export type NavKey =
   | 'finance'
   | 'long'
   | 'learning'
+  | 'goals'
   | 'settings';
 
 export type NavDefinition = {
@@ -61,6 +62,12 @@ export const NAV: readonly NavDefinition[] = [
   { key: 'calendar', href: '/calendar', label: 'calendar', enabled: true, ranged: false, inStrip: true }, // M1.7
   { key: 'analytics', href: '/analytics', label: 'analytics', enabled: true, ranged: true, inStrip: true }, // M1.5
   { key: 'learning', href: '/learning', label: 'learning', enabled: true, ranged: true, inStrip: true },
+  /*
+   * Not ranged. The unit here is a week — the screen draws one, titles it with its dates, and
+   * steps with its own arrows. A range picker above it would be a second control for the same
+   * thing, able to disagree with the arrows and to ask for a span no checklist can be.
+   */
+  { key: 'goals', href: '/goals', label: 'goals', enabled: true, ranged: false, inStrip: true },
   { key: 'settings', href: '/settings', label: 'settings', enabled: true, ranged: false, inStrip: false },
 ];
 

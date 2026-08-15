@@ -20,7 +20,7 @@ export type BrotherSwitchLabels = {
  * chosen position is never a mystery, but it is dimmed and captioned: a filter that quietly
  * did nothing on those screens would read as data loss the first time somebody noticed.
  */
-const OWNED_PATHS = ['/finance', '/learning'];
+const OWNED_PATHS = ['/finance', '/learning', '/goals'];
 
 /**
  * The brother switch: whose money and whose hours the owned screens are showing.

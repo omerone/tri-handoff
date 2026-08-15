@@ -13,7 +13,8 @@
     "long": "Manual entry",
     "settings": "Settings",
     "signOut": "Sign out",
-    "learning": "Learning"
+    "learning": "Learning",
+    "goals": "Goals"
   },
   "range": {
     "title": "Time range",
@@ -780,5 +781,36 @@
   "household": {
     "title": "Whose data",
     "shared": "Trading is shared — this switch applies to Finance and Learning"
+  },
+  "goals": {
+    "title": "Goals for the week",
+    "week": "This week",
+    "thisWeek": "Current week",
+    "previousWeek": "Previous week",
+    "nextWeek": "Next week",
+    "addGoal": "Add a goal",
+    "goalTitle": "Goal",
+    "goalPlaceholder": "What needs to happen",
+    "day": "Day",
+    "add": "Add",
+    "edit": "Edit",
+    "remove": "Remove",
+    "save": "Save",
+    "cancel": "Cancel",
+    "markDone": "Mark done",
+    "empty": "Nothing written for this week yet. Add one and watch how many you get through.",
+    "freeDay": "Free",
+    "invalid": "That could not be saved. Check the fields and try again.",
+    "kept": "Kept",
+    "keptOf": "{done} of {due} due so far",
+    "daysKept": "Full days",
+    "daysKeptSub": "Days where everything was ticked",
+    "missed": "Missed",
+    "missedSub": "Unticked, and the day has gone",
+    "planned": "Planned",
+    "plannedSub": "The whole week, including what is still ahead",
+    "trend": "Trend",
+    "trendInfo": "How much of each of the last six weeks was kept. Every week is scored only against the days that have arrived, so the current one does not look bad for being half over. A week with nothing written shows a dash rather than a zero — not writing is not failing.",
+    "trendEmpty": "Not enough weeks yet to show a trend."
   }
 }

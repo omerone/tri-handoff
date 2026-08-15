@@ -7,6 +7,7 @@ import {
   BarChart3,
   CalendarDays,
   LayoutDashboard,
+  ListChecks,
   Settings,
   Table,
   TrendingUp,
@@ -22,6 +23,7 @@ const ICONS: Record<string, LucideIcon> = {
   trades: Table,
   calendar: CalendarDays,
   finance: Wallet,
+  goals: ListChecks,
   long: TrendingUp,
   settings: Settings,
 };
