@@ -22,6 +22,8 @@ export type ActiveTenant = {
   readonly id: string;
   readonly name: string;
   readonly domain: string;
+  /** Who shares this login, by name. Empty is one person — no switch, no owner split. */
+  readonly household: readonly string[];
 };
 
 /** The signed-in user of the active tenant. */

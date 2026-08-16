@@ -1,13 +1,13 @@
 import 'server-only';
 import type { TenantContext } from '@/lib/tenant/context';
-import type { Brother } from '@/lib/household';
 import { toIsoDate } from '@/lib/time/format';
 import { assertContext } from './context';
 import { prisma } from './prisma';
 
 export type Goal = {
   id: string;
-  owner: string;
+  /** The member this goal belongs to; null in a household of one. */
+  owner: string | null;
   title: string;
   /** `yyyy-mm-dd`, as the week module works in. */
   dueOn: string;
@@ -38,7 +38,11 @@ const utc = (iso: string) => new Date(`${iso}T00:00:00Z`);
  */
 export async function listGoals(
   ctx: TenantContext,
-  owner: Brother,
+  /**
+   * A member's name, or null for a household of one. Null matches only null — Prisma turns
+   * it into IS NULL — so a solo screen cannot pick up an owned row or the other way round.
+   */
+  owner: string | null,
   from: string,
   to: string,
 ): Promise<Goal[]> {
@@ -67,7 +71,7 @@ export async function listGoals(
 
 export async function createGoal(
   ctx: TenantContext,
-  input: { owner: Brother; title: string; dueOn: string },
+  input: { owner: string | null; title: string; dueOn: string },
 ): Promise<void> {
   assertContext(ctx);
   await prisma.goal.create({

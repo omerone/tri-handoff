@@ -7,7 +7,7 @@ import { Chip, EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { describeShare, phrase } from '@/lib/charts/describe';
 import { findLearningEntry, listLearningEntries, listLearningTopics } from '@/lib/db';
-import { currentBrother } from '@/lib/preferences/brother';
+import { currentMember } from '@/lib/preferences/brother';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { isKnownTopic, learnerKey, learningTotals, topicKey } from '@/lib/learning/types';
 import { formatNumber } from '@/lib/money/currency';
@@ -84,8 +84,10 @@ export default async function LearningPage({
    * matching runs through `learnerKey`, which folds case and spacing — entries written before
    * the switch existed still land on the right brother.
    */
-  const who = await currentBrother();
-  // `who` is always a brother — the switch has no merged position — so this narrows, always.
+  const who = await currentMember(session.tenant.household);
+  // `learnerKey(null)` is the empty string, so a household of one — where `who` is null and
+  // every session was stored without a learner — matches exactly its own rows, and a member
+  // matches exactly theirs. One line, both worlds.
   const entries = everyone.filter((entry) => learnerKey(entry.learner) === learnerKey(who));
 
   const totals = learningTotals(entries);

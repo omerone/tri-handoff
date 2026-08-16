@@ -1,15 +1,15 @@
 import 'server-only';
 import { cookies } from 'next/headers';
-import { BROTHER_COOKIE, parseBrother, type Brother } from '@/lib/household';
+import { MEMBER_COOKIE, resolveMember, type MemberFilter } from '@/lib/household';
 
 /**
- * Which brother the header switch is resting on, for any server component that filters by it.
+ * Which member the header switch is resting on, for the household this request belongs to.
  *
- * The same shape as `currentResolvedRange`: the cookie is the only store, and an absent or
- * unrecognisable value falls back to the first brother — this value survives deployments
- * inside people's browsers, and with no merged view to degrade to, a deterministic somebody
- * beats an error. The first visit simply opens on יוני, exactly as if he had been chosen.
+ * Takes the household rather than reaching for it, because the tenant is already on the
+ * session every caller holds — and a reader that resolved the tenant itself would be a second
+ * opinion about whose request this is. Null for a single-person household: no switch exists,
+ * so no position does either.
  */
-export async function currentBrother(): Promise<Brother> {
-  return parseBrother((await cookies()).get(BROTHER_COOKIE)?.value);
+export async function currentMember(household: readonly string[]): Promise<MemberFilter> {
+  return resolveMember(household, (await cookies()).get(MEMBER_COOKIE)?.value);
 }

@@ -1,12 +1,12 @@
 import 'server-only';
 import type { TenantContext } from '@/lib/tenant/context';
-import type { Brother } from '@/lib/household';
 import { assertContext } from './context';
 import { prisma } from './prisma';
 
 export type Budget = {
   id: string;
-  owner: string;
+  /** The member this ceiling belongs to; null in a household of one. */
+  owner: string | null;
   category: string;
   /** A month's ceiling, in `currency` — see the model. */
   amount: number;
@@ -20,7 +20,7 @@ export type Budget = {
  * allowances on Evyatar's screen would be the same mistake the ledger already avoids, and
  * this is the screen where it would look most authoritative.
  */
-export async function listBudgets(ctx: TenantContext, owner: Brother): Promise<Budget[]> {
+export async function listBudgets(ctx: TenantContext, owner: string | null): Promise<Budget[]> {
   assertContext(ctx);
   const rows = await prisma.budget.findMany({
     where: { userId: ctx.userId, user: { tenantId: ctx.tenantId }, owner },
@@ -39,9 +39,44 @@ export async function listBudgets(ctx: TenantContext, owner: Brother): Promise<B
  */
 export async function setBudget(
   ctx: TenantContext,
-  input: { owner: Brother; category: string; amount: number; currency: string },
+  input: { owner: string | null; category: string; amount: number; currency: string },
 ): Promise<void> {
   assertContext(ctx);
+  /*
+   * Two write paths for one rule. The composite unique cannot name a null owner — Postgres
+   * treats NULLs as distinct and Prisma refuses them in an upsert's unique key — so the solo
+   * branch is find-then-write under the partial index `budgets_user_id_category_solo_key`,
+   * which enforces the same one-ceiling-per-category fact the upsert enforces for members.
+   */
+  if (input.owner === null) {
+    const existing = await prisma.budget.findFirst({
+      where: {
+        userId: ctx.userId,
+        user: { tenantId: ctx.tenantId },
+        owner: null,
+        category: input.category,
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      await prisma.budget.update({
+        where: { id: existing.id },
+        data: { amount: input.amount, currency: input.currency },
+      });
+    } else {
+      await prisma.budget.create({
+        data: {
+          userId: ctx.userId,
+          owner: null,
+          category: input.category,
+          amount: input.amount,
+          currency: input.currency,
+        },
+      });
+    }
+    return;
+  }
+
   await prisma.budget.upsert({
     where: {
       userId_owner_category: {

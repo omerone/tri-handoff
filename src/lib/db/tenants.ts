@@ -28,12 +28,17 @@ export async function lookupTenantByDomain(host: string): Promise<TenantLookup> 
 
   const row = await prisma.tenant.findUnique({
     where: { domain },
-    select: { id: true, name: true, domain: true, status: true },
+    select: { id: true, name: true, domain: true, status: true, household: true },
   });
 
   if (!row) return { state: 'unknown' };
 
-  const tenant: ActiveTenant = { id: row.id, name: row.name, domain: row.domain };
+  const tenant: ActiveTenant = {
+    id: row.id,
+    name: row.name,
+    domain: row.domain,
+    household: row.household,
+  };
   return row.status === 'active' ? { state: 'active', tenant } : { state: 'suspended', tenant };
 }
 

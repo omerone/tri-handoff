@@ -6,7 +6,7 @@ import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { isAtOrBefore, stepMonth } from '@/lib/finance/bounds';
 import { applyRangeAction } from '@/app/actions/range';
-import { currentBrother } from '@/lib/preferences/brother';
+import { currentMember } from '@/lib/preferences/brother';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { describeRange } from '@/lib/time/range';
 import { listBudgets, listFinanceEntries, listLongPositions, listMt5Accounts } from '@/lib/db';
@@ -72,7 +72,7 @@ export default async function FinancePage({
    * filtered by it — the broker accounts and the long-term book are joint, which is what the
    * dimmed switch on those screens is saying — so the filter stops here, at the money.
    */
-  const brother = await currentBrother();
+  const brother = await currentMember(session.tenant.household);
 
   const [entries, accounts, positions, budgets] = await Promise.all([
     listFinanceEntries(session.ctx, brother),

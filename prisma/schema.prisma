@@ -35,6 +35,11 @@ model Tenant {
   /// Fully-qualified host, lowercased, no scheme and no trailing dot.
   /// The middleware matches the incoming Host header against this exactly.
   domain    String       @unique
+  /// Who shares this login, by name — empty means one person, and the screens show no
+  /// member switch. Two brothers sharing one book is what filled it first; a solo trader
+  /// is the default for every tenant onboarded after.
+  household String[] @default([])
+
   status    TenantStatus @default(active)
   notes     String?
   createdAt DateTime     @default(now()) @map("created_at")
@@ -512,7 +517,7 @@ model Goal {
 
   /// Whose week. Like the ledger and the study hours, and unlike the trading screens: two
   /// brothers share this login and their days are their own.
-  owner String
+  owner String?
 
   title String
 
@@ -538,7 +543,7 @@ model Budget {
   userId String @map("user_id")
   /// One of the names in `src/lib/household.ts`. Never null — unlike a ledger row, a budget
   /// with no owner belongs to nobody and would be drawn on both brothers' screens.
-  owner  String
+  owner  String?
 
   /// Free text, exactly like `FinanceEntry.category`, so a budget can be set on whatever the
   /// trader actually writes down rather than on a list somebody else chose.

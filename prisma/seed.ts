@@ -18,10 +18,13 @@ const ADMIN_EMAIL = (process.env.SEED_ADMIN_EMAIL ?? 'admin@tri.local').toLowerC
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'TriAdmin2026!';
 
 async function main() {
+  // The demo household mirrors the first real client — two people, one login — because the
+  // e2e suite exercises the member switch and the per-member split against this tenant.
+  const HOUSEHOLD = ['יוני', 'אביתר'];
   const tenant = await prisma.tenant.upsert({
     where: { domain: DEMO_DOMAIN },
-    update: {},
-    create: { name: 'Demo Trader', domain: DEMO_DOMAIN, status: 'active' },
+    update: { household: HOUSEHOLD },
+    create: { name: 'Demo Trader', domain: DEMO_DOMAIN, status: 'active', household: HOUSEHOLD },
   });
 
   const passwordHash = await hashPassword(DEMO_PASSWORD);

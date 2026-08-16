@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { requireSession } from '@/lib/auth/session';
 import { createLearningEntry, deleteLearningEntry, updateLearningEntry } from '@/lib/db';
 import { isPlausibleDate } from '@/lib/finance/bounds';
-import { isBrother } from '@/lib/household';
+import { isMember } from '@/lib/household';
 import { LEARNING_TOPICS, normalizeTopic, topicKey } from '@/lib/learning/types';
 import { LOCALES } from '@/i18n/config';
 
@@ -24,14 +24,6 @@ const entrySchema = z.object({
   // Free text now, and bounded rather than enumerated: the list of topics is the trader's,
   // not ours. `resolveTopic` decides whether what arrived is a built-in or their own word.
   topic: z.string().trim().min(1).max(60),
-  /**
-   * Who studied. Always one of the two brothers, refused otherwise — the same rule the
-   * finance action applies, and it was briefly looser here: this field accepted any string
-   * while the screens filter on exactly two names, so a crafted POST — or a stale form cached
-   * from the build that still had a free-text field — wrote a session that no view would ever
-   * show again. A row that cannot be seen cannot be corrected, which is worse than an error.
-   */
-  learner: z.string().refine(isBrother),
   title: z.string().trim().min(1).max(120),
   note: z.string().trim().max(2_000),
   /*
@@ -115,7 +107,6 @@ export async function createLearningEntryAction(
 
   const parsed = entrySchema.safeParse({
     topic: formData.get('topic'),
-    learner: formData.get('learner') ?? '',
     title: formData.get('title') ?? '',
     note: formData.get('note') ?? '',
     hours: String(formData.get('hours') ?? ''),
@@ -123,6 +114,15 @@ export async function createLearningEntryAction(
     learnedOn: String(formData.get('learnedOn') ?? ''),
   });
   if (!parsed.success) return { error: t('invalid') };
+
+  // Resolved in the body against the household of this tenant — see finance/actions.ts.
+  const learner =
+    session.tenant.household.length === 0
+      ? null
+      : isMember(session.tenant.household, formData.get('learner'))
+        ? (formData.get('learner') as string)
+        : false;
+  if (learner === false) return { error: t('invalid') };
 
   const total = totalHours(parsed.data.hours, parsed.data.minutes);
   if (total === null) return { error: t('invalid') };
@@ -136,7 +136,7 @@ export async function createLearningEntryAction(
     note: parsed.data.note || null,
     hours: total,
     learnedOn: parsed.data.learnedOn,
-    learner: parsed.data.learner,
+    learner,
   });
 
   revalidatePath('/learning');
@@ -169,7 +169,6 @@ export async function updateLearningEntryAction(
 
   const parsed = entrySchema.safeParse({
     topic: formData.get('topic'),
-    learner: formData.get('learner') ?? '',
     title: formData.get('title') ?? '',
     note: formData.get('note') ?? '',
     hours: String(formData.get('hours') ?? ''),
@@ -177,6 +176,14 @@ export async function updateLearningEntryAction(
     learnedOn: String(formData.get('learnedOn') ?? ''),
   });
   if (!parsed.success) return { error: t('invalid') };
+
+  const learner =
+    session.tenant.household.length === 0
+      ? null
+      : isMember(session.tenant.household, formData.get('learner'))
+        ? (formData.get('learner') as string)
+        : false;
+  if (learner === false) return { error: t('invalid') };
 
   const total = totalHours(parsed.data.hours, parsed.data.minutes);
   if (total === null) return { error: t('invalid') };
@@ -190,7 +197,7 @@ export async function updateLearningEntryAction(
     note: parsed.data.note || null,
     hours: total,
     learnedOn: parsed.data.learnedOn,
-    learner: parsed.data.learner,
+    learner,
   });
 
   revalidatePath('/learning');

@@ -1,50 +1,42 @@
 /**
- * The two people behind the one login.
+ * Who shares a login.
  *
- * The client is a pair of brothers. Trading — the accounts, the trades, the long-term
- * positions — is genuinely joint, which is why the product stays one tenant with one login:
- * splitting the account would split the book, the 2FA and the broker sync along with it, all
- * of which are shared on purpose. What is *not* joint is money and study: each brother has his
- * own income, his own expenses and his own hours, and a ledger that merges them answers a
- * question neither of them asked.
+ * This began as a constant — two brothers, named in code — because the client the product was
+ * built for is a pair whose trading is joint and whose money is not. Then the operator
+ * onboarded a tenant of their own, and the constant did what constants do: it made the
+ * brothers every tenant's household, splitting a single person's budget between two names
+ * that are not theirs.
  *
- * So "whose" is a property of a row, not of a login, and this is the list of possible answers.
- * A constant rather than a table because two fixed names are configuration, not data — there
- * is no screen for editing them, and a typo'd third brother appearing in a dropdown is exactly
- * what a free-text field allowed and this closes off.
+ * So the names live on the tenant row now, and this module keeps only the vocabulary. An
+ * empty household is one person: no switch in the header, no owner written on new rows, no
+ * filter on any screen. Two or more names get the switch and the per-member split exactly as
+ * the brothers had it.
  *
- * The names are Hebrew because they are names, not labels: they render identically in both
- * locales, the way a name on an envelope does. Nothing translates them.
+ * Names are stored as written — they are names, and nothing translates them.
  */
-export const HOUSEHOLD = ['יוני', 'אביתר'] as const;
 
-export type Brother = (typeof HOUSEHOLD)[number];
+/** A member of the household, or null where "nobody in particular" is a legal answer. */
+export type MemberFilter = string | null;
 
-/**
- * A repository-level filter: one brother, or null for "no filter".
- *
- * The *screens* never pass null any more — the switch has exactly two positions, because the
- * brothers asked for their money apart, full stop, and a third "both" position was a merged
- * view neither of them wanted. Null stays at this layer for the tests and for any tooling
- * that legitimately reads the whole table.
- */
-export type BrotherFilter = Brother | null;
-
-export function isBrother(value: unknown): value is Brother {
-  return typeof value === 'string' && (HOUSEHOLD as readonly string[]).includes(value);
+export function isMember(household: readonly string[], value: unknown): value is string {
+  return typeof value === 'string' && household.includes(value);
 }
 
 /** The cookie the header switch keeps its position in. */
-export const BROTHER_COOKIE = 'tri-brother';
+export const MEMBER_COOKIE = 'tri-brother';
 
 /**
- * Reads a raw cookie value back into a position, defaulting to the first brother.
+ * Reads the raw cookie back into a position for this household.
  *
- * There is no "both": the switch rests on somebody, always. Tolerant of stale or
- * unrecognisable values on purpose — this survives deployments inside people's browsers, and
- * a renamed brother must degrade to a working screen rather than to an error or to a filter
- * on a person who no longer exists.
+ * A single-person household has no positions, so the answer is null — the caller filters
+ * nothing and writes no owner. With members, an absent or unrecognisable value falls back to
+ * the first: the value survives deployments inside people's browsers, and a renamed member
+ * must degrade to a working screen rather than to a filter on somebody who no longer exists.
  */
-export function parseBrother(value: string | undefined): Brother {
-  return isBrother(value) ? value : HOUSEHOLD[0];
+export function resolveMember(
+  household: readonly string[],
+  value: string | undefined,
+): MemberFilter {
+  if (household.length === 0) return null;
+  return isMember(household, value) ? value : (household[0] ?? null);
 }

@@ -37,3 +37,23 @@ describe('whose goals these are', () => {
     expect(await listGoals(mine.ctx, 'יוני', WEEK_START, WEEK_END)).toHaveLength(1);
   });
 });
+
+describe('a household of one', () => {
+  /**
+   * The operator's own tenant: no members, no switch, owner null on every row. The partial
+   * unique index and the null-matching filter are what this pins — a solo tenant must not
+   * see an owned row, an owned view must not see a solo row, and two ceilings for one
+   * category must be impossible in both worlds.
+   */
+  it('keeps solo rows and owned rows apart', async () => {
+    const fixture = await createTenantFixture();
+    await createGoal(fixture.ctx, { owner: null, title: 'שלי, בלי שם', dueOn: '2026-01-05' });
+    await createGoal(fixture.ctx, { owner: 'יוני', title: 'של יוני', dueOn: '2026-01-05' });
+
+    const solo = await listGoals(fixture.ctx, null, WEEK_START, WEEK_END);
+    expect(solo.map((row) => row.title)).toEqual(['שלי, בלי שם']);
+
+    const owned = await listGoals(fixture.ctx, 'יוני', WEEK_START, WEEK_END);
+    expect(owned.map((row) => row.title)).toEqual(['של יוני']);
+  });
+});

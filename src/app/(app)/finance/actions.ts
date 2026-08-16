@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
-import { isBrother } from '@/lib/household';
+import { isMember } from '@/lib/household';
 import { requireSession } from '@/lib/auth/session';
 import {
   correctFinanceEntry,
@@ -54,18 +54,24 @@ const entrySchema = z.object({
     message: `The date must be between ${MIN_YEAR} and a few years from now.`,
   }),
   isRecurring: z.coerce.boolean().default(false),
-  /**
-   * Whose money. Always one of the two brothers: the switch has no "both" position any more,
-   * so there is nobody for an unowned row to belong to. Refused rather than defaulted — a
-   * tampered value silently becoming somebody's expense is the wrong failure.
-   */
-  owner: z.string().refine(isBrother),
 });
+
+/**
+ * The submitted owner, resolved against this tenant's household.
+ *
+ * A household of one writes null, whatever the form said — there is nobody to attribute to,
+ * and a stale hidden field from before the household changed must not invent somebody. With
+ * members, anything that is not one of them refuses the submission rather than defaulting:
+ * a tampered value silently becoming somebody's row is the wrong failure.
+ */
+function resolveOwner(household: readonly string[], value: unknown): string | null | false {
+  if (household.length === 0) return null;
+  return isMember(household, value) ? value : false;
+}
 
 function parse(formData: FormData) {
   return entrySchema.safeParse({
     type: formData.get('type'),
-    owner: formData.get('owner') ?? '',
     label: formData.get('label'),
     amountIls: formData.get('amountIls'),
     category: formData.get('category') || DEFAULT_CATEGORY,
@@ -85,8 +91,12 @@ export async function createFinanceEntryAction(
   const parsed = parse(formData);
   if (!parsed.success) return { error: t('invalid') };
 
+  const owner = resolveOwner(session.tenant.household, formData.get('owner') ?? '');
+  if (owner === false) return { error: t('invalid') };
+
   await createFinanceEntry(session.ctx, {
     ...parsed.data,
+    owner,
     category: await categoryKeyFor(parsed.data.category),
   });
 

@@ -52,7 +52,7 @@ export function EntryForm({
    * being entered was already answered by the switch; the form states the answer instead of
    * re-asking it.
    */
-  owner: string;
+  owner: string | null;
   ownerLabel: string;
   /**
    * What the screen is currently showing, as `yyyy-mm-dd` bounds. Posted with the entry so
@@ -98,13 +98,15 @@ export function EntryForm({
           <input name="label" required maxLength={120} className={field} />
         </label>
 
-        <div className="flex flex-col gap-1">
-          <span className="text-dim text-[11px] font-semibold">{ownerLabel}</span>
-          {/* Stated, not asked — change it with the header switch, where the whole screen
-              follows, rather than in a corner of a form where only this row would. */}
-          <span className={`${field} flex items-center font-semibold`}>{owner}</span>
-          <input type="hidden" name="owner" value={owner} />
-        </div>
+        {owner !== null ? (
+          <div className="flex flex-col gap-1">
+            <span className="text-dim text-[11px] font-semibold">{ownerLabel}</span>
+            {/* Stated, not asked — change it with the header switch, where the whole screen
+                follows. A household of one states nothing: the whole ledger is theirs. */}
+            <span className={`${field} flex items-center font-semibold`}>{owner}</span>
+            <input type="hidden" name="owner" value={owner} />
+          </div>
+        ) : null}
 
         <label className="flex flex-col gap-1">
           <span className="text-dim text-[11px] font-semibold">{labels.category}</span>

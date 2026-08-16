@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
 import { listGoals } from '@/lib/db';
-import { currentBrother } from '@/lib/preferences/brother';
+import { currentMember } from '@/lib/preferences/brother';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import {
   planWeek,
@@ -43,7 +43,7 @@ export default async function GoalsPage({
   const params = await searchParams;
 
   // Whose week. Like the ledger and the study hours — see the header switch.
-  const brother = await currentBrother();
+  const brother = await currentMember(session.tenant.household);
 
   const today = isoOf(wallClock(new Date()));
   /*

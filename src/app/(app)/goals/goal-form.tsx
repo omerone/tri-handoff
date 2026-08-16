@@ -44,7 +44,7 @@ export function DayAdd({
   day,
   labels,
 }: {
-  owner: string;
+  owner: string | null;
   /** `yyyy-mm-dd`, fixed by the card. Not a field, so there is nothing to pick wrongly. */
   day: string;
   labels: DayAddLabels;
@@ -85,7 +85,7 @@ export function DayAdd({
       }}
       className="flex flex-col gap-1 pt-1"
     >
-      <input type="hidden" name="owner" value={owner} />
+      {owner !== null ? <input type="hidden" name="owner" value={owner} /> : null}
       <input type="hidden" name="dueOn" value={day} />
 
       <div className="flex items-center gap-1">

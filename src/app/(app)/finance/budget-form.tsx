@@ -36,7 +36,7 @@ export type BudgetFormLabels = {
  * budget on "Food" while the expenses are filed under "food" is a gauge that reads zero
  * forever, and the suggestion is what stops the two drifting apart.
  */
-export function BudgetForm({ owner, labels }: { owner: string; labels: BudgetFormLabels }) {
+export function BudgetForm({ owner, labels }: { owner: string | null; labels: BudgetFormLabels }) {
   const [state, action] = useActionState<BudgetFormState, FormData>(setBudgetAction, {});
   const form = useRef<HTMLFormElement>(null);
 
@@ -49,7 +49,7 @@ export function BudgetForm({ owner, labels }: { owner: string; labels: BudgetFor
 
   return (
     <form ref={form} action={action} className="flex flex-wrap items-end gap-2">
-      <input type="hidden" name="owner" value={owner} />
+      {owner !== null ? <input type="hidden" name="owner" value={owner} /> : null}
 
       <label className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-none sm:w-44">
         <span className="text-dim text-[11px] font-semibold">{labels.category}</span>

@@ -5,7 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth/session';
 import { deleteBudget, setBudget, setBudgetAmount } from '@/lib/db';
-import { isBrother } from '@/lib/household';
+import { isMember } from '@/lib/household';
 import { isSupportedCurrency } from '@/lib/money/currency';
 import { resolveCategoryKey } from '@/lib/finance/categories';
 
@@ -27,7 +27,6 @@ const budgetSchema = z.object({
    * against a brother who does not exist is a row no screen would ever draw again, which is
    * worse than an error because it cannot be corrected from the interface.
    */
-  owner: z.string().refine(isBrother),
   category: z.string().trim().min(1).max(60),
   amount: amountSchema,
   /*
@@ -46,15 +45,23 @@ export async function setBudgetAction(
   const t = await getTranslations('finance');
 
   const parsed = budgetSchema.safeParse({
-    owner: formData.get('owner') ?? '',
     category: formData.get('category') ?? '',
     amount: String(formData.get('amount') ?? ''),
     currency: formData.get('currency') ?? '',
   });
   if (!parsed.success) return { error: t('invalid') };
 
+  // Resolved in the body against the household of this tenant — see finance/actions.ts.
+  const owner =
+    session.tenant.household.length === 0
+      ? null
+      : isMember(session.tenant.household, formData.get('owner'))
+        ? (formData.get('owner') as string)
+        : false;
+  if (owner === false) return { error: t('invalid') };
+
   await setBudget(session.ctx, {
-    owner: parsed.data.owner,
+    owner,
     /*
      * Back to a key, exactly as the ledger does with the same word.
      *

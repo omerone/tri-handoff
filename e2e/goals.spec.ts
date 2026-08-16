@@ -46,10 +46,18 @@ async function addGoal(page: Page, title: string, day: string) {
   const card = dayCard(page, day);
   const field = card.locator('input[name="title"]');
 
-  if (!(await field.isVisible().catch(() => false))) {
+  // Clicked until the field is actually there. Arriving here right after a navigation — the
+  // member switch is a form POST — means the opener's onClick may not be attached yet, and a
+  // single click into the pre-hydration DOM is swallowed whole. Evidence, not hope.
+  for (let attempt = 0; attempt < 6 && !(await field.isVisible().catch(() => false)); attempt += 1) {
     await card.getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(field).toBeVisible();
+    try {
+      await expect(field).toBeVisible({ timeout: 2_000 });
+    } catch {
+      // swallowed — go again
+    }
   }
+  await expect(field).toBeVisible();
 
   await field.fill(title);
   await card.getByRole('button', { name: 'Save', exact: true }).click();

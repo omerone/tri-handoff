@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from 'next/navigation';
 import { applyBrotherAction } from '@/app/actions/brother';
-import { HOUSEHOLD, type Brother } from '@/lib/household';
+
 
 export type BrotherSwitchLabels = {
   /** The group's name for a screen reader, and the tooltip's subject. */
@@ -33,11 +33,14 @@ const OWNED_PATHS = ['/finance', '/learning', '/goals'];
  * The names are not translated. They are names; they read the same in either locale.
  */
 export function BrotherSwitch({
+  household,
   current,
   labels,
 }: {
+  /** This tenant's members. The shell renders no switch below two, so this is 2+ here. */
+  household: readonly string[];
   /** The cookie's position, resolved on the server so the first paint agrees with it. */
-  current: Brother;
+  current: string;
   labels: BrotherSwitchLabels;
 }) {
   const pathname = usePathname();
@@ -45,11 +48,11 @@ export function BrotherSwitch({
   const owned = OWNED_PATHS.some((path) => pathname.startsWith(path));
 
   /*
-   * Two positions and no third. There was briefly a "both" that merged the ledgers; the
-   * brothers asked for their money apart, and a merged view of two private budgets is the
+   * One position per member and no "everyone". There was briefly a merged position; the
+   * brothers asked for their money apart, and a combined view of private budgets is the
    * exact thing they were separating. The switch always rests on somebody.
    */
-  const positions = HOUSEHOLD.map((name) => ({ value: name as Brother, label: name }));
+  const positions = household.map((name) => ({ value: name, label: name }));
 
   return (
     <form

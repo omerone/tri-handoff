@@ -37,7 +37,7 @@ import { holdTimes } from '@/lib/analytics/streaks';
 import { formatDuration, hoursToMinutes } from '@/lib/time/format';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { listLearningEntries } from '@/lib/db';
-import { currentBrother } from '@/lib/preferences/brother';
+import { currentMember } from '@/lib/preferences/brother';
 import { isKnownTopic, learnerKey, learningTotals } from '@/lib/learning/types';
 import { originalTpBreakdown, tpTimingBreakdown } from '@/lib/review/stats';
 import { ORIGINAL_TP_COLOR, TIMING_COLOR, topicColor } from '@/lib/review/colors';
@@ -108,7 +108,7 @@ export default async function AnalyticsPage({
     // other brother's hours — same window, same donut, two different answers.
     listLearningEntries(session.ctx, { from: window.from, to: window.to }),
   ]);
-  const brother = await currentBrother();
+  const brother = await currentMember(session.tenant.household);
   const { money, display } = await displayMoney({
     source: book.accountCurrency,
     display: session.user.displayCurrency,

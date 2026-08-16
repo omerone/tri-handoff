@@ -5,7 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth/session';
 import { createGoal, deleteGoal, editGoal, setGoalDone } from '@/lib/db';
-import { isBrother } from '@/lib/household';
+import { isMember } from '@/lib/household';
 
 export type GoalFormState = { error?: string; ok?: boolean };
 
@@ -25,7 +25,6 @@ const daySchema = z
   });
 
 const newGoalSchema = z.object({
-  owner: z.string().refine(isBrother),
   title: z.string().trim().min(1).max(160),
   dueOn: daySchema,
 });
@@ -38,13 +37,21 @@ export async function createGoalAction(
   const t = await getTranslations('goals');
 
   const parsed = newGoalSchema.safeParse({
-    owner: formData.get('owner') ?? '',
     title: formData.get('title') ?? '',
     dueOn: formData.get('dueOn') ?? '',
   });
   if (!parsed.success) return { error: t('invalid') };
 
-  await createGoal(session.ctx, parsed.data);
+  // Resolved in the body against the household of this tenant — see finance/actions.ts.
+  const owner =
+    session.tenant.household.length === 0
+      ? null
+      : isMember(session.tenant.household, formData.get('owner'))
+        ? (formData.get('owner') as string)
+        : false;
+  if (owner === false) return { error: t('invalid') };
+
+  await createGoal(session.ctx, { ...parsed.data, owner });
   revalidatePath('/goals');
   return { ok: true };
 }

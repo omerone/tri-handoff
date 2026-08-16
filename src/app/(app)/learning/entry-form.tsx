@@ -14,7 +14,7 @@ import {
 
 export type LearningFormLabels = {
   /** "Who studied" — the field label. */
-  learner: string;
+  learner: string | null;
   what: string;
   whatPlaceholder: string;
   hours: string;
@@ -69,7 +69,7 @@ export function LearningEntryForm({
    * form of asking allowed the same contradiction, a session entered on אביתר's screen and
    * attributed to יוני, gone from view the moment it saved. The switch already answered.
    */
-  learner: string;
+  learner: string | null;
   /**
    * The row being rewritten, or undefined when this is the add form.
    *
@@ -181,12 +181,15 @@ export function LearningEntryForm({
           row, which on a phone it needs — a half cell gave it 169px and the placeholder is
           three examples long, clipped before the first one ended.
         */}
-        <label className="flex flex-col gap-1 sm:min-w-[9rem] lg:min-w-0 lg:shrink">
-          <span className="text-dim text-[11px] font-semibold">{labels.learner}</span>
-          {/* Stated, not asked — the header switch is where "whose" changes. */}
-          <span className={`${field} flex items-center font-semibold`}>{learner}</span>
-          <input type="hidden" name="learner" value={learner} />
-        </label>
+        {/* Stated, not asked — the header switch is where "whose" changes. A household of
+            one states nothing, caption included: every session is theirs. */}
+        {learner !== null ? (
+          <label className="flex flex-col gap-1 sm:min-w-[9rem] lg:min-w-0 lg:shrink">
+            <span className="text-dim text-[11px] font-semibold">{labels.learner}</span>
+            <span className={`${field} flex items-center font-semibold`}>{learner}</span>
+            <input type="hidden" name="learner" value={learner} />
+          </label>
+        ) : null}
 
         <label className="col-span-2 flex flex-col gap-1 sm:col-auto sm:min-w-[12rem] sm:flex-1 lg:min-w-0">
           <span className="text-dim text-[11px] font-semibold">{labels.what}</span>

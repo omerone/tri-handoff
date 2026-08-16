@@ -73,7 +73,7 @@ const { endSession, getSession, requireSession, startSession } = await import('.
 
 // --- fixtures ---------------------------------------------------------------
 
-const TENANT = { id: 'tenant-alice', name: 'Alice', domain: 'alice.itest' };
+const TENANT = { id: 'tenant-alice', name: 'Alice', domain: 'alice.itest', household: ['יוני', 'אביתר'] };
 
 const activeTenant: TenantLookup = { state: 'active', tenant: TENANT };
 
@@ -146,7 +146,7 @@ describe('getSession', () => {
     signIn();
     resolveTenant.mockResolvedValue({
       state: 'active',
-      tenant: { id: 'tenant-bob', name: 'Bob', domain: 'bob.itest' },
+      tenant: { id: 'tenant-bob', name: 'Bob', domain: 'bob.itest', household: ['יוני', 'אביתר'] },
     });
     findSession.mockResolvedValue(null);
 

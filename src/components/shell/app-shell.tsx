@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import type { Locale } from '@/i18n/config';
 import { resolveTheme, THEME_COOKIE } from '@/lib/theme';
 import { navRoute, stripNav } from '@/lib/nav';
-import { currentBrother } from '@/lib/preferences/brother';
+import { currentMember } from '@/lib/preferences/brother';
 import { currentRange } from '@/lib/preferences/range';
 import { monthNames, selectableYears } from '@/lib/time/range-options';
 import type { TenantSession } from '@/lib/tenant/context';
@@ -46,7 +46,7 @@ export async function AppShell({
   // resolved against two different clocks is two different months, and a hydration mismatch.
   const now = new Date();
   const range = await currentRange();
-  const brother = await currentBrother();
+  const member = await currentMember(session.tenant.household);
 
   return (
     <div className="min-h-screen">
@@ -88,14 +88,19 @@ export async function AppShell({
           */}
             <div className="flex flex-wrap items-center gap-2">
               {/* Whose money and whose hours the owned screens show. First in the row: it is
-                  an answer about identity, and the rest of the row is about state. */}
-              <BrotherSwitch
-                current={brother}
-                labels={{
-                  title: t('household.title'),
-                  shared: t('household.shared'),
-                }}
-              />
+                  an answer about identity, and the rest of the row is about state. Drawn only
+                  for a household of two or more — a solo tenant has nobody to switch to, and
+                  a control with one position is furniture. */}
+              {member !== null && session.tenant.household.length > 1 ? (
+                <BrotherSwitch
+                  household={session.tenant.household}
+                  current={member}
+                  labels={{
+                    title: t('household.title'),
+                    shared: t('household.shared'),
+                  }}
+                />
+              ) : null}
               <SyncStatus session={session} lastLoginAt={session.user.lastLoginAt} />
               {/* Beside the theme, because both are "how I want to read this right now"
                   rather than settings — see the note on the component. */}
