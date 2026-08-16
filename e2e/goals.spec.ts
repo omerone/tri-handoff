@@ -30,28 +30,29 @@ test.afterAll(async () => {
   }
 });
 
+/** One day's card, found by the date printed on it. */
+function dayCard(page: Page, iso: string) {
+  const [year, month, day] = iso.split('-');
+  return page.locator('section').filter({ hasText: `${day}/${month}/${year}` }).first();
+}
+
 /**
- * Write one down, on whichever layout is drawing the form.
+ * Write one down, into the day you are looking at.
  *
- * Inline from `md`; on a phone it is behind a button whose handler only exists after
- * hydration, so a click that lands too early is swallowed silently. Clicking until the field
- * is actually visible is the only evidence the handler was attached.
+ * The field stays open after a save — a run of goals for one day is the ordinary case — so the
+ * opener is only pressed when it is actually there.
  */
 async function addGoal(page: Page, title: string, day: string) {
-  const form = page.locator('form:has(select[name="dueOn"])').first();
-  const field = form.locator('input[name="title"]');
-  const opener = page.getByRole('button', { name: 'Add a goal' }).first();
+  const card = dayCard(page, day);
+  const field = card.locator('input[name="title"]');
 
-  for (let attempt = 0; attempt < 6 && !(await field.isVisible().catch(() => false)); attempt += 1) {
-    if (await opener.isVisible().catch(() => false)) await opener.click();
-    await expect(field)
-      .toBeVisible({ timeout: 2_000 })
-      .catch(() => undefined);
+  if (!(await field.isVisible().catch(() => false))) {
+    await card.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(field).toBeVisible();
   }
 
   await field.fill(title);
-  await form.locator('select[name="dueOn"]').selectOption(day);
-  await form.getByRole('button', { name: 'Add', exact: true }).click();
+  await card.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText(title)).toBeVisible();
 }
 
@@ -107,6 +108,33 @@ test.describe('the week’s checklist', () => {
     await expect(tile(page, 'Missed')).toContainText('0');
     // The goal is still counted as planned: that is what the week holds, not what was scored.
     await expect(tile(page, 'Planned')).toContainText('1');
+  });
+
+
+  test('writes into the day that was pressed', async ({ page }) => {
+    /*
+     * What the client reported. The week is drawn as seven cards, they look like something you
+     * can press, and pressing one did nothing: the only way in was a form above them with the
+     * day in a dropdown — scroll up, find Wednesday again in a list of seven, having just
+     * pointed at it.
+     *
+     * The day is not a field any more, it is which card you are in, so it cannot be picked
+     * wrongly either.
+     */
+    const title = goal('pressed');
+    await page.goto(`/goals?week=${PAST_WEEK}`);
+
+    // Every day offers one, including the empty ones — a day you cannot write to is a day the
+    // week is missing.
+    await expect(page.getByRole('button', { name: 'Add', exact: true })).toHaveCount(7);
+
+    await addGoal(page, title, '2026-01-07');
+    await expect(dayCard(page, '2026-01-07')).toContainText(title);
+    await expect(dayCard(page, '2026-01-06')).not.toContainText(title);
+
+    // And it stays open, so a second goal for the same day is one field away rather than four
+    // clicks: this is written in runs.
+    await expect(dayCard(page, '2026-01-07').locator('input[name="title"]')).toBeVisible();
   });
 
   test('steps between weeks and back to this one', async ({ page }) => {

@@ -12,92 +12,111 @@ import {
 
 export type DayOption = { value: string; label: string };
 
-export type GoalFormLabels = {
-  title: string;
-  titlePlaceholder: string;
-  day: string;
-  add: string;
-};
-
 const FIELD =
   'border-line bg-raised text-text placeholder:text-dim/60 min-h-11 w-full rounded-[10px] border px-3 py-2 text-sm sm:min-h-9';
 
+export type DayAddLabels = {
+  add: string;
+  placeholder: string;
+  save: string;
+  cancel: string;
+  /** Names the day, for a reader who cannot see which card the field is in. */
+  field: string;
+};
+
 /**
- * Writing one down.
+ * Writing one down, on the day you are looking at.
  *
- * Title and a day, and nothing else. A checklist earns its keep by being faster to add to than
- * to think about — every field beyond these two is a decision taken at the moment somebody is
- * trying to get something out of their head and onto a list.
+ * This was a single form above the week with the day in a dropdown, and the client found the
+ * hole in it straight away: the days are drawn as cards, they look like something you can
+ * press, and pressing one did nothing. Adding to Wednesday meant scrolling back up and
+ * finding Wednesday again in a list of seven — having just pointed at it.
+ *
+ * So the day is not asked for any more, it is *where you are*. The card carries the field and
+ * the value is fixed by the card it is in, which also means it cannot be got wrong.
+ *
+ * It stays open after each one. Goals arrive in runs — somebody sits down once a week and
+ * writes four for the same day — and a field that closes itself after every save turns four
+ * goals into eight clicks.
  */
-export function GoalForm({
+export function DayAdd({
   owner,
-  days,
-  defaultDay,
+  day,
   labels,
 }: {
   owner: string;
-  days: DayOption[];
-  defaultDay: string;
-  labels: GoalFormLabels;
+  /** `yyyy-mm-dd`, fixed by the card. Not a field, so there is nothing to pick wrongly. */
+  day: string;
+  labels: DayAddLabels;
 }) {
+  const [open, setOpen] = useState(false);
   const [state, action] = useActionState<GoalFormState, FormData>(createGoalAction, {});
   const form = useRef<HTMLFormElement>(null);
   const title = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!state.ok) return;
-    /*
-     * Reset, then put the cursor back. Goals arrive in runs — a person sits down once a week
-     * and writes six — and a form that clears itself and then makes you click it again to
-     * write the next one is a form you stop using after the second.
-     *
-     * The day is deliberately not reset with it: a run of goals is usually a run for the same
-     * day, so `form.reset()` would send you back to the picker between every one.
-     */
-    const day = form.current?.querySelector<HTMLSelectElement>('select[name="dueOn"]')?.value;
     form.current?.reset();
-    if (day) {
-      const picker = form.current?.querySelector<HTMLSelectElement>('select[name="dueOn"]');
-      if (picker) picker.value = day;
-    }
     title.current?.focus();
   }, [state]);
 
-  return (
-    <form ref={form} action={action} className="flex flex-wrap items-end gap-2">
-      <input type="hidden" name="owner" value={owner} />
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="tri-tap text-dim hover:text-brand flex min-h-9 w-full items-center gap-1.5 rounded-lg text-[12px] font-semibold"
+      >
+        <Plus size={13} aria-hidden />
+        {labels.add}
+      </button>
+    );
+  }
 
-      <label className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-dim text-[11px] font-semibold">{labels.title}</span>
+  return (
+    <form
+      ref={form}
+      action={action}
+      onKeyDown={(event) => {
+        // Stopped here, or the sheet a form sits in on a phone would close along with it.
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        setOpen(false);
+      }}
+      className="flex flex-col gap-1 pt-1"
+    >
+      <input type="hidden" name="owner" value={owner} />
+      <input type="hidden" name="dueOn" value={day} />
+
+      <div className="flex items-center gap-1">
         <input
           ref={title}
           name="title"
           required
+          autoFocus
           maxLength={160}
-          placeholder={labels.titlePlaceholder}
-          className={FIELD}
+          aria-label={labels.field}
+          placeholder={labels.placeholder}
+          className={`${FIELD} min-w-0 flex-1`}
         />
-      </label>
+        <button
+          type="submit"
+          aria-label={labels.save}
+          className="tri-tap text-pos hover:bg-raised flex size-8 shrink-0 items-center justify-center rounded-lg"
+        >
+          <Check size={15} aria-hidden />
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label={labels.cancel}
+          className="tri-tap text-dim hover:text-text flex size-8 shrink-0 items-center justify-center rounded-lg"
+        >
+          <X size={15} aria-hidden />
+        </button>
+      </div>
 
-      <label className="flex w-36 flex-col gap-1">
-        <span className="text-dim text-[11px] font-semibold">{labels.day}</span>
-        <select name="dueOn" defaultValue={defaultDay} className={FIELD}>
-          {days.map((day) => (
-            <option key={day.value} value={day.value}>
-              {day.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <button
-        type="submit"
-        className="bg-brand text-on-brand inline-flex min-h-11 items-center gap-1.5 rounded-[10px] px-4 text-sm font-bold sm:min-h-9"
-      >
-        <Plus size={14} aria-hidden /> {labels.add}
-      </button>
-
-      {state.error ? <p className="text-neg w-full text-xs">{state.error}</p> : null}
+      {state.error ? <p className="text-neg text-[11px]">{state.error}</p> : null}
     </form>
   );
 }

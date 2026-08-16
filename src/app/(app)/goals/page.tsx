@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getLocale, getTranslations } from 'next-intl/server';
-import { AddSheet } from '@/components/ui/add-sheet';
 import { Card } from '@/components/ui/card';
 import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
@@ -19,7 +18,7 @@ import {
 import { formatPercent } from '@/lib/money/currency';
 import { formatWeekdayDate, isoToDayMonth, parseIsoDate } from '@/lib/time/format';
 import { wallClock } from '@/lib/time/zone';
-import { GoalForm, GoalRow } from './goal-form';
+import { DayAdd, GoalRow } from './goal-form';
 
 /** How many weeks of history the trend reads. Six is a month and a half — long enough to be a
  *  trend, short enough that every bar is a week the person remembers. */
@@ -79,9 +78,13 @@ export default async function GoalsPage({
     value: day,
     label: formatWeekdayDate(parseIsoDate(day)!, locale),
   }));
-  /* Today when today is in the week being looked at, otherwise the week's own first day —
-     so writing a goal while browsing next week does not silently date it to this Tuesday. */
-  const defaultDay = days.includes(today) ? today : start;
+  const addLabels = {
+    add: t('add'),
+    placeholder: t('goalPlaceholder'),
+    save: t('save'),
+    cancel: t('cancel'),
+    field: t('goalTitle'),
+  };
 
   const rowLabels = {
     done: t('markDone'),
@@ -154,25 +157,10 @@ export default async function GoalsPage({
           </div>
         }
       >
-        <div className="flex flex-col gap-4">
-          <AddSheet label={t('addGoal')}>
-            <GoalForm
-              owner={brother}
-              days={dayOptions}
-              defaultDay={defaultDay}
-              labels={{
-                title: t('goalTitle'),
-                titlePlaceholder: t('goalPlaceholder'),
-                day: t('day'),
-                add: t('add'),
-              }}
-            />
-          </AddSheet>
+        <div className="flex flex-col gap-3">
+          {progress.total === 0 ? <p className="text-dim text-xs">{t('empty')}</p> : null}
 
-          {progress.total === 0 ? (
-            <EmptyState>{t('empty')}</EmptyState>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {plan.map((day) => {
                 const isToday = day.date === today;
                 const gone = day.date < today;
@@ -203,27 +191,26 @@ export default async function GoalsPage({
                       ) : null}
                     </header>
 
-                    {day.total === 0 ? (
-                      <p className="text-dim/70 py-1 text-[11px]">{t('freeDay')}</p>
-                    ) : (
-                      day.goals.map((goal) => (
-                        <GoalRow
-                          key={goal.id}
-                          id={goal.id}
-                          title={goal.title}
-                          done={goal.done}
-                          dueOn={goal.dueOn}
-                          days={dayOptions}
-                          overdue={gone && !goal.done}
-                          labels={rowLabels}
-                        />
-                      ))
-                    )}
+                    {day.goals.map((goal) => (
+                      <GoalRow
+                        key={goal.id}
+                        id={goal.id}
+                        title={goal.title}
+                        done={goal.done}
+                        dueOn={goal.dueOn}
+                        days={dayOptions}
+                        overdue={gone && !goal.done}
+                        labels={rowLabels}
+                      />
+                    ))}
+
+                    {/* Every day, whether or not it holds anything: the button is how a goal
+                        is written, so a day without one is a day you cannot write to. */}
+                    <DayAdd owner={brother} day={day.date} labels={addLabels} />
                   </section>
                 );
               })}
-            </div>
-          )}
+          </div>
         </div>
       </Card>
 
