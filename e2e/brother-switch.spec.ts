@@ -128,12 +128,15 @@ test.describe('the brother switch', () => {
 
     await page.goto('/learning');
     await flip(page, 'יוני').click();
-    await openForm(page, page.getByLabel(/^what|מה נלמד/i));
+    /* Scoped to the form: page-wide, "Hours…" also matches the donut above the list, which
+       is named for a screen reader exactly the way a field is. */
+    const studyForm = page.locator('form:has(input[name="topic"]), form:has(select[name="topic"])');
+    await openForm(page, studyForm.getByLabel(/^what|מה נלמד/i).first());
     // Stated here too — the hidden field carries the switch's answer.
     await expect(page.locator('input[name="learner"]')).toHaveValue('יוני');
     await fillForm([
-      { locator: page.getByLabel(/^what|מה נלמד/i), value: title },
-      { locator: page.getByLabel(/^hours|שעות/i).first(), value: '2' },
+      { locator: studyForm.getByLabel(/^what|מה נלמד/i).first(), value: title },
+      { locator: studyForm.getByLabel(/^hours|שעות/i).first(), value: '2' },
     ]);
     await page.getByRole('button', { name: /^add$|^הוסף$/i }).click();
     await expect(page.getByText(title).first()).toBeVisible();

@@ -19,6 +19,7 @@ import {
 } from '@/lib/money/currency';
 import { returnFromStart } from '@/lib/analytics';
 import { ChartTooltip, type TooltipNote } from './chart-tooltip';
+import { ChartFigure } from './chart-figure';
 
 export type EquityDatum = { index: number; balance: number; label: string };
 
@@ -32,12 +33,30 @@ export type EquityDatum = { index: number; balance: number; label: string };
  * The axis flips side in RTL, which Recharts supports directly and is the difference between
  * a Hebrew dashboard that reads naturally and one that reads like a translation.
  */
+export type EquityChartLabels = {
+  /** Names the graphic. */
+  title: string;
+  /** The two columns of the readable version. */
+  point: string;
+  balance: string;
+  /**
+   * One sentence saying what the curve does, built on the server.
+   *
+   * Not a function taking the figures: props cross the server boundary as data, and a
+   * callback does not serialise — the same rule that put `MoneyDisplay` in this file's
+   * signature instead of a formatter. The server has the balances and the same
+   * `formatDisplayMoney` this side uses, so it writes the sentence and the two agree.
+   */
+  summary: string;
+};
+
 export function EquityChart({
   data,
   startBalance,
   rtl,
   display,
   fromStartLabel,
+  labels,
 }: {
   data: EquityDatum[];
   startBalance: number;
@@ -45,6 +64,7 @@ export function EquityChart({
   display: MoneyDisplay;
   /** Names the second tooltip line. Passed in because this side cannot read translations. */
   fromStartLabel: string;
+  labels: EquityChartLabels;
 }) {
   const format = (value: number) => formatDisplayMoney(value, display);
   // The axis gets the short form; the tooltip keeps the exact figure.
@@ -84,7 +104,21 @@ export function EquityChart({
     /* Shorter on a phone. 240px is a good chart on a desktop and a quarter of the screen on a
        handset, where it competes with the tiles above it rather than with the whitespace it
        has on a monitor. */
-    <div className="h-[180px] sm:h-[240px]">
+    <ChartFigure
+      label={labels.title}
+      summary={labels.summary}
+      table={
+        data.length === 0
+          ? undefined
+          : {
+              caption: labels.title,
+              columns: [labels.point, labels.balance],
+              rows: data.map((point) => [point.label, format(point.balance)]),
+            }
+      }
+      className="h-[180px] sm:h-[240px]"
+    >
+      <div className="h-[180px] sm:h-[240px]">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
           <defs>
@@ -120,6 +154,7 @@ export function EquityChart({
           />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+      </div>
+    </ChartFigure>
   );
 }

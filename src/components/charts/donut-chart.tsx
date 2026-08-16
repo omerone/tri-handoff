@@ -29,12 +29,25 @@ export function DonutChart({
   total,
   centerLabel,
   emptyLabel,
+  title,
+  summary,
 }: {
   data: DonutSlice[];
   /** Rendered large in the middle, already formatted. */
   total: string;
   centerLabel: string;
   emptyLabel: string;
+  /** Names the graphic — "Hours by topic", not "chart". */
+  title: string;
+  /**
+   * What the ring says, in a sentence.
+   *
+   * Deliberately no hidden table under this one. The legend to its right is real text and
+   * already names every slice with its share, so a table would be the same figures a second
+   * time — and a screen reader would read the whole breakdown twice before reaching whatever
+   * comes next.
+   */
+  summary: string;
 }) {
   const [hovered, setHovered] = useState(false);
   const drawable = data.filter((slice) => slice.value > 0);
@@ -55,7 +68,14 @@ export function DonutChart({
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <div className="relative shrink-0" style={{ width: size, height: size }}>
+      {/* One graphic with a name, rather than a tree of `<path>` elements read out as
+          coordinates. The legend stays outside it, in the reading order, as text. */}
+      <div
+        role="img"
+        aria-label={`${title}. ${summary}`}
+        className="relative shrink-0"
+        style={{ width: size, height: size }}
+      >
         {drawable.length === 0 ? (
           /*
            * A dashed ring where the chart would be, and nothing written inside it. The

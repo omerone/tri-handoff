@@ -115,6 +115,30 @@ const barHeight = (netR: number) =>
   (Math.min(Math.abs(netR), MAX_R) / MAX_R) * MAX_BAR + MIN_BAR;
 
 /**
+ * What one column of the strip is, said out loud.
+ *
+ * The columns carry `tabIndex` so the detail card can be opened from the keyboard — which was
+ * half a thought. A focusable element with no accessible name is announced as "group, blank":
+ * a reader could tab through sixty of them and be told nothing sixty times, and the card that
+ * opens on focus is drawn with `group-focus-within` in CSS, so it is decoration to anything
+ * that is not looking at the screen.
+ *
+ * The same figures the card shows, in the same formatters, so the two cannot drift.
+ */
+function dayLabel(day: DailyREntry, labels: RStripLabels): string {
+  const date = labels.formatLongDate(day.date);
+  if (day.count === 0) return `${date}: ${labels.noTrades}`;
+
+  return [
+    date,
+    labels.tradeCount(day.count),
+    `${labels.netR} ${labels.formatR(day.netR)}`,
+    `${labels.netPnl} ${labels.formatMoney(day.net)}`,
+    `${labels.winRate} ${labels.formatPercent(day.count === 0 ? 0 : (day.wins / day.count) * 100)}`,
+  ].join(', ');
+}
+
+/**
  * The hover card.
  *
  * Replaces the browser's `title`, which took a second to appear, could not be styled, and —
@@ -242,6 +266,10 @@ export function RStrip({ days, labels }: { days: DailyREntry[]; labels: RStripLa
                 // `tabIndex` so the same detail is reachable by keyboard: `group-focus-within`
                 // opens the card, which a hover-only affordance never would.
                 tabIndex={0}
+                /* Named, because the card that opens on focus is CSS and says nothing to a
+                   reader that is not looking at it. */
+                role="img"
+                aria-label={dayLabel(day, labels)}
                 className="group relative flex min-w-0 flex-1 cursor-default flex-col items-center gap-1 rounded-md focus-visible:outline-2"
               >
                 <DayCard day={day} labels={labels} align={align} />

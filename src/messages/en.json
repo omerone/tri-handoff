@@ -810,5 +810,14 @@
     "trend": "Trend",
     "trendInfo": "How much of each of the last six weeks was kept. Every week is scored only against the days that have arrived, so the current one does not look bad for being half over. A week with nothing written shows a dash rather than a zero — not writing is not failing.",
     "trendEmpty": "Not enough weeks yet to show a trend."
+  },
+  "charts": {
+    "empty": "Nothing to show in this range.",
+    "share": "{count, plural, one {One category} other {# categories}}. Largest: {top}.",
+    "spread": "{count, plural, one {One group} other {# groups}}. Highest: {top}. Lowest: {bottom}.",
+    "spreadOne": "One group: {top}.",
+    "equity": "Opened at {start}, now {end} · {change}.",
+    "equityPoint": "Point",
+    "equityBalance": "Balance"
   }
 }

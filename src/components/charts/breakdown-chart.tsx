@@ -35,10 +35,19 @@ export function BreakdownChart({
   data,
   rtl,
   display,
+  title,
+  summary,
 }: {
   data: BreakdownDatum[];
   rtl: boolean;
   display: MoneyDisplay;
+  /** Names the graphic. */
+  title: string;
+  /**
+   * What the bars say, in a sentence. No hidden table: the caption row below already prints
+   * every bar's label and figure as text, and duplicating it would be read out twice.
+   */
+  summary: string;
 }) {
   const format = (value: number) => formatDisplayMoney(value, display);
   // The axis gets the short form; the tooltip keeps the exact figure.
@@ -71,7 +80,8 @@ export function BreakdownChart({
         around it looks like. The row is still level — the grid stretches the cards — and the
         difference sits under the legend, which is the honest cost of that.
       */}
-      <div style={{ height }}>
+      {/* One graphic with a name. The caption row below stays outside it, as text. */}
+      <div role="img" aria-label={`${title}. ${summary}`} style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
             <CartesianGrid stroke={TOKEN.line} vertical={false} />

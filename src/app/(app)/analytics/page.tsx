@@ -1,4 +1,5 @@
 import { getLocale, getTranslations } from 'next-intl/server';
+import { describeShare, describeSpread, phrase } from '@/lib/charts/describe';
 import { Card } from '@/components/ui/card';
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { EmptyState, Num } from '@/components/ui/kpi';
@@ -71,6 +72,28 @@ export default async function AnalyticsPage({
   const locale = (await getLocale()) as Locale;
   const rtl = LOCALE_DIR[locale] === 'rtl';
 
+  const tCharts = await getTranslations('charts');
+  /*
+   * The sentence that stands in for each drawing. One helper rather than a string per chart:
+   * there are six of these on this page and they should not describe themselves six ways.
+   */
+  const shareSummary = (slices: readonly { label: string; value: number; caption: string }[]) => {
+    const seen = describeShare(slices);
+    return seen.top === null
+      ? tCharts('empty')
+      : tCharts('share', { count: seen.count, top: phrase(seen.top) });
+  };
+  const spreadSummary = (bars: readonly { label: string; net: number; caption: string }[]) => {
+    const seen = describeSpread(bars);
+    if (seen.top === null) return tCharts('empty');
+    if (seen.bottom === null) return tCharts('spreadOne', { top: phrase(seen.top) });
+    return tCharts('spread', {
+      count: seen.count,
+      top: phrase(seen.top),
+      bottom: phrase(seen.bottom),
+    });
+  };
+
   // Every breakdown, insight and heatmap cell below is computed from this one list, so the
   // range is applied once, here, and the "buckets sum to the total" guarantee survives it.
   const range = await currentResolvedRange((await searchParams).range);
@@ -116,6 +139,14 @@ export default async function AnalyticsPage({
   const curve = equityCurve(book.trades, book.openingBalance);
   const spell = underwater(curve, book.openingBalance);
   const loads = dayLoads(book.trades);
+  /* Built once rather than inline in the markup: the chart and the sentence that describes it
+     have to read the same rows, and two copies of a `.map` is how they stop doing that. */
+  const loadBars = loads.map((load) => ({
+    key: String(load.trades),
+    label: t('analytics.tradesPerDay', { count: load.trades }),
+    net: load.avgNet,
+    caption: `${t('analytics.daysCount', { count: load.days })} · ${formatNumber(load.winRate, locale, 0)}%`,
+  }));
   const excursions = computeExcursions(book.trades);
   const months = monthlyReturns(book.trades, book.openingBalance);
   const grid = monthGrid(months);
@@ -175,6 +206,8 @@ export default async function AnalyticsPage({
         <Card title={t('learning.byTopic')}>
           <DonutChart
             data={learningSlices}
+            title={t('learning.byTopic')}
+            summary={shareSummary(learningSlices)}
             total={learningHours(learned.hours)}
             centerLabel={t('learning.totalHours')}
             emptyLabel={t('learning.empty')}
@@ -421,7 +454,13 @@ export default async function AnalyticsPage({
             info={chart.info}
             infoLabel={chart.title}
           >
-            <BreakdownChart data={chart.data} rtl={rtl} display={display} />
+            <BreakdownChart
+              data={chart.data}
+              rtl={rtl}
+              display={display}
+              title={chart.title}
+              summary={spreadSummary(chart.data)}
+            />
           </CollapsibleCard>
         ))}
       </div>
@@ -436,6 +475,8 @@ export default async function AnalyticsPage({
         <CollapsibleCard defaultOpen={false} title={t('review.tpTiming')}>
           <DonutChart
             data={timingSlices}
+            title={t('review.tpTiming')}
+            summary={shareSummary(timingSlices)}
             total={formatNumber(timing.total, locale)}
             centerLabel={t('review.ofTrades', { count: '' }).trim()}
             emptyLabel={t('review.noneReviewed')}
@@ -448,6 +489,8 @@ export default async function AnalyticsPage({
         <CollapsibleCard defaultOpen={false} title={t('review.originalTp')}>
           <DonutChart
             data={originalSlices}
+            title={t('review.originalTp')}
+            summary={shareSummary(originalSlices)}
             total={formatNumber(original.total, locale)}
             centerLabel={t('review.ofTrades', { count: '' }).trim()}
             emptyLabel={t('review.noneReviewed')}
@@ -458,6 +501,8 @@ export default async function AnalyticsPage({
         <CollapsibleCard defaultOpen={false} title={t('learning.byTopic')}>
           <DonutChart
             data={learningSlices}
+            title={t('learning.byTopic')}
+            summary={shareSummary(learningSlices)}
             total={learningHours(learned.hours)}
             centerLabel={t('learning.totalHours')}
             emptyLabel={t('learning.empty')}
@@ -686,18 +731,15 @@ export default async function AnalyticsPage({
           </div>
         ) : null}
 
-        {loads.length > 1 ? (
+        {loads.length > 1 && loadBars.length > 0 ? (
           <div className="mt-4">
             <div className="text-dim mb-2 text-[11px] font-semibold">
               {t('analytics.byDayLoad')}
             </div>
             <BreakdownChart
-              data={loads.map((load) => ({
-                key: String(load.trades),
-                label: t('analytics.tradesPerDay', { count: load.trades }),
-                net: load.avgNet,
-                caption: `${t('analytics.daysCount', { count: load.days })} · ${formatNumber(load.winRate, locale, 0)}%`,
-              }))}
+              data={loadBars}
+              title={t('analytics.byDayLoad')}
+              summary={spreadSummary(loadBars)}
               rtl={rtl}
               display={display}
             />

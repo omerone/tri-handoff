@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { Chip, EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
+import { describeShare, phrase } from '@/lib/charts/describe';
 import { findLearningEntry, listLearningEntries, listLearningTopics } from '@/lib/db';
 import { currentBrother } from '@/lib/preferences/brother';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
@@ -42,6 +43,7 @@ export default async function LearningPage({
 }) {
   const session = await requireSession();
   const t = await getTranslations('learning');
+  const tCharts = await getTranslations('charts');
   const tBulk = await getTranslations('bulk');
   const locale = (await getLocale()) as Locale;
   const rtl = LOCALE_DIR[locale] === 'rtl';
@@ -114,6 +116,14 @@ export default async function LearningPage({
     color: topicColor(bucket.topic),
   }));
 
+  /* What the ring says, for a reader who cannot see it. The legend beside it carries every
+     slice already, so this is the glance rather than the detail. */
+  const seenTopics = describeShare(slices);
+  const topicSummary =
+    seenTopics.top === null
+      ? tCharts('empty')
+      : tCharts('share', { count: seenTopics.count, top: phrase(seenTopics.top) });
+
   const today = new Date();
   const defaultDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -138,6 +148,8 @@ export default async function LearningPage({
           total={hours(totals.hours)}
           centerLabel={t('totalHours')}
           emptyLabel={t('empty')}
+          title={t('byTopic')}
+          summary={topicSummary}
         />
       </Card>
 

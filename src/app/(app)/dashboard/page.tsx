@@ -13,8 +13,7 @@ import {
   maxDrawdown,
   maxRunUp,
   recentDailyR,
-  streaks,
-} from '@/lib/analytics';
+  streaks, returnFromStart } from '@/lib/analytics';
 import { loadBook } from '@/lib/analytics/load';
 import { currentResolvedRange } from '@/lib/preferences/range';
 import { toTradeFilter } from '@/lib/time/range';
@@ -23,7 +22,7 @@ import { normalizeLayout, type WidgetId } from '@/lib/dashboard/layout';
 import { DashboardGrid } from './grid';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import { displayMoney } from '@/lib/money/display';
-import { formatNumber, formatPercent } from '@/lib/money/currency';
+import { formatDisplayMoney, formatNumber, formatPercent } from '@/lib/money/currency';
 
 /**
  * SPEC §1.1's strip, in days. Thirty is a month a trader can hold in their head, and it is
@@ -56,6 +55,37 @@ export default async function DashboardPage({
 }) {
   const session = await requireSession();
   const t = await getTranslations();
+
+  /*
+   * The sentence each equity curve is announced with, written here rather than in the chart.
+   *
+   * Props cross into a client component as data, and a callback does not serialise — the same
+   * rule that put `MoneyDisplay` in the chart's signature instead of a formatter. The server
+   * has the balances and the same `formatDisplayMoney` the axis uses, so the summary and the
+   * drawing cannot disagree.
+   */
+  const equitySummary = (points: readonly { balance: number }[], start: number) => {
+    const last = points.at(-1);
+    if (!last) return t('charts.empty');
+
+    const money = formatDisplayMoney(last.balance - start, display, { signed: true });
+    const percent = returnFromStart(last.balance, start);
+    return t('charts.equity', {
+      start: formatDisplayMoney(start, display),
+      end: formatDisplayMoney(last.balance, display),
+      // A percentage of a base we cannot use still leaves the amount, which is always true.
+      change:
+        percent === null
+          ? money
+          : `${percent > 0 ? '+' : ''}${formatPercent(percent, locale, 1)} · ${money}`,
+    });
+  };
+  const equityLabels = (title: string, points: readonly { balance: number }[], start: number) => ({
+    title,
+    point: t('charts.equityPoint'),
+    balance: t('charts.equityBalance'),
+    summary: equitySummary(points, start),
+  });
   const locale = (await getLocale()) as Locale;
   const rtl = LOCALE_DIR[locale] === 'rtl';
 
@@ -95,6 +125,18 @@ export default async function DashboardPage({
 
   const metrics = computeMetrics(book.trades);
   const curve = equityCurve(book.trades, book.openingBalance);
+  /* Built once: the chart, its readable table and the sentence describing it all read the
+     same points, and three copies of a `.map` is how those stop agreeing. */
+  const equityPoints = curve.map((point) => ({
+    index: point.index,
+    balance: point.balance,
+    label: `${formatDayMonthAt(point.closeAt)} ${formatTimeAt(point.closeAt)}`,
+  }));
+  const historyPoints = snapshots.map((snapshot, index) => ({
+    index: index + 1,
+    balance: snapshot.balance,
+    label: formatDayMonthAt(snapshot.at),
+  }));
   const drawdown = maxDrawdown(curve, book.openingBalance);
   // The same curve read the other way up — see maxRunUp. Cheap enough to compute beside it,
   // and the pair is only legible together.
@@ -289,15 +331,12 @@ export default async function DashboardPage({
     equity: (
       <Card title={t('dash.equity')}>
         <EquityChart
-          data={curve.map((point) => ({
-            index: point.index,
-            balance: point.balance,
-            label: `${formatDayMonthAt(point.closeAt)} ${formatTimeAt(point.closeAt)}`,
-          }))}
+          data={equityPoints}
           startBalance={book.openingBalance}
           rtl={rtl}
           display={display}
           fromStartLabel={t('dash.fromStart')}
+          labels={equityLabels(t('dash.equity'), equityPoints, book.openingBalance)}
         />
       </Card>
     ),
@@ -310,14 +349,15 @@ export default async function DashboardPage({
       snapshots.length > 1 ? (
         <Card title={t('dash.balanceHistory')}>
           <EquityChart
-            data={snapshots.map((snapshot, index) => ({
-              index: index + 1,
-              balance: snapshot.balance,
-              label: formatDayMonthAt(snapshot.at),
-            }))}
+            data={historyPoints}
             startBalance={snapshots[0]!.balance}
             rtl={rtl}
             display={display}
+            labels={equityLabels(
+              t('dash.balanceHistory'),
+              historyPoints,
+              snapshots[0]!.balance,
+            )}
             fromStartLabel={t('dash.fromStart')}
           />
           <p className="text-dim mt-3 text-[11px] leading-relaxed">

@@ -45,9 +45,18 @@ async function fillForm(fields: { locator: ReturnType<Page['getByLabel']>; value
   throw new Error('the form never held its values');
 }
 
-const what = (page: Page) => page.getByLabel(/^what|מה נלמד/i);
-const hours = (page: Page) => page.getByLabel(/^hours|שעות/i).first();
-const minutes = (page: Page) => page.getByLabel(/^minutes|דקות/i).first();
+/*
+ * Scoped to the form rather than to the page.
+ *
+ * `getByLabel(/^hours/i)` across the whole document is a lookup that matches anything named
+ * "Hours…", and the donut above this list is now called "Hours by topic" — a chart is named
+ * for a screen reader exactly the way a field is. A field lookup belongs inside the form the
+ * field is in; page-wide it was one accessible name away from breaking, and this is that name.
+ */
+const fields = (page: Page) => page.locator('form:has(select[name="topic"]), form:has(input[name="topic"])');
+const what = (page: Page) => fields(page).getByLabel(/^what|מה נלמד/i).first();
+const hours = (page: Page) => fields(page).getByLabel(/^hours|שעות/i).first();
+const minutes = (page: Page) => fields(page).getByLabel(/^minutes|דקות/i).first();
 
 test.describe('correcting a study session', () => {
   test('opens the row in a seeded form and rewrites it in place', async ({ page }) => {
