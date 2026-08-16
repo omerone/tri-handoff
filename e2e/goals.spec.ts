@@ -148,3 +148,44 @@ test.describe('the week’s checklist', () => {
     await expect(page.getByText('04/01 – 10/01')).toBeVisible();
   });
 });
+
+test.describe('whose week it is', () => {
+  /**
+   * Goals are per-brother, like the money and the hours.
+   *
+   * The screen reads the header switch and the repository filters on `owner`, but nothing
+   * proved the two were joined up — and a filter that quietly stops filtering is invisible
+   * until one brother is ticking off the other's week. The switch also has to be *live* here:
+   * it is dimmed on the trading screens, so "the control is on the page" is not the same claim.
+   */
+  const flip = (page: Page, name: string) =>
+    page
+      .getByRole('group', { name: /whose data|של מי הנתונים/i })
+      .getByRole('button', { name, exact: true });
+
+  test('keeps one brother’s goals out of the other’s week', async ({ page }) => {
+    const mine = goal('yoni-week');
+
+    await page.goto(`/goals?week=${PAST_WEEK}`);
+    await flip(page, 'יוני').click();
+    await expect(flip(page, 'יוני')).toHaveAttribute('aria-pressed', 'true');
+    await addGoal(page, mine, PAST_WEEK);
+
+    await flip(page, 'אביתר').click();
+    await expect(
+      page.getByText(mine),
+      "יוני's goal is showing in אביתר's week",
+    ).toHaveCount(0);
+
+    // And it is still there when the switch comes back — filtered, not lost.
+    await flip(page, 'יוני').click();
+    await expect(page.getByText(mine)).toBeVisible();
+  });
+
+  test('the switch is live here rather than dimmed', async ({ page }) => {
+    // Dimmed means "this screen is shared" — which goals are not.
+    await page.goto(`/goals?week=${PAST_WEEK}`);
+    const group = page.getByRole('group', { name: /whose data|של מי הנתונים/i });
+    await expect(page.locator('form[data-tip]').filter({ has: group })).toHaveCount(0);
+  });
+});
