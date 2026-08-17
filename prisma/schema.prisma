@@ -133,6 +133,7 @@ model User {
   financeEntries FinanceEntry[]
   budgets        Budget[]
   goals            Goal[]
+  dayNotes         DayNote[]
   longPositions  LongPosition[]
   learning       LearningEntry[]
   syncLogs       SyncLog[]
@@ -510,6 +511,38 @@ enum FinanceType {
 /// Deliberately a day rather than an instant. This is a checklist for a week, and "Tuesday"
 /// is the answer a person gives when asked when something should happen — a time of day would
 /// be a field nobody fills in and a false precision in every statistic built on it.
+/// A line about one day: what happened, why the list looks the way it does.
+///
+/// Deliberately not a `Goal` with a flag. The week's figures are built by counting goals, so a
+/// note carrying that shape would be counted — every day somebody wrote a sentence on would
+/// read as a day with an unkept goal, and the measure would punish writing things down.
+///
+/// One per day per member, which is what makes it a note on the day rather than a feed. The
+/// unique is enforced two ways for the same reason the budgets' is: Postgres treats NULLs as
+/// distinct, so a household of one needs a partial index to get the same rule.
+model DayNote {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+
+  /// Whose day. Null in a household of one, like every other owned row.
+  owner String?
+
+  /// The day it is about. A calendar date, stored as one.
+  day DateTime @db.Date
+
+  body String
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, owner, day])
+  @@index([userId, day])
+  @@map("day_notes")
+}
+
 model Goal {
   id String @id @default(cuid())
 

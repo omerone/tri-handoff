@@ -25,6 +25,7 @@ test.afterAll(async () => {
   const prisma = new PrismaClient();
   try {
     await prisma.goal.deleteMany({ where: { title: { startsWith: PREFIX } } });
+    await prisma.dayNote.deleteMany({ where: { body: { startsWith: PREFIX } } });
   } finally {
     await prisma.$disconnect();
   }
@@ -143,6 +144,66 @@ test.describe('the week’s checklist', () => {
     // And it stays open, so a second goal for the same day is one field away rather than four
     // clicks: this is written in runs.
     await expect(dayCard(page, '2026-01-07').locator('input[name="title"]')).toBeVisible();
+  });
+
+
+  test('takes a note on a day without counting it as a goal', async ({ page }) => {
+    /*
+     * The line this feature had to not cross.
+     *
+     * The week's figures are counted out of the checklist, so a note carrying a goal's shape
+     * would be counted with them — and every day somebody wrote a sentence on would read as a
+     * day with something left undone. A tool that quietly marks you down for writing things
+     * down is worse than one with no notes at all, which is why the figures are read before
+     * and after and have to be identical.
+     */
+    const note = `${PREFIX} market closed early`;
+    await page.goto(`/goals?week=${PAST_WEEK}`);
+
+    const before = {
+      kept: await tile(page, 'Kept').innerText(),
+      missed: await tile(page, 'Missed').innerText(),
+      planned: await tile(page, 'Planned').innerText(),
+    };
+
+    const card = dayCard(page, '2026-01-08');
+    await card.getByRole('button', { name: 'Note', exact: true }).click();
+    await card.locator('textarea[name="body"]').fill(note);
+    await card.getByRole('button', { name: 'Save', exact: true }).click();
+
+    await expect(card).toContainText(note);
+    expect(await tile(page, 'Kept').innerText()).toBe(before.kept);
+    expect(await tile(page, 'Missed').innerText()).toBe(before.missed);
+    expect(await tile(page, 'Planned').innerText()).toBe(before.planned);
+
+    // It is still there on the way back, rather than only looking written.
+    await page.reload();
+    await expect(dayCard(page, '2026-01-08')).toContainText(note);
+
+    // And it belongs to its own day, not to the week.
+    await expect(dayCard(page, '2026-01-07')).not.toContainText(note);
+  });
+
+  test('removes the note when the field is emptied', async ({ page }) => {
+    // The only gesture there is: clearing the field. A second control for the same act is a
+    // second thing to find, and an empty note stored as a row is a note to every query that
+    // counts them and to nobody reading the screen.
+    const note = `${PREFIX} written then withdrawn`;
+    await page.goto(`/goals?week=${PAST_WEEK}`);
+
+    const card = dayCard(page, '2026-01-09');
+    await card.getByRole('button', { name: 'Note', exact: true }).click();
+    await card.locator('textarea[name="body"]').fill(note);
+    await card.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(card).toContainText(note);
+
+    await card.getByRole('button', { name: 'Note on the day' }).click();
+    await card.locator('textarea[name="body"]').fill('');
+    await card.getByRole('button', { name: 'Save', exact: true }).click();
+
+    await expect(card).not.toContainText(note);
+    await page.reload();
+    await expect(dayCard(page, '2026-01-09')).not.toContainText(note);
   });
 
   test('steps between weeks and back to this one', async ({ page }) => {

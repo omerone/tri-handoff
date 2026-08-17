@@ -30,6 +30,7 @@ export * from './snapshots';
 export * from './finance';
 export * from './budgets';
 export * from './goals';
+export * from './day-notes';
 export * from './learning';
 export * from './long-positions';
 export * from './fx';

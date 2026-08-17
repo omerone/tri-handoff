@@ -809,7 +809,11 @@
     "plannedSub": "The whole week, including what is still ahead",
     "trend": "Trend",
     "trendInfo": "How much of each of the last six weeks was kept. Every week is scored only against the days that have arrived, so the current one does not look bad for being half over. A week with nothing written shows a dash rather than a zero — not writing is not failing.",
-    "trendEmpty": "Not enough weeks yet to show a trend."
+    "trendEmpty": "Not enough weeks yet to show a trend.",
+    "noteAdd": "Note",
+    "noteEdit": "Note on the day",
+    "notePlaceholder": "What happened, and what is worth remembering from it",
+    "noteClearHint": "Clearing the field removes the note"
   },
   "charts": {
     "empty": "Nothing to show in this range.",

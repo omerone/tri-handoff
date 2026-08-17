@@ -4,7 +4,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { Card } from '@/components/ui/card';
 import { EmptyState, KPI, Num } from '@/components/ui/kpi';
 import { requireSession } from '@/lib/auth/session';
-import { listGoals } from '@/lib/db';
+import { listDayNotes, listGoals } from '@/lib/db';
 import { currentMember } from '@/lib/preferences/brother';
 import { LOCALE_DIR, type Locale } from '@/i18n/config';
 import {
@@ -18,7 +18,7 @@ import {
 import { formatPercent } from '@/lib/money/currency';
 import { formatWeekdayDate, isoToDayMonth, parseIsoDate } from '@/lib/time/format';
 import { wallClock } from '@/lib/time/zone';
-import { DayAdd, GoalRow } from './goal-form';
+import { DayAdd, DayNote, GoalRow } from './goal-form';
 
 /** How many weeks of history the trend reads. Six is a month and a half — long enough to be a
  *  trend, short enough that every bar is a week the person remembers. */
@@ -65,6 +65,9 @@ export default async function GoalsPage({
    */
   const trendStart = shiftWeeks(start, -(TREND_WEEKS - 1));
   const goals = await listGoals(session.ctx, brother, trendStart, end);
+  /* Only the week on screen: a note is context for the days being looked at, and the trend
+     behind them counts goals, which notes deliberately are not. */
+  const notes = await listDayNotes(session.ctx, brother, start, end);
 
   const plan = planWeek(days, goals);
   const progress = weekProgress(plan, today);
@@ -78,6 +81,15 @@ export default async function GoalsPage({
     value: day,
     label: formatWeekdayDate(parseIsoDate(day)!, locale),
   }));
+  const noteLabels = {
+    add: t('noteAdd'),
+    edit: t('noteEdit'),
+    placeholder: t('notePlaceholder'),
+    save: t('save'),
+    cancel: t('cancel'),
+    clearHint: t('noteClearHint'),
+  };
+
   const addLabels = {
     add: t('add'),
     placeholder: t('goalPlaceholder'),
@@ -207,6 +219,15 @@ export default async function GoalsPage({
                     {/* Every day, whether or not it holds anything: the button is how a goal
                         is written, so a day without one is a day you cannot write to. */}
                     <DayAdd owner={brother} day={day.date} labels={addLabels} />
+
+                    {/* Under the list rather than in it: a note is about the day, not another
+                        thing to tick, and the figures above are counted off the ticks. */}
+                    <DayNote
+                      owner={brother}
+                      day={day.date}
+                      body={notes.get(day.date) ?? ''}
+                      labels={noteLabels}
+                    />
                   </section>
                 );
               })}
